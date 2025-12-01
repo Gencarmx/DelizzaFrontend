@@ -1,11 +1,11 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import appLogo from '/favicon.svg'
-import PWABadge from './PWABadge.tsx'
-import './App.css'
+import { useState } from "react";
+import reactLogo from "@assets/images/react.svg";
+import appLogo from "/favicon.svg";
+import  PWABadge  from "@presentation/components/common/PWABadge";
+import "./Home.css";
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function Home() {
+  const [count, setCount] = useState(0);
 
   return (
     <>
@@ -31,7 +31,5 @@ function App() {
       </p>
       <PWABadge />
     </>
-  )
+  );
 }
-
-export default App
