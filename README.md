@@ -69,6 +69,27 @@ import { apiClient } from "@infrastructure/api/http/client";
 import { formatDate } from "@shared/utils/formatters";
 ```
 
+### Patrón de Barril (Barrel Exports)
+
+El proyecto utiliza el patrón de **Barrel Exports** para organizar y simplificar las importaciones. Cada directorio de componente o módulo principal contiene un archivo `index.ts` que re-exporta los miembros públicos.
+
+Ejemplo:
+
+```typescript
+// src/presentation/components/common/PWABadge/index.ts
+export { default } from "./PWABadge";
+```
+
+Esto permite importar componentes de manera más limpia:
+
+```typescript
+// Importación limpia
+import PWABadge from "@presentation/components/common/PWABadge";
+
+// En lugar de
+import PWABadge from "@presentation/components/common/PWABadge/PWABadge";
+```
+
 ## 🚀 Instalación
 
 ### Requisitos Previos
