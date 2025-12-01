@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import reactLogo from "@assets/images/react.svg";
 import appLogo from "/favicon.svg";
-import  PWABadge  from "@presentation/components/common/PWABadge";
+import PWABadge from "@presentation/components/common/PWABadge";
 import "./Home.css";
 
 export default function Home() {
@@ -29,6 +30,19 @@ export default function Home() {
       <p className="read-the-docs">
         Click on the Vite and React logos to learn more
       </p>
+      <nav
+        style={{
+          marginTop: "2rem",
+          display: "flex",
+          gap: "1rem",
+          justifyContent: "center",
+        }}
+      >
+        <Link to="/">Home</Link>
+        <Link to="/about">About</Link>
+        <Link to="/user/123">User Profile</Link>
+        <Link to="/products">Products</Link>
+      </nav>
       <PWABadge />
     </>
   );
