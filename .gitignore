@@ -25,3 +25,22 @@ dev-dist
 *.sln
 *.sw?
 
+# Next.js (legacy)
+/.next/
+/out/
+
+# Production
+/build
+
+# Misc
+*.pem
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Testing
+/coverage
