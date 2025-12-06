@@ -1,0 +1,121 @@
+.location-modal {
+  max-width: 480px;
+  max-height: 80vh;
+}
+
+.location-modal-body {
+  padding: 24px;
+}
+
+.search-container {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #757575;
+}
+
+.search-input {
+  width: 100%;
+  padding: 14px 16px 14px 48px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 15px;
+  color: #212121;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #fdd835;
+}
+
+.current-location-section,
+.saved-locations-section {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #212121;
+  margin-bottom: 12px;
+}
+
+.location-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #f5f5f5;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  transition: all 0.2s;
+}
+
+.location-card.current {
+  background: #fffbea;
+  border: 2px solid #fdd835;
+}
+
+.location-card:hover {
+  background: #eeeeee;
+}
+
+.location-card.current:hover {
+  background: #fffbea;
+}
+
+.location-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #212121;
+  flex-shrink: 0;
+}
+
+.location-info {
+  flex: 1;
+}
+
+.location-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #212121;
+  margin-bottom: 4px;
+}
+
+.location-address {
+  font-size: 13px;
+  color: #757575;
+}
+
+.edit-btn {
+  background: none;
+  border: none;
+  color: #212121;
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s;
+}
+
+.edit-btn:hover {
+  opacity: 0.7;
+}
+
+.locations-list {
+  max-height: 300px;
+  overflow-y: auto;
+}

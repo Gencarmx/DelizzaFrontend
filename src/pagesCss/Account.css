@@ -1,0 +1,132 @@
+.account-page {
+  min-height: 100vh;
+  background-color: #fafafa;
+  padding-bottom: 80px;
+}
+
+.account-header {
+  background: white;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.account-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #212121;
+  text-align: center;
+}
+
+.account-content {
+  padding: 20px;
+}
+
+.user-profile {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.user-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fdd835 0%, #f9ca24 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.user-info {
+  flex: 1;
+}
+
+.user-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #212121;
+  margin-bottom: 4px;
+}
+
+.user-email {
+  font-size: 14px;
+  color: #757575;
+}
+
+.menu-list {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border: none;
+  background: white;
+  cursor: pointer;
+  transition: background 0.2s;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-item:hover {
+  background: #fafafa;
+}
+
+.menu-item-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.menu-item-left svg {
+  color: #757575;
+}
+
+.menu-item-left span {
+  font-size: 15px;
+  color: #212121;
+}
+
+.menu-item svg:last-child {
+  color: #bdbdbd;
+}
+
+.logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  background: #ff3d00;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(255, 61, 0, 0.2);
+}
+
+.logout-btn:hover {
+  background: #e63900;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 61, 0, 0.3);
+}

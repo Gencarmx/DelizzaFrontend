@@ -1,0 +1,103 @@
+.payment-methods-page {
+  min-height: 100vh;
+  background-color: #fafafa;
+}
+
+.payment-content {
+  padding: 20px;
+}
+
+.add-payment-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  background: white;
+  border: 2px dashed #fdd835;
+  border-radius: 12px;
+  color: #fdd835;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 20px;
+}
+
+.add-payment-btn:hover {
+  background: #fffbea;
+}
+
+.payment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.payment-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.payment-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #4c4cff 0%, #3737d8 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.payment-info {
+  flex: 1;
+}
+
+.payment-type {
+  font-size: 15px;
+  font-weight: 700;
+  color: #212121;
+  margin-bottom: 4px;
+}
+
+.payment-number {
+  font-size: 13px;
+  color: #757575;
+  margin-bottom: 6px;
+}
+
+.default-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #fdd835;
+  color: white;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.delete-payment-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: #ffebee;
+  color: #f44336;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delete-payment-btn:hover {
+  transform: scale(1.1);
+}

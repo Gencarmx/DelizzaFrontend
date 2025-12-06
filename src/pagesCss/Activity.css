@@ -1,0 +1,136 @@
+.activity-page {
+  min-height: 100vh;
+  background-color: #fafafa;
+  padding-bottom: 80px;
+}
+
+.activity-header {
+  background: white;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.activity-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #212121;
+  text-align: center;
+}
+
+.activity-content {
+  padding: 20px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #212121;
+  margin-bottom: 16px;
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.order-card {
+  background: white;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.order-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.order-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-text {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.status-text.delivered {
+  color: #4caf50;
+}
+
+.status-text.in-progress {
+  color: #fdd835;
+}
+
+.status-text.pending {
+  color: #2196f3;
+}
+
+.status-text.cancelled {
+  color: #f44336;
+}
+
+.order-date {
+  font-size: 12px;
+  color: #757575;
+}
+
+.order-restaurant {
+  font-size: 16px;
+  font-weight: 600;
+  color: #212121;
+  margin-bottom: 8px;
+}
+
+.order-items {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px 0;
+}
+
+.order-items li {
+  font-size: 14px;
+  color: #757575;
+  margin-bottom: 4px;
+}
+
+.order-items li::before {
+  content: "• ";
+  margin-right: 6px;
+}
+
+.order-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.order-total {
+  font-size: 16px;
+  font-weight: 700;
+  color: #212121;
+}
+
+.reorder-btn {
+  background: #fdd835;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reorder-btn:hover {
+  background: #f9ca24;
+  transform: translateY(-1px);
+}

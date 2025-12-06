@@ -1,0 +1,13 @@
+.app-container {
+  min-height: 100vh;
+  background-color: #fafafa;
+}
+
+/* Global mobile-first styles */
+@media (min-width: 768px) {
+  .app-container {
+    max-width: 480px;
+    margin: 0 auto;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  }
+}

@@ -1,0 +1,50 @@
+.account-favorites-page {
+  min-height: 100vh;
+  background-color: #fafafa;
+}
+
+.favorites-tabs {
+  display: flex;
+  gap: 12px;
+  padding: 20px;
+  background: white;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 24px;
+  border: 1px solid #e0e0e0;
+  background: white;
+  color: #757575;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn.active {
+  background: #fdd835;
+  color: white;
+  border-color: #fdd835;
+}
+
+.favorites-content {
+  padding: 20px;
+}
+
+.favorites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.empty-state p {
+  font-size: 16px;
+  color: #757575;
+}
