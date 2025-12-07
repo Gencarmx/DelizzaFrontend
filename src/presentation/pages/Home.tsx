@@ -1,81 +1,33 @@
-import { useState } from "react";
-import { Link } from "react-router";
-import reactLogo from "@assets/images/react.svg";
-import appLogo from "/favicon.svg";
-import PWABadge from "@presentation/components/common/PWABadge";
-
 export default function Home() {
-  const [count, setCount] = useState(0);
-
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center max-w-7xl mx-auto">
-      <div className="flex justify-center gap-8 mb-8">
-        <a href="https://vite.dev" target="_blank" rel="noopener noreferrer">
-          <img
-            src={appLogo}
-            className="h-24 md:h-32 p-4 transition-all duration-300 hover:drop-shadow-[0_0_2em_#646cffaa] will-change-[filter]"
-            alt="dlizza-frontend logo"
-          />
-        </a>
-        <a href="https://react.dev" target="_blank" rel="noopener noreferrer">
-          <img
-            src={reactLogo}
-            className="h-24 md:h-32 p-4 transition-all duration-300 hover:drop-shadow-[0_0_2em_#61dafbaa] motion-safe:animate-[spin_20s_linear_infinite] will-change-[filter]"
-            alt="React logo"
-          />
-        </a>
-      </div>
+    <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+      <div className="text-center">
+        <div className="mb-8">
+          <div className="inline-flex items-center justify-center w-24 h-24 bg-linear-to-br from-yellow-400 to-yellow-500 rounded-full shadow-xl mb-6">
+            <svg
+              className="w-12 h-12 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
+              />
+            </svg>
+          </div>
+        </div>
 
-      <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-8">
-        dlizza-frontend
-      </h1>
+        <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-4">
+          Bienvenido a <span className="text-yellow-500">Dlizza</span>
+        </h1>
 
-      <div className="mb-8">
-        <button
-          onClick={() => setCount((count) => count + 1)}
-          className="px-6 py-3 rounded-lg border border-transparent bg-[#1a1a1a] font-medium cursor-pointer transition-colors duration-300 hover:border-[#646cff] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#646cff]"
-        >
-          count is {count}
-        </button>
-        <p className="mt-4 text-sm md:text-base">
-          Edit{" "}
-          <code className="bg-[#1a1a1a] px-2 py-1 rounded">src/App.tsx</code>{" "}
-          and save to test HMR
+        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          Tu plataforma de confianza para gestionar tus pedidos
         </p>
       </div>
-
-      <p className="text-gray-400 mb-8 text-sm md:text-base">
-        Click on the Vite and React logos to learn more
-      </p>
-
-      <nav className="flex flex-wrap gap-4 justify-center">
-        <Link
-          to="/"
-          className="text-[#646cff] hover:text-[#535bf2] font-medium no-underline transition-colors"
-        >
-          Home
-        </Link>
-        <Link
-          to="/about"
-          className="text-[#646cff] hover:text-[#535bf2] font-medium no-underline transition-colors"
-        >
-          About
-        </Link>
-        <Link
-          to="/user/123"
-          className="text-[#646cff] hover:text-[#535bf2] font-medium no-underline transition-colors"
-        >
-          User Profile
-        </Link>
-        <Link
-          to="/products"
-          className="text-[#646cff] hover:text-[#535bf2] font-medium no-underline transition-colors"
-        >
-          Products
-        </Link>
-      </nav>
-
-      <PWABadge />
     </div>
   );
 }
