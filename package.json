@@ -6,12 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "gen-types": "supabase gen types typescript --project-id czaiyunauxgfvdmvqxsw > src/core/supabase/types.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "generate-pwa-icons": "pwa-assets-generator"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.89.0",
     "@tailwindcss/vite": "^4.1.17",
+    "axios": "^1.13.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router": "^7.9.6",
@@ -29,6 +32,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.23",
     "globals": "^16.4.0",
+    "supabase": "^2.70.4",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.45.0",
     "vite": "^7.1.9",
