@@ -9,8 +9,18 @@ import NotFound from "@presentation/pages/NotFound";
 import Favorites from "@presentation/pages/Favorites";
 import Activity from "@presentation/pages/Activity";
 import Account from "@presentation/pages/Account";
+import Login from "@presentation/pages/Login";
+import Register from "@presentation/pages/Register";
 
 export const routes: RouteObject[] = [
+  {
+    path: "/login",
+    element: <Login />,
+  },
+  {
+    path: "/register",
+    element: <Register />,
+  },
   {
     path: "/",
     element: <RootLayout />,
