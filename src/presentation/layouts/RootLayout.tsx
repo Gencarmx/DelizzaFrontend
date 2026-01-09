@@ -1,9 +1,5 @@
-import { Outlet } from "react-router";
+import { MainLayout } from "../components/layout/MainLayout";
 
 export default function RootLayout() {
-  return (
-    <div className="app-container">
-      <Outlet />
-    </div>
-  );
+  return <MainLayout />;
 }
