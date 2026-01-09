@@ -6,6 +6,9 @@ import UserProfile from "@presentation/pages/UserProfile";
 import Products from "@presentation/pages/Products";
 import { productsLoader } from "@core/router/loaders/productsLoader";
 import NotFound from "@presentation/pages/NotFound";
+import Favorites from "@presentation/pages/Favorites";
+import Activity from "@presentation/pages/Activity";
+import Account from "@presentation/pages/Account";
 
 export const routes: RouteObject[] = [
   {
@@ -19,6 +22,18 @@ export const routes: RouteObject[] = [
       {
         path: "about",
         element: <About />,
+      },
+      {
+        path: "favorites",
+        element: <Favorites />,
+      },
+      {
+        path: "activity",
+        element: <Activity />,
+      },
+      {
+        path: "account",
+        element: <Account />,
       },
       {
         path: "user/:userId",
