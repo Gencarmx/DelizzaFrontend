@@ -8,15 +8,16 @@ import {
   LogOut,
   ChevronRight,
 } from "lucide-react";
+import { Link } from "react-router";
 
 export default function Account() {
   const menuItems = [
-    { icon: User, label: "Editar perfil" },
-    { icon: MapPin, label: "Direcciones guardadas" },
-    { icon: CreditCard, label: "Métodos de pago" },
-    { icon: Heart, label: "Favoritos" },
-    { icon: Bell, label: "Notificaciones" },
-    { icon: Settings, label: "Configuración" },
+    { icon: User, label: "Editar perfil", path: "/edit-profile" },
+    { icon: MapPin, label: "Direcciones guardadas", path: "/saved-addresses" },
+    { icon: CreditCard, label: "Métodos de pago", path: "/payment-methods" },
+    { icon: Heart, label: "Favoritos", path: "/favorites" },
+    { icon: Bell, label: "Notificaciones", path: "/notifications" },
+    { icon: Settings, label: "Configuración", path: "/settings" },
   ];
 
   return (
@@ -40,8 +41,9 @@ export default function Account() {
         {/* Menu Items */}
         <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 overflow-hidden">
           {menuItems.map((item, index) => (
-            <button
+            <Link
               key={index}
+              to={item.path}
               className={`w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors ${
                 index !== menuItems.length - 1 ? "border-b border-gray-100" : ""
               }`}
@@ -56,7 +58,7 @@ export default function Account() {
                 </span>
               </div>
               <ChevronRight className="w-4 h-4 text-gray-400" />
-            </button>
+            </Link>
           ))}
         </div>
 

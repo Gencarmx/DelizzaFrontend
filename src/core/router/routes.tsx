@@ -11,6 +11,11 @@ import Activity from "@presentation/pages/Activity";
 import Account from "@presentation/pages/Account";
 import Login from "@presentation/pages/Login";
 import Register from "@presentation/pages/Register";
+import Notifications from "@presentation/pages/Notifications";
+import Settings from "@presentation/pages/Settings";
+import PaymentMethods from "@presentation/pages/PaymentMethods";
+import EditProfile from "@presentation/pages/EditProfile";
+import SavedAddresses from "@presentation/pages/SavedAddresses";
 
 export const routes: RouteObject[] = [
   {
@@ -44,6 +49,26 @@ export const routes: RouteObject[] = [
       {
         path: "account",
         element: <Account />,
+      },
+      {
+        path: "notifications",
+        element: <Notifications />,
+      },
+      {
+        path: "settings",
+        element: <Settings />,
+      },
+      {
+        path: "payment-methods",
+        element: <PaymentMethods />,
+      },
+      {
+        path: "edit-profile",
+        element: <EditProfile />,
+      },
+      {
+        path: "saved-addresses",
+        element: <SavedAddresses />,
       },
       {
         path: "user/:userId",
