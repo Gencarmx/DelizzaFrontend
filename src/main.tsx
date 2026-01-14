@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { routes } from "@core/router/routes";
-import { AuthProvider } from "@core/context/AuthContext";
+import { AuthProvider, CartProvider } from "@core/context";
 import "@presentation/styles/global.css";
 
 const router = createBrowserRouter(routes);
@@ -10,7 +10,9 @@ const router = createBrowserRouter(routes);
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>
-      <RouterProvider router={router} />
+      <CartProvider>
+        <RouterProvider router={router} />
+      </CartProvider>
     </AuthProvider>
   </StrictMode>
 );

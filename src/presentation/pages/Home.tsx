@@ -1,6 +1,32 @@
+import { useState } from "react";
 import { ChevronDown, Heart, Star, Clock } from "lucide-react";
+import ProductModal from "@presentation/components/common/ProductModal";
 
 export default function Home() {
+  const [selectedProduct, setSelectedProduct] = useState<{
+    id: string;
+    name: string;
+    price: number;
+    image: string;
+    restaurant?: string;
+    description?: string;
+  } | null>(null);
+
+  const handleProductClick = (product: {
+    id: string;
+    name: string;
+    price: number;
+    image: string;
+    restaurant?: string;
+    description?: string;
+  }) => {
+    setSelectedProduct(product);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedProduct(null);
+  };
+
   return (
     <div className="flex flex-col gap-6 pt-2">
       {/* Address Selector */}
@@ -51,25 +77,34 @@ export default function Home() {
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x hide-scrollbar">
           {[
             {
+              id: "fav-1",
               name: "Tio hamburguesas",
               rating: "4.3",
               delivery: "$30",
               time: "35 min",
+              price: 120,
+              restaurant: "Tio hamburguesas",
+              description: "Deliciosa hamburguesa clásica con queso, lechuga, tomate y nuestra salsa especial.",
               image:
                 "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YnVyZ2VyfGVufDB8fDB8fHww",
             },
             {
+              id: "fav-2",
               name: "Sushi roll",
               rating: "3",
               delivery: "$35",
               time: "40 min",
+              price: 180,
+              restaurant: "Sushi roll",
+              description: "Rollo de sushi fresco con salmón, aguacate y pepino envuelto en arroz y alga nori.",
               image:
                 "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NXx8c3VzaGl8ZW58MHx8MHx8fDA%3D",
             },
           ].map((item, index) => (
             <div
               key={index}
-              className="bg-white rounded-2xl p-3 min-w-[200px] shadow-sm border border-gray-100 flex flex-col gap-2 snap-start"
+              onClick={() => handleProductClick(item)}
+              className="bg-white rounded-2xl p-3 min-w-[200px] shadow-sm border border-gray-100 flex flex-col gap-2 snap-start cursor-pointer hover:shadow-md transition-shadow"
             >
               <div className="relative h-32 rounded-xl overflow-hidden bg-gray-100">
                 <img
@@ -111,25 +146,34 @@ export default function Home() {
         <div className="flex flex-col gap-4">
           {[
             {
+              id: "rest-1",
               name: "China food express",
               delivery: "$40",
               time: "25 min",
               rating: "4.8",
+              price: 150,
+              restaurant: "China food express",
+              description: "Delicioso platillo de comida china con vegetales frescos y salsa agridulce.",
               image:
                 "https://images.unsplash.com/photo-1525755662778-989d0524087e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y2hpbmVzZSUyMGZvb2R8ZW58MHx8MHx8fDA%3D",
             },
             {
+              id: "rest-2",
               name: "Kinich",
               delivery: "$37",
               time: "20 min",
               rating: "4.4",
+              price: 200,
+              restaurant: "Kinich",
+              description: "Platillo especial de la casa con ingredientes locales y sabor tradicional.",
               image:
                 "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8Zm9vZHxlbnwwfHwwfHx8MA%3D%3D",
             },
           ].map((item, index) => (
             <div
               key={index}
-              className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex gap-4"
+              onClick={() => handleProductClick(item)}
+              className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex gap-4 cursor-pointer hover:shadow-md transition-shadow"
             >
               <div className="w-20 h-20 bg-gray-100 rounded-xl flex-shrink-0 overflow-hidden">
                 <img
@@ -154,6 +198,15 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* Product Modal */}
+      {selectedProduct && (
+        <ProductModal
+          isOpen={!!selectedProduct}
+          onClose={handleCloseModal}
+          product={selectedProduct}
+        />
+      )}
     </div>
   );
 }

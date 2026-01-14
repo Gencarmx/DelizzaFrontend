@@ -16,6 +16,7 @@ import Settings from "@presentation/pages/Settings";
 import PaymentMethods from "@presentation/pages/PaymentMethods";
 import EditProfile from "@presentation/pages/EditProfile";
 import SavedAddresses from "@presentation/pages/SavedAddresses";
+import Cart from "@presentation/pages/Cart";
 
 export const routes: RouteObject[] = [
   {
@@ -69,6 +70,10 @@ export const routes: RouteObject[] = [
       {
         path: "saved-addresses",
         element: <SavedAddresses />,
+      },
+      {
+        path: "cart",
+        element: <Cart />,
       },
       {
         path: "user/:userId",
