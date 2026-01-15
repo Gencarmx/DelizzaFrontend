@@ -1,5 +1,6 @@
 import type { RouteObject } from "react-router";
 import RootLayout from "@presentation/layouts/RootLayout";
+import RestaurantLayout from "@presentation/layouts/RestaurantLayout";
 import Home from "@presentation/pages/Home";
 import About from "@presentation/pages/About";
 import UserProfile from "@presentation/pages/UserProfile";
@@ -17,6 +18,12 @@ import PaymentMethods from "@presentation/pages/PaymentMethods";
 import EditProfile from "@presentation/pages/EditProfile";
 import SavedAddresses from "@presentation/pages/SavedAddresses";
 import Cart from "@presentation/pages/Cart";
+import {
+  Dashboard,
+  ProductList,
+  ProductAdd,
+  ProductEdit,
+} from "@presentation/pages/restaurantUI";
 
 export const routes: RouteObject[] = [
   {
@@ -86,6 +93,36 @@ export const routes: RouteObject[] = [
       },
       {
         path: "*",
+        element: <NotFound />,
+      },
+    ],
+  },
+  {
+    path: "/restaurant",
+    element: <RestaurantLayout />,
+    children: [
+      {
+        path: "dashboard",
+        element: <Dashboard />,
+      },
+      {
+        path: "products",
+        element: <ProductList />,
+      },
+      {
+        path: "products/add",
+        element: <ProductAdd />,
+      },
+      {
+        path: "products/edit/:productId",
+        element: <ProductEdit />,
+      },
+      {
+        path: "orders",
+        element: <NotFound />,
+      },
+      {
+        path: "settings",
         element: <NotFound />,
       },
     ],
