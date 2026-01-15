@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      business_hours: {
+        Row: {
+          active: boolean
+          business_id: string
+          close_time: string
+          created_at: string
+          day_of_week: number
+          id: string
+          open_time: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          business_id: string
+          close_time: string
+          created_at?: string
+          day_of_week: number
+          id: string
+          open_time: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          business_id?: string
+          close_time?: string
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          open_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_business_hours_business"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       businesses: {
         Row: {
           active: boolean | null
@@ -50,7 +91,7 @@ export type Database = {
             foreignKeyName: "businesses_owner_id_fkey"
             columns: ["owner_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -101,14 +142,14 @@ export type Database = {
             foreignKeyName: "collaborators_invited_by_fkey"
             columns: ["invited_by"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "collaborators_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -206,7 +247,7 @@ export type Database = {
             foreignKeyName: "orders_assigned_driver_id_fkey"
             columns: ["assigned_driver_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -220,7 +261,7 @@ export type Database = {
             foreignKeyName: "orders_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -346,33 +387,33 @@ export type Database = {
           },
         ]
       }
-      users: {
+      profiles: {
         Row: {
           active: boolean | null
           created_at: string | null
+          full_name: string | null
           id: string
-          name: string | null
-          password_hash: string
           phone_number: string
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           active?: boolean | null
           created_at?: string | null
+          full_name?: string | null
           id?: string
-          name?: string | null
-          password_hash: string
           phone_number: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           active?: boolean | null
           created_at?: string | null
+          full_name?: string | null
           id?: string
-          name?: string | null
-          password_hash?: string
           phone_number?: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -381,7 +422,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_top_businesses_with_products: {
+        Args: {
+          p_current_time: string
+          p_day_of_week: number
+          p_limit?: number
+          p_products_per_business?: number
+        }
+        Returns: {
+          address: string
+          business_id: string
+          business_name: string
+          logo_url: string
+          products: Json
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
