@@ -23,6 +23,7 @@ import {
   ProductList,
   ProductAdd,
   ProductEdit,
+  Orders,
 } from "@presentation/pages/restaurantUI";
 
 export const routes: RouteObject[] = [
@@ -119,11 +120,11 @@ export const routes: RouteObject[] = [
       },
       {
         path: "orders",
-        element: <NotFound />,
+        element: <Orders />,
       },
       {
         path: "settings",
-        element: <NotFound />,
+        element: <Settings />,
       },
     ],
   },

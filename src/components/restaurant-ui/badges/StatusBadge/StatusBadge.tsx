@@ -1,5 +1,11 @@
 export interface StatusBadgeProps {
-  status: "active" | "inactive" | "pending" | "completed" | "cancelled";
+  status:
+    | "active"
+    | "inactive"
+    | "pending"
+    | "completed"
+    | "cancelled"
+    | "in_progress";
   label?: string;
 }
 
@@ -29,6 +35,11 @@ export default function StatusBadge({ status, label }: StatusBadgeProps) {
       bg: "bg-red-100",
       text: "text-red-700",
       label: label || "Cancelado",
+    },
+    in_progress: {
+      bg: "bg-blue-100",
+      text: "text-blue-700",
+      label: label || "En preparación",
     },
   };
 
