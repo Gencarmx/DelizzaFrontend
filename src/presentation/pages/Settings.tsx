@@ -7,9 +7,11 @@ import {
   Shield,
   HelpCircle,
   FileText,
-  Trash2,
+  LogOut,
+  Store,
+  Clock,
 } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 import { useState } from "react";
 
 type SettingItem = {
@@ -23,10 +25,30 @@ type SettingItem = {
 
 export default function Settings() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
+  const [active, setActive] = useState(true);
 
-  const settingsSections: { title: string; items: SettingItem[] }[] = [
+  // Determine context based on URL
+  const isRestaurant = location.pathname.includes("/restaurant");
+
+  const commonSections: { title: string; items: SettingItem[] }[] = [
+    {
+      title: "Cuenta",
+      items: [
+        {
+          icon: LogOut,
+          label: "Cerrar sesión",
+          type: "link",
+          danger: true,
+          // In a real app, this would trigger signOut()
+        },
+      ],
+    },
+  ];
+
+  const clientSections: { title: string; items: SettingItem[] }[] = [
     {
       title: "Preferencias",
       items: [
@@ -77,17 +99,48 @@ export default function Settings() {
         },
       ],
     },
+  ];
+
+  const restaurantSections: { title: string; items: SettingItem[] }[] = [
     {
-      title: "Cuenta",
+      title: "Negocio",
       items: [
         {
-          icon: Trash2,
-          label: "Eliminar cuenta",
+          icon: Store,
+          label: "Estado del restaurante",
+          type: "toggle",
+          value: active,
+          onChange: setActive,
+        },
+        {
+          icon: Globe,
+          label: "Información del negocio",
           type: "link",
-          danger: true,
+        },
+        {
+          icon: Clock,
+          label: "Horarios de atención",
+          type: "link",
         },
       ],
     },
+    {
+      title: "Pedidos",
+      items: [
+        {
+          icon: Bell,
+          label: "Notificaciones de pedidos",
+          type: "toggle",
+          value: notificationsEnabled,
+          onChange: setNotificationsEnabled,
+        },
+      ],
+    },
+  ];
+
+  const settingsSections = [
+    ...(isRestaurant ? restaurantSections : clientSections),
+    ...commonSections,
   ];
 
   return (
@@ -100,7 +153,9 @@ export default function Settings() {
         >
           <ChevronLeft className="w-5 h-5 text-gray-700" />
         </button>
-        <h2 className="font-bold text-lg text-gray-900">Configuración</h2>
+        <h2 className="font-bold text-lg text-gray-900">
+          {isRestaurant ? "Configuración del Restaurante" : "Configuración"}
+        </h2>
       </div>
 
       {/* Settings Sections */}
@@ -142,9 +197,7 @@ export default function Settings() {
 
                   {item.type === "toggle" && (
                     <button
-                      onClick={() =>
-                        item.onChange?.(!(item.value as boolean))
-                      }
+                      onClick={() => item.onChange?.(!(item.value as boolean))}
                       className={`relative w-12 h-6 rounded-full transition-colors ${
                         item.value ? "bg-amber-400" : "bg-gray-300"
                       }`}

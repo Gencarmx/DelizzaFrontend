@@ -73,6 +73,7 @@ export default defineConfig({
       "@presentation": path.resolve(__dirname, "./src/presentation"),
       "@shared": path.resolve(__dirname, "./src/shared"),
       "@assets": path.resolve(__dirname, "./src/assets"),
+      "@components": path.resolve(__dirname, "./src/components"),
     },
   },
 });
