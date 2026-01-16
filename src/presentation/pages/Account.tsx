@@ -8,9 +8,12 @@ import {
   LogOut,
   ChevronRight,
 } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
+import { useAuth } from "@core/context/AuthContext";
 
 export default function Account() {
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const menuItems = [
     { icon: User, label: "Editar perfil", path: "/edit-profile" },
     { icon: MapPin, label: "Direcciones guardadas", path: "/saved-addresses" },
@@ -63,7 +66,13 @@ export default function Account() {
         </div>
 
         {/* Logout Button */}
-        <button className="w-full bg-[#FF3B30] text-white font-bold py-3.5 rounded-xl shadow-sm flex items-center justify-center gap-2 mt-4 cursor-pointer hover:bg-[#E6352B] transition-colors">
+        <button
+          onClick={async () => {
+            await signOut();
+            navigate("/login");
+          }}
+          className="w-full bg-[#FF3B30] text-white font-bold py-3.5 rounded-xl shadow-sm flex items-center justify-center gap-2 mt-4 cursor-pointer hover:bg-[#E6352B] transition-colors"
+        >
           <LogOut className="w-5 h-5" />
           <span>Cerrar sesión</span>
         </button>

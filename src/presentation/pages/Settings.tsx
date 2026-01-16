@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router";
 import { useState } from "react";
+import { useAuth } from "@core/context/AuthContext";
 
 type SettingItem = {
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
@@ -26,6 +27,7 @@ type SettingItem = {
 export default function Settings() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { signOut } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [active, setActive] = useState(true);
@@ -43,6 +45,10 @@ export default function Settings() {
           type: "link",
           danger: true,
           // In a real app, this would trigger signOut()
+          onChange: () => {
+            signOut();
+            navigate("/login");
+          },
         },
       ],
     },
@@ -169,7 +175,7 @@ export default function Settings() {
               {section.items.map((item, itemIndex) => (
                 <div
                   key={itemIndex}
-                  className={`flex items-center justify-between p-4 ${
+                  className={`relative flex items-center justify-between p-4 ${
                     itemIndex !== section.items.length - 1
                       ? "border-b border-gray-100"
                       : ""
@@ -219,6 +225,14 @@ export default function Settings() {
                       )}
                       <ChevronRight className="w-4 h-4 text-gray-400" />
                     </div>
+                  )}
+
+                  {/* Handle click for link items, especially logout which uses onChange */}
+                  {item.type === "link" && item.onChange && (
+                    <div
+                      className="absolute inset-0"
+                      onClick={() => item.onChange?.(true)}
+                    />
                   )}
                 </div>
               ))}

@@ -5,9 +5,17 @@ import type { User, Session, AuthError } from "@supabase/supabase-js";
 interface AuthContextType {
   user: User | null;
   session: Session | null;
+  role: "owner" | "client" | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: AuthError | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string
+  ) => Promise<{ error: AuthError | null }>;
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -16,22 +24,58 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [role, setRole] = useState<"owner" | "client" | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const fetchRole = async (userId: string) => {
+      try {
+        const { data } = await supabase
+          .from("collaborators")
+          .select("role")
+          .eq("user_id", userId)
+          .eq("role", "owner")
+          .single();
+
+        return data ? "owner" : "client";
+      } catch {
+        return "client";
+      }
+    };
+
+    const initializeAuth = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       setSession(session);
       setUser(session?.user ?? null);
-      setLoading(false);
-    });
 
-    // Listen for auth changes
+      if (session?.user) {
+        const userRole = await fetchRole(session.user.id);
+        setRole(userRole);
+      } else {
+        setRole(null);
+      }
+
+      setLoading(false);
+    };
+
+    initializeAuth();
+
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+
+      if (session?.user) {
+        const userRole = await fetchRole(session.user.id);
+        setRole(userRole);
+      } else {
+        setRole(null);
+      }
+
       setLoading(false);
     });
 
@@ -80,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     user,
     session,
+    role,
     loading,
     signUp,
     signIn,
