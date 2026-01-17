@@ -3,7 +3,7 @@ import {
   Bar,
   XAxis,
   YAxis,
-  CartesianGrid, 
+  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   Cell,
@@ -50,17 +50,20 @@ export default function ProductsBarChart({
                 fontSize: "12px",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
               }}
-              formatter={(value: number | undefined) => [`${value ?? 0} unidades`, "Vendidos"]}
+              formatter={(value: number | undefined) => [
+                `${value ?? 0} unidades`,
+                "Vendidos",
+              ]}
             />
-            <Bar 
-              dataKey="sales" 
+            <Bar
+              dataKey="sales"
               radius={[8, 8, 0, 0]}
               animationDuration={1500}
               animationEasing="ease-in-out"
             >
-              {data.map((entry, index) => (
-                <Cell 
-                  key={`cell-${index}`} 
+              {data.map((_, index) => (
+                <Cell
+                  key={`cell-${index}`}
                   fill={colors[index % colors.length]}
                   className="hover:opacity-80 transition-opacity cursor-pointer"
                 />
