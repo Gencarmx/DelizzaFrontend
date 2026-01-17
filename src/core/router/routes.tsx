@@ -3,20 +3,19 @@ import RootLayout from "@presentation/layouts/RootLayout";
 import RestaurantLayout from "@presentation/layouts/RestaurantLayout";
 import Home from "@presentation/pages/Home";
 import About from "@presentation/pages/About";
-import UserProfile from "@presentation/pages/UserProfile";
 import Products from "@presentation/pages/Products";
 import { productsLoader } from "@core/router/loaders/productsLoader";
 import NotFound from "@presentation/pages/NotFound";
 import Favorites from "@presentation/pages/Favorites";
 import Activity from "@presentation/pages/Activity";
-import Account from "@presentation/pages/Account";
-import Login from "@presentation/pages/Login";
-import Register from "@presentation/pages/Register";
-import Notifications from "@presentation/pages/Notifications";
-import Settings from "@presentation/pages/Settings";
-import PaymentMethods from "@presentation/pages/PaymentMethods";
-import EditProfile from "@presentation/pages/EditProfile";
-import SavedAddresses from "@presentation/pages/SavedAddresses";
+import { Login, Register } from "@presentation/pages/auth";
+import { Account, UserProfile, EditProfile } from "@presentation/pages/profile";
+import {
+  Settings,
+  PaymentMethods,
+  SavedAddresses,
+  Notifications,
+} from "@presentation/pages/settings";
 import Cart from "@presentation/pages/Cart";
 import {
   Dashboard,

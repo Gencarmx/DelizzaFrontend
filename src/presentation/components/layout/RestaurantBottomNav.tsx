@@ -23,15 +23,15 @@ export function RestaurantBottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-6 py-3 flex justify-between items-center z-50 pb-safe shadow-lg">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-6 py-3 flex justify-between items-center z-50 pb-safe shadow-lg">
       {navItems.map((item) => (
         <Link
           key={item.path}
           to={item.path}
           className={`flex flex-col items-center gap-1 transition-colors ${
             isActive(item.path)
-              ? "text-amber-600"
-              : "text-gray-400 hover:text-gray-600"
+              ? "text-amber-500"
+              : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
           }`}
         >
           <item.icon

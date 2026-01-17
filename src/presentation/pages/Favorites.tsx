@@ -33,7 +33,7 @@ export default function Favorites() {
 
   return (
     <div className="flex flex-col pt-2">
-      <h2 className="font-bold text-lg text-gray-900 mb-4 bg-white sticky top-0 z-10 py-2">
+      <h2 className="font-bold text-lg text-gray-900 dark:text-white mb-4 bg-white dark:bg-gray-800 sticky top-0 z-10 py-2">
         Favoritos
       </h2>
 
@@ -41,7 +41,7 @@ export default function Favorites() {
         {favorites.map((item) => (
           <div
             key={item.id}
-            className="bg-white rounded-3xl p-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col gap-2"
+            className="bg-white dark:bg-gray-800 rounded-3xl p-3 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700 flex flex-col gap-2"
           >
             <div className="relative h-32 rounded-2xl overflow-hidden bg-gray-100">
               <img
@@ -55,11 +55,11 @@ export default function Favorites() {
             </div>
 
             <div className="px-1">
-              <h4 className="font-semibold text-gray-800 text-sm truncate mb-1">
+              <h4 className="font-semibold text-gray-800 dark:text-white text-sm truncate mb-1">
                 {item.name}
               </h4>
-              <div className="flex items-center gap-2 text-[10px] text-gray-500 font-medium">
-                <span className="flex items-center gap-0.5 text-gray-800">
+              <div className="flex items-center gap-2 text-[10px] text-gray-500 dark:text-gray-400 font-medium">
+                <span className="flex items-center gap-0.5 text-gray-800 dark:text-white">
                   <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
                   <span className="mt-0.5">{item.rating}</span>
                 </span>

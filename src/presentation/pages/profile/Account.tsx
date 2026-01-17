@@ -22,42 +22,42 @@ export default function Account() {
 
   return (
     <div className="flex flex-col pt-2 pb-6">
-      <h2 className="font-bold text-lg text-gray-900 mb-4 bg-white sticky top-0 z-10 py-2">
+      <h2 className="font-bold text-lg text-gray-900 dark:text-white mb-4 bg-white dark:bg-gray-800 sticky top-0 z-10 py-2">
         Cuenta
       </h2>
 
       <div className="flex flex-col gap-6">
         {/* Profile Card */}
-        <div className="bg-white rounded-3xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 flex items-center gap-4">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700 flex items-center gap-4">
           <div className="w-16 h-16 bg-amber-300/80 rounded-full flex items-center justify-center text-gray-800">
             <User className="w-8 h-8" strokeWidth={1.5} />
           </div>
           <div>
-            <h3 className="font-bold text-gray-900 text-lg">Usuario</h3>
-            <p className="text-gray-500 text-sm">usuario@email.com</p>
+            <h3 className="font-bold text-gray-900 dark:text-white text-lg">Usuario</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">usuario@email.com</p>
           </div>
         </div>
 
         {/* Menu Items */}
-        <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700 overflow-hidden">
           {menuItems.map((item, index) => (
             <Link
               key={index}
               to={item.path}
-              className={`w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors ${
-                index !== menuItems.length - 1 ? "border-b border-gray-100" : ""
+              className={`w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                index !== menuItems.length - 1 ? "border-b border-gray-100 dark:border-gray-700" : ""
               }`}
             >
               <div className="flex items-center gap-3">
                 <item.icon
-                  className="w-5 h-5 text-gray-700"
+                  className="w-5 h-5 text-gray-700 dark:text-gray-200"
                   strokeWidth={1.5}
                 />
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
                   {item.label}
                 </span>
               </div>
-              <ChevronRight className="w-4 h-4 text-gray-400" />
+              <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500" />
             </Link>
           ))}
         </div>
