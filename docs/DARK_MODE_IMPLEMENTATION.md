@@ -74,7 +74,7 @@ ThemeContext manages:
     - theme state ('light' | 'dark' | 'system')
     - effectiveTheme ('light' | 'dark')
     - localStorage persistence
-    - system preference detection
+    - system preference detection 
     ↓
 Applies 'dark' class to <html> element
     ↓

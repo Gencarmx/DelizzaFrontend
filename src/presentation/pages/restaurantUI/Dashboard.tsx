@@ -162,10 +162,12 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
+    <div className="flex flex-col gap-6 animate-fade-in">
+      
+      <div className="animate-slide-down">
+        <h1 className="text-3xl font-bold text-amber-400 mb-2">
+          Dashboard
+        </h1>
         <p className="text-gray-600">
           Resumen de tu restaurante en tiempo real
         </p>
@@ -174,21 +176,49 @@ export default function Dashboard() {
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((metric, index) => (
-          <MetricCard key={index} {...metric} />
+          <div
+            key={index}
+            className="animate-slide-up"
+            style={{
+              animationDelay: `${index * 100}ms`,
+              animationFillMode: "backwards",
+            }}
+          >
+            <MetricCard {...metric} />
+          </div>
         ))}
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SalesLineChart data={salesData} title="Ventas de la semana" />
-        <ProductsBarChart
-          data={productsData}
-          title="Productos más vendidos"
-        />
+        <div
+          className="animate-slide-up"
+          style={{
+            animationDelay: "400ms",
+            animationFillMode: "backwards",
+          }}
+        >
+          <SalesLineChart data={salesData} title="Ventas de la semana" />
+        </div>
+        <div
+          className="animate-slide-up"
+          style={{
+            animationDelay: "500ms",
+            animationFillMode: "backwards",
+          }}
+        >
+          <ProductsBarChart
+            data={productsData}
+            title="Productos más vendidos"
+          />
+        </div>
       </div>
-
-      {/* Recent Orders */}
-      <div>
+      <div
+        className="animate-slide-up"
+        style={{
+          animationDelay: "600ms",
+          animationFillMode: "backwards",
+        }}
+      >
         <h2 className="text-xl font-bold text-gray-900 mb-4">
           Pedidos recientes
         </h2>

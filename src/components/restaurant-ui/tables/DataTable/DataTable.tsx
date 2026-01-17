@@ -5,7 +5,7 @@ export interface Column<T> {
   header: string;
   render?: (item: T) => ReactNode;
   width?: string;
-}
+} 
 
 export interface DataTableProps<T> {
   columns: Column<T>[];
@@ -21,11 +21,11 @@ export default function DataTable<T>({
   emptyMessage = "No hay datos disponibles",
 }: DataTableProps<T>) {
   return (
-    <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)] transition-shadow duration-300">
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
+          <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+            <tr> 
               {columns.map((column) => (
                 <th
                   key={column.key}
@@ -42,16 +42,20 @@ export default function DataTable<T>({
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-6 py-12 text-center text-gray-500"
+                  className="px-6 py-12 text-center text-gray-500 animate-fade-in"
                 >
                   {emptyMessage}
                 </td>
               </tr>
             ) : (
-              data.map((item) => (
+              data.map((item, index) => (
                 <tr
                   key={keyExtractor(item)}
-                  className="hover:bg-gray-50 transition-colors"
+                  className="hover:bg-gradient-to-r hover:from-amber-50 hover:to-transparent transition-all duration-200 cursor-pointer animate-slide-up"
+                  style={{
+                    animationDelay: `${index * 50}ms`,
+                    animationFillMode: "backwards",
+                  }}
                 >
                   {columns.map((column) => (
                     <td key={column.key} className="px-6 py-4 text-sm">
