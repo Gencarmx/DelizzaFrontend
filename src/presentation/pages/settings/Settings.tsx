@@ -12,7 +12,7 @@ import {
   Clock,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useTheme } from "@core/context";
 
 type SettingItem = {
