@@ -6,7 +6,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
 } from "recharts";
 
 export interface ProductData {
@@ -23,14 +22,10 @@ export default function ProductsBarChart({
   data,
   title,
 }: ProductsBarChartProps) {
-  const colors = ["#fbbf24", "#f59e0b", "#d97706", "#b45309", "#92400e"];
-
   return (
-    <div className="group bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)] hover:border-amber-100 transition-all duration-300">
+    <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100">
       {title && (
-        <h3 className="text-lg font-bold text-gray-900 mb-4 group-hover:text-amber-700 transition-colors">
-          {title}
-        </h3>
+        <h3 className="text-lg font-bold text-gray-900 mb-4">{title}</h3>
       )}
       <div className="animate-fade-in">
         <ResponsiveContainer width="100%" height={300}>
