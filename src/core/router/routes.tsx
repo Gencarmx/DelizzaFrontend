@@ -1,4 +1,5 @@
 import type { RouteObject } from "react-router";
+import { ProtectedRoute } from "@core/router/ProtectedRoute";
 import RootLayout from "@presentation/layouts/RootLayout";
 import RestaurantLayout from "@presentation/layouts/RestaurantLayout";
 import Home from "@presentation/pages/Home";
@@ -36,7 +37,11 @@ export const routes: RouteObject[] = [
   },
   {
     path: "/",
-    element: <RootLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={["client"]}>
+        <RootLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -99,7 +104,11 @@ export const routes: RouteObject[] = [
   },
   {
     path: "/restaurant",
-    element: <RestaurantLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={["owner"]}>
+        <RestaurantLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         path: "dashboard",
