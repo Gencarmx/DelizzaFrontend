@@ -1,6 +1,7 @@
 import {
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -17,6 +18,8 @@ export interface ProductsBarChartProps {
   data: ProductData[];
   title?: string;
 }
+
+const colors = ["#fbbf24", "#60a5fa", "#34d399", "#f87171", "#a78bfa"];
 
 export default function ProductsBarChart({
   data,
