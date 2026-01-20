@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { ChevronDown, Heart, Star, Clock } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ChevronDown, Heart, Star, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import ProductModal from "@presentation/components/common/ProductModal";
+import { supabase } from "@core/supabase/client";
 
 export default function Home() {
   const [selectedProduct, setSelectedProduct] = useState<{
@@ -11,6 +12,10 @@ export default function Home() {
     restaurant?: string;
     description?: string;
   } | null>(null);
+
+  const [favorites, setFavorites] = useState<any[]>([]);
+  const [restaurants, setRestaurants] = useState<any[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleProductClick = (product: {
     id: string;
@@ -25,6 +30,63 @@ export default function Home() {
 
   const handleCloseModal = () => {
     setSelectedProduct(null);
+  };
+
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*, businesses(name)')
+        .eq('active', true)
+        .limit(10);
+
+      if (error) {
+        console.error('Error fetching favorites:', error);
+      } else {
+        const mapped = data.map(p => ({
+          id: p.id,
+          name: p.name,
+          rating: "4.5",
+          delivery: "$30",
+          time: "30 min",
+          price: p.price,
+          restaurant: p.businesses?.name || "Unknown",
+          description: p.description || "",
+          image: p.image_url || "https://via.placeholder.com/200"
+        }));
+        setFavorites(mapped);
+      }
+    };
+
+    const fetchRestaurants = async () => {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('*');
+
+      if (error) {
+        console.error('Error fetching restaurants:', error);
+      } else {
+        const mapped = data.map(b => ({
+          id: b.id,
+          name: b.name,
+          address: b.address || "Dirección no disponible",
+          status: b.active ? "Abierto" : "Cerrado",
+          logo: b.logo_url || "https://via.placeholder.com/200"
+        }));
+        setRestaurants(mapped);
+      }
+    };
+
+    fetchFavorites();
+    fetchRestaurants();
+  }, []);
+
+  const scrollLeft = () => {
+    scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
+  };
+
+  const scrollRight = () => {
+    scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
   };
 
   return (
@@ -74,33 +136,12 @@ export default function Home() {
         <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-4">
           El favorito entre los locales
         </h3>
-        <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x hide-scrollbar">
-          {[
-            {
-              id: "fav-1",
-              name: "Tio hamburguesas",
-              rating: "4.3",
-              delivery: "$30",
-              time: "35 min",
-              price: 120,
-              restaurant: "Tio hamburguesas",
-              description: "Deliciosa hamburguesa clásica con queso, lechuga, tomate y nuestra salsa especial.",
-              image:
-                "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YnVyZ2VyfGVufDB8fDB8fHww",
-            },
-            {
-              id: "fav-2",
-              name: "Sushi roll",
-              rating: "3",
-              delivery: "$35",
-              time: "40 min",
-              price: 180,
-              restaurant: "Sushi roll",
-              description: "Rollo de sushi fresco con salmón, aguacate y pepino envuelto en arroz y alga nori.",
-              image:
-                "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NXx8c3VzaGl8ZW58MHx8MHx8fDA%3D",
-            },
-          ].map((item, index) => (
+        <div className="relative">
+          <button onClick={scrollLeft} className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 p-2 rounded-full shadow-md z-10 opacity-70 hover:opacity-100">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <div ref={scrollRef} className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x hide-scrollbar">
+            {favorites.map((item, index) => (
             <div
               key={index}
               onClick={() => handleProductClick(item)}
@@ -132,6 +173,10 @@ export default function Home() {
               </div>
             </div>
           ))}
+          </div>
+          <button onClick={scrollRight} className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 p-2 rounded-full shadow-md z-10 opacity-70 hover:opacity-100">
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </section>
 
@@ -144,40 +189,14 @@ export default function Home() {
           </button>
         </div>
         <div className="flex flex-col gap-4">
-          {[
-            {
-              id: "rest-1",
-              name: "China food express",
-              delivery: "$40",
-              time: "25 min",
-              rating: "4.8",
-              price: 150,
-              restaurant: "China food express",
-              description: "Delicioso platillo de comida china con vegetales frescos y salsa agridulce.",
-              image:
-                "https://images.unsplash.com/photo-1525755662778-989d0524087e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y2hpbmVzZSUyMGZvb2R8ZW58MHx8MHx8fDA%3D",
-            },
-            {
-              id: "rest-2",
-              name: "Kinich",
-              delivery: "$37",
-              time: "20 min",
-              rating: "4.4",
-              price: 200,
-              restaurant: "Kinich",
-              description: "Platillo especial de la casa con ingredientes locales y sabor tradicional.",
-              image:
-                "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8Zm9vZHxlbnwwfHwwfHx8MA%3D%3D",
-            },
-          ].map((item, index) => (
+          {restaurants.map((item, index) => (
             <div
               key={index}
-              onClick={() => handleProductClick(item)}
-              className="bg-white dark:bg-gray-800 p-3 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex gap-4 cursor-pointer hover:shadow-md transition-shadow"
+              className="bg-white dark:bg-gray-800 p-3 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex gap-4"
             >
               <div className="w-20 h-20 bg-gray-100 rounded-xl flex-shrink-0 overflow-hidden">
                 <img
-                  src={item.image}
+                  src={item.logo}
                   className="w-full h-full object-cover"
                   alt={item.name}
                 />
@@ -185,13 +204,8 @@ export default function Home() {
               <div className="flex-1 py-1">
                 <h4 className="font-semibold text-gray-800 dark:text-white">{item.name}</h4>
                 <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  <span>Envío: {item.delivery}</span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {item.time}
-                  </span>
-                  <span className="flex items-center gap-1 text-amber-500 font-medium">
-                    <Star className="w-3 h-3 fill-current" /> {item.rating}
-                  </span>
+                  <span>Dirección: {item.address}</span>
+                  <span>{item.status}</span>
                 </div>
               </div>
             </div>

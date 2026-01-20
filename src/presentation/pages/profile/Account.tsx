@@ -13,7 +13,7 @@ import { useAuth } from "@core/context/AuthContext";
 
 export default function Account() {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
 
   const menuItems = [
     { icon: User, label: "Editar perfil", path: "/edit-profile" },
@@ -37,8 +37,8 @@ export default function Account() {
             <User className="w-8 h-8" strokeWidth={1.5} />
           </div>
           <div>
-            <h3 className="font-bold text-gray-900 dark:text-white text-lg">Usuario</h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">usuario@email.com</p>
+            <h3 className="font-bold text-gray-900 dark:text-white text-lg">{user?.user_metadata?.full_name || 'Usuario'}</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">{user?.email || 'usuario@email.com'}</p>
           </div>
         </div>
 
