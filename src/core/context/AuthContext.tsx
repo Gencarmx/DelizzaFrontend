@@ -21,24 +21,91 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const ROLE_CACHE_KEY = "dlizza-role";
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<"owner" | "client" | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const getCachedRole = (userId: string): "owner" | "client" | null => {
+    try {
+      const cached = localStorage.getItem(`${ROLE_CACHE_KEY}-${userId}`);
+      return cached as "owner" | "client" | null;
+    } catch {
+      return null;
+    }
+  };
+
+  const setCachedRole = (userId: string, userRole: "owner" | "client") => {
+    try {
+      localStorage.setItem(`${ROLE_CACHE_KEY}-${userId}`, userRole);
+    } catch {
+      // Ignore localStorage errors
+    }
+  };
+
+  const clearRoleCache = (userId?: string) => {
+    try {
+      if (userId) {
+        localStorage.removeItem(`${ROLE_CACHE_KEY}-${userId}`);
+      } else {
+        // Clear all role caches
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith(ROLE_CACHE_KEY)) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  };
+
   useEffect(() => {
     const fetchRole = async (userId: string) => {
+      // Check cache first
+      const cachedRole = getCachedRole(userId);
+      if (cachedRole) {
+        return cachedRole;
+      }
+
       try {
-        const { data } = await supabase
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("Role fetch timeout")), 2000);
+        });
+
+        const queryPromise = supabase
           .from("collaborators")
           .select("role")
           .eq("user_id", userId)
           .eq("role", "owner")
           .single();
-        return data ? "owner" : "client";
-      } catch {
-        return "client";
+
+        const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
+
+        if (error) {
+          // If table doesn't exist or permission denied, assume client role
+          if (error.message?.includes("relation") || error.message?.includes("permission")) {
+            const defaultRole = "client" as const;
+            setCachedRole(userId, defaultRole);
+            return defaultRole;
+          }
+          const defaultRole = "client" as const;
+          setCachedRole(userId, defaultRole);
+          return defaultRole;
+        }
+
+        const userRole = data ? "owner" : "client";
+        setCachedRole(userId, userRole);
+        return userRole;
+      } catch (error: any) {
+        // If timeout or any other error, default to client
+        const defaultRole = "client" as const;
+        setCachedRole(userId, defaultRole);
+        return defaultRole;
       }
     };
 
@@ -112,6 +179,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    if (user?.id) {
+      clearRoleCache(user.id);
+    }
     await supabase.auth.signOut();
   };
 
