@@ -118,7 +118,7 @@ export default function Dashboard() {
       header: "ID Pedido",
       width: "120px",
       render: (order) => (
-        <span className="font-mono font-semibold text-gray-900">
+        <span className="font-mono font-semibold text-gray-900 dark:text-white">
           {order.id}
         </span>
       ),
@@ -127,14 +127,18 @@ export default function Dashboard() {
       key: "customer",
       header: "Cliente",
       render: (order) => (
-        <span className="font-medium text-gray-900">{order.customer}</span>
+        <span className="font-medium text-gray-900 dark:text-white">
+          {order.customer}
+        </span>
       ),
     },
     {
       key: "items",
       header: "Productos",
       render: (order) => (
-        <span className="text-gray-600 text-sm">{order.items}</span>
+        <span className="text-gray-600 dark:text-gray-400 text-sm">
+          {order.items}
+        </span>
       ),
     },
     {
@@ -142,7 +146,9 @@ export default function Dashboard() {
       header: "Total",
       width: "100px",
       render: (order) => (
-        <span className="font-bold text-gray-900">${order.total}</span>
+        <span className="font-bold text-gray-900 dark:text-white">
+          ${order.total}
+        </span>
       ),
     },
     {
@@ -156,7 +162,9 @@ export default function Dashboard() {
       header: "Hora",
       width: "100px",
       render: (order) => (
-        <span className="text-gray-600 text-sm">{order.date}</span>
+        <span className="text-gray-600 dark:text-gray-400 text-sm">
+          {order.date}
+        </span>
       ),
     },
   ];
@@ -165,8 +173,10 @@ export default function Dashboard() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
-        <p className="text-gray-600">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          Dashboard
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
           Resumen de tu restaurante en tiempo real
         </p>
       </div>
@@ -181,15 +191,12 @@ export default function Dashboard() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SalesLineChart data={salesData} title="Ventas de la semana" />
-        <ProductsBarChart
-          data={productsData}
-          title="Productos más vendidos"
-        />
+        <ProductsBarChart data={productsData} title="Productos más vendidos" />
       </div>
 
       {/* Recent Orders */}
       <div>
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
           Pedidos recientes
         </h2>
         <DataTable

@@ -96,9 +96,7 @@ export default function ProductList() {
 
   const confirmDelete = () => {
     if (deleteModal.productId) {
-      setProducts((prev) =>
-        prev.filter((p) => p.id !== deleteModal.productId)
-      );
+      setProducts((prev) => prev.filter((p) => p.id !== deleteModal.productId));
       setDeleteModal({ isOpen: false, productId: null, productName: "" });
     }
   };
@@ -152,14 +150,18 @@ export default function ProductList() {
       header: "ID",
       width: "120px",
       render: (product) => (
-        <span className="font-mono text-sm text-gray-600">{product.id}</span>
+        <span className="font-mono text-sm text-gray-600 dark:text-gray-400">
+          {product.id}
+        </span>
       ),
     },
     {
       key: "name",
       header: "Nombre",
       render: (product) => (
-        <span className="font-semibold text-gray-900">{product.name}</span>
+        <span className="font-semibold text-gray-900 dark:text-white">
+          {product.name}
+        </span>
       ),
     },
     {
@@ -167,7 +169,9 @@ export default function ProductList() {
       header: "Categoría",
       width: "150px",
       render: (product) => (
-        <span className="text-gray-600 text-sm">{product.category}</span>
+        <span className="text-gray-600 dark:text-gray-400 text-sm">
+          {product.category}
+        </span>
       ),
     },
     {
@@ -175,7 +179,9 @@ export default function ProductList() {
       header: "Precio",
       width: "100px",
       render: (product) => (
-        <span className="font-bold text-gray-900">${product.price}</span>
+        <span className="font-bold text-gray-900 dark:text-white">
+          ${product.price}
+        </span>
       ),
     },
     {
@@ -188,8 +194,8 @@ export default function ProductList() {
             product.stock === 0
               ? "text-red-600"
               : product.stock < 20
-              ? "text-amber-600"
-              : "text-green-600"
+                ? "text-amber-600"
+                : "text-green-600"
           }`}
         >
           {product.stock}
@@ -211,7 +217,7 @@ export default function ProductList() {
   ];
 
   const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
+    product.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
@@ -219,8 +225,10 @@ export default function ProductList() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Productos</h1>
-          <p className="text-gray-600">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Productos
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
             Gestiona el catálogo de productos de tu restaurante
           </p>
         </div>

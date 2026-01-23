@@ -39,10 +39,7 @@ export default function ProductAdd() {
     { value: "inactive", label: "Inactivo" },
   ];
 
-  const handleChange = (
-    field: string,
-    value: string
-  ) => {
+  const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
@@ -114,15 +111,15 @@ export default function ProductAdd() {
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate("/restaurant/products")}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
         >
-          <ChevronLeft className="w-6 h-6 text-gray-700" />
+          <ChevronLeft className="w-6 h-6 text-gray-700 dark:text-gray-300" />
         </button>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
             Agregar producto
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-400">
             Completa la información del nuevo producto
           </p>
         </div>
@@ -131,12 +128,12 @@ export default function ProductAdd() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         {/* Image Upload */}
-        <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100">
-          <label className="text-sm font-medium text-gray-700 mb-3 block">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">
             Imagen del producto
           </label>
           {imagePreview ? (
-            <div className="relative w-full h-64 rounded-xl overflow-hidden bg-gray-100">
+            <div className="relative w-full h-64 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-700">
               <img
                 src={imagePreview}
                 alt="Preview"
@@ -145,18 +142,18 @@ export default function ProductAdd() {
               <button
                 type="button"
                 onClick={removeImage}
-                className="absolute top-3 right-3 p-2 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
+                className="absolute top-3 right-3 p-2 bg-white dark:bg-gray-700 rounded-full shadow-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
               >
-                <X className="w-5 h-5 text-gray-700" />
+                <X className="w-5 h-5 text-gray-700 dark:text-gray-300" />
               </button>
             </div>
           ) : (
-            <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-amber-400 hover:bg-amber-50/50 transition-all">
-              <Upload className="w-12 h-12 text-gray-400 mb-3" />
-              <span className="text-sm font-medium text-gray-600 mb-1">
+            <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:border-amber-400 hover:bg-amber-50/50 dark:hover:bg-amber-900/20 transition-all">
+              <Upload className="w-12 h-12 text-gray-400 dark:text-gray-500 mb-3" />
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
                 Haz clic para subir una imagen
               </span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500 dark:text-gray-500">
                 PNG, JPG o WEBP (máx. 5MB)
               </span>
               <input
@@ -170,8 +167,8 @@ export default function ProductAdd() {
         </div>
 
         {/* Product Information */}
-        <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col gap-4">
-          <h3 className="text-lg font-bold text-gray-900 mb-2">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700 flex flex-col gap-4">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
             Información del producto
           </h3>
 
