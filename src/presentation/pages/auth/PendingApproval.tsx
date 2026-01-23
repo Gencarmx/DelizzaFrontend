@@ -13,7 +13,6 @@ export default function PendingApproval() {
     status: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 15; // 30 seconds max (15 retries * 2 seconds)
 
   useEffect(() => {
