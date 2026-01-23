@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -25,28 +26,58 @@ export default function ProductsBarChart({
   data,
   title,
 }: ProductsBarChartProps) {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    };
+
+    checkTheme();
+
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700">
       {title && (
-        <h3 className="text-lg font-bold text-gray-900 mb-4">{title}</h3>
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+          {title}
+        </h3>
       )}
       <div className="animate-fade-in">
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="currentColor"
+              className="text-gray-200 dark:text-gray-700"
+            />
             <XAxis
               dataKey="name"
-              stroke="#9ca3af"
+              stroke="currentColor"
+              className="text-gray-400 dark:text-gray-500"
               style={{ fontSize: "12px" }}
             />
-            <YAxis stroke="#9ca3af" style={{ fontSize: "12px" }} />
+            <YAxis
+              stroke="currentColor"
+              className="text-gray-400 dark:text-gray-500"
+              style={{ fontSize: "12px" }}
+            />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#fff",
-                border: "1px solid #e5e7eb",
+                backgroundColor: isDark ? "#1f2937" : "#fff",
+                border: `1px solid ${isDark ? "#374151" : "#e5e7eb"}`,
                 borderRadius: "12px",
                 fontSize: "12px",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                color: isDark ? "#f9fafb" : "#111827",
               }}
               formatter={(value: number | undefined) => [
                 `${value ?? 0} unidades`,
