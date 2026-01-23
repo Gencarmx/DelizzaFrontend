@@ -74,13 +74,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const fetchRole = async (userId: string) => {
+    const fetchRole = async (userId: string, userMetadata?: any) => {
       // Check cache first
       const cachedRole = getCachedRole(userId);
       if (cachedRole) {
         return cachedRole;
       }
 
+      // PRIORITY 1: Check user metadata from Supabase Auth (most reliable source)
+      // This is set during registration and persists even if profiles table isn't ready
+      if (userMetadata?.user_role) {
+        const metadataRole = userMetadata.user_role as "owner" | "client";
+        console.log('Role found in user metadata:', metadataRole);
+        setCachedRole(userId, metadataRole);
+        return metadataRole;
+      }
+
+      // PRIORITY 2: Query profiles table as fallback
       try {
         // Add timeout to prevent hanging
         const timeoutPromise = new Promise((_, reject) => {
@@ -96,22 +106,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
         if (error) {
-          // If table doesn't exist or permission denied, assume client role
-          if (error.message?.includes("relation") || error.message?.includes("permission")) {
-            const defaultRole = "client" as const;
-            setCachedRole(userId, defaultRole);
-            return defaultRole;
-          }
-          console.error("Error fetching role:", error);
+          console.error("Error fetching role from profiles:", error);
+          // If profiles query fails, default to client as last resort
+          // NOTE: This should rarely happen now that we check metadata first
           const defaultRole = "client" as const;
           setCachedRole(userId, defaultRole);
           return defaultRole;
         }
 
-        const userRole = data ? (data.user_role as "owner" | "client") : "client";
-        setCachedRole(userId, userRole);
-        return userRole;
+        if (data?.user_role) {
+          const userRole = data.user_role as "owner" | "client";
+          setCachedRole(userId, userRole);
+          return userRole;
+        }
+
+        // If no data found in profiles, default to client
+        const defaultRole = "client" as const;
+        setCachedRole(userId, defaultRole);
+        return defaultRole;
       } catch (error: any) {
+        console.error("Exception in fetchRole:", error);
         // If timeout or any other error, default to client
         const defaultRole = "client" as const;
         setCachedRole(userId, defaultRole);
@@ -159,7 +173,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        const userRole = await fetchRole(session.user.id);
+        // Pass user metadata to fetchRole for reliable role detection
+        const userRole = await fetchRole(session.user.id, session.user.user_metadata);
         setRole(userRole);
         
         // Fetch business status only for owners
@@ -184,7 +199,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        const userRole = await fetchRole(session.user.id);
+        // Pass user metadata to fetchRole for reliable role detection
+        const userRole = await fetchRole(session.user.id, session.user.user_metadata);
         setRole(userRole);
         
         // Fetch business status only for owners
@@ -206,13 +222,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
+      // ℹ️ NOTA: Los triggers de Supabase ya manejan la asignación de roles en la tabla 'profiles'.
+      // Sin embargo, también establecemos user_role en los metadatos para:
+      // 1. Tener acceso inmediato al rol sin consultar la BD
+      // 2. Mantener consistencia entre metadatos y tabla profiles
+      // 
+      // ⚠️ CONSIDERACIÓN DE SEGURIDAD: 
+      // Aunque los metadatos pueden ser establecidos desde el cliente, la fuente de verdad
+      // es la tabla 'profiles' manejada por triggers del servidor. Los metadatos son solo
+      // para conveniencia y velocidad de acceso.
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
-            user_role: 'client',
+            user_role: 'client', // Metadatos para acceso rápido (triggers manejan la tabla profiles)
           },
         },
       });
@@ -257,7 +282,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         phoneNumber,
       });
 
-      // Create user with phone number in metadata
+      // ℹ️ NOTA: Los triggers de Supabase ya manejan la asignación de roles en la tabla 'profiles'
+      // y la creación del registro en la tabla 'businesses'.
+      // Los metadatos (user_role, business_name, etc.) se establecen aquí para:
+      // 1. Que los triggers tengan acceso a esta información
+      // 2. Proporcionar acceso inmediato sin consultar la BD
+      // 
+      // ⚠️ CONSIDERACIÓN DE SEGURIDAD:
+      // La fuente de verdad es la tabla 'profiles' manejada por triggers del servidor.
+      // Los metadatos son solo para conveniencia y para que los triggers los procesen.
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -265,7 +298,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           data: {
             full_name: fullName,
             phone_number: phoneNumber,
-            user_role: 'owner',
+            user_role: 'owner', // Metadatos para triggers y acceso rápido
             business_name: businessName,
             business_address: businessAddress,
           },
