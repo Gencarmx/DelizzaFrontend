@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "@core/context/AuthContext";
 import { Eye, EyeOff } from "lucide-react";
@@ -9,8 +9,24 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const { signIn, user, role, businessActive } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && role) {
+      if (role === "owner") {
+        // Check if business is active
+        if (businessActive === false) {
+          navigate("/pending-approval", { replace: true });
+        } else {
+          navigate("/restaurant/dashboard", { replace: true });
+        }
+      } else if (role === "client") {
+        navigate("/", { replace: true });
+      }
+    }
+  }, [user, role, businessActive, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,10 +36,37 @@ export default function Login() {
     const { error } = await signIn(email, password);
 
     if (error) {
-      setError(error.message);
+      // Parse error message to provide user-friendly feedback
+      let errorMessage = error.message;
+      const originalError = errorMessage.toLowerCase();
+
+      // Check for invalid credentials
+      if (originalError.includes("invalid") && (originalError.includes("credentials") || originalError.includes("login"))) {
+        errorMessage = "❌ Correo electrónico o contraseña incorrectos. Por favor verifica tus datos.";
+      }
+      // Check for email not confirmed
+      else if (originalError.includes("email") && originalError.includes("confirm")) {
+        errorMessage = "❌ Por favor confirma tu correo electrónico antes de iniciar sesión.";
+      }
+      // Check for user not found
+      else if (originalError.includes("user") && originalError.includes("not found")) {
+        errorMessage = `❌ No existe una cuenta con el correo "${email}". Por favor regístrate primero.`;
+      }
+      // Generic network error
+      else if (originalError.includes("failed to fetch") || originalError.includes("network")) {
+        errorMessage = "❌ Error de conexión. Por favor verifica tu conexión a internet e intenta nuevamente.";
+      }
+      // Keep original error if we can't parse it, but add emoji
+      else if (!errorMessage.startsWith("❌")) {
+        errorMessage = `❌ ${errorMessage}`;
+      }
+
+      setError(errorMessage);
       setLoading(false);
     } else {
-      navigate("/");
+      // Don't navigate here - let the useEffect handle it based on role
+      // The role will be available after signIn completes
+      setLoading(false);
     }
   };
 

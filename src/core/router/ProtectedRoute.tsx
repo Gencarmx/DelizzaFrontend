@@ -1,4 +1,4 @@
-import { Navigate, Outlet } from "react-router";
+import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "@core/context/AuthContext";
 import type { ReactNode } from "react";
 
@@ -11,7 +11,8 @@ export const ProtectedRoute = ({
   allowedRoles,
   children,
 }: ProtectedRouteProps) => {
-  const { user, role, loading } = useAuth();
+  const { user, role, businessActive, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     // You might want to replace this with a proper LoadingSpinner component if available
@@ -31,6 +32,11 @@ export const ProtectedRoute = ({
       return <Navigate to="/restaurant/dashboard" replace />;
     }
     return <Navigate to="/" replace />;
+  }
+
+  // Check if owner's business is not active and trying to access routes other than pending-approval
+  if (role === "owner" && businessActive === false && location.pathname !== "/pending-approval") {
+    return <Navigate to="/pending-approval" replace />;
   }
 
   return children ? <>{children}</> : <Outlet />;

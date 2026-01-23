@@ -1,34 +1,291 @@
-# Análisis y Recomendaciones: Separación de Registros de Usuarios
+# Implementación del Registro e Inicio de Sesión de Usuarios
 
-## 📋 Resumen Ejecutivo
+## 🔄 Secuencia Detallada de Registro y Login
 
-Este documento analiza la arquitectura actual del proyecto Delizza y proporciona recomendaciones específicas para implementar la separación de flujos de registro entre usuarios comunes (clientes) y propietarios de restaurantes, considerando la necesidad de aprobación manual y pago de cuota mensual para propietarios.
+### Flujo de Registro e Inicio de Sesión para Clientes
 
-## 🔍 Análisis de la Arquitectura Actual
+#### 1. Registro de Cliente
+**Paso 1: Acceso al Formulario**
+- Usuario navega a `/register`
+- Renderiza `Register.tsx` con campos básicos
 
-### Estructura del Proyecto
-Basado en el análisis de la estructura de archivos, el proyecto sigue una **arquitectura limpia** con tres capas principales:
+**Paso 2: Validación de Datos**
+- Campos requeridos: `email`, `password`, `fullName`
+- Validación frontend: formato email, fortaleza de contraseña
+- Validación backend: unicidad de email
 
-- **Core Layer** (`src/core/`): Contiene lógica de negocio, contextos de autenticación y enrutamiento
-- **Infrastructure Layer** (`src/components/restaurant-ui/`): Componentes reutilizables de UI
-- **Presentation Layer** (`src/presentation/`): Páginas y componentes de usuario
+**Paso 3: Creación de Cuenta (Técnico)**
+```typescript
+// AuthContext.tsx - signUpClient
+const { data, error } = await supabase.auth.signUp({
+  email,
+  password,
+  options: {
+    data: {
+      full_name: fullName,
+      user_role: 'client'
+    }
+  }
+});
 
-### Sistema de Autenticación Actual
-- **AuthContext** (`src/core/context/AuthContext.tsx`): Maneja autenticación con roles ("owner" | "client" | null)
-- **Rutas Protegidas**: `ProtectedRoute` con control de acceso por roles
-- **Base de Datos**: Supabase con tablas `profiles`, `businesses`, `collaborators`
+// Inserción en tabla profiles
+await supabase.from('profiles').insert({
+  user_id: data.user.id,
+  full_name: fullName,
+  user_role: 'client',
+  created_at: new Date()
+});
+```
 
-### Limitaciones Identificadas
-1. **Flujo de Registro Único**: Actualmente solo existe `/register` sin diferenciación de roles
-2. **Falta de Estados Intermedios**: No hay manejo de estados "pending" para aprobación
-3. **Sin Sistema de Pagos**: No hay integración para cobro de cuotas mensuales
-4. **Sin Verificación de Documentos**: No hay upload de documentos para validación
+**Paso 4: Confirmación de Email**
+- Supabase envía email de verificación automáticamente
+- Usuario debe confirmar email para activar cuenta
 
-## 🎯 Recomendaciones de Implementación
+**Paso 5: Activación Inmediata**
+- Una vez confirmado el email, cuenta activa
+- Redirección automática a dashboard de cliente
 
-### Opción 1: Flujos de Registro Completamente Separados (Recomendado)
+#### 2. Inicio de Sesión de Cliente
+**Paso 1: Acceso al Login**
+- Usuario navega a `/login`
+- Renderiza `Login.tsx`
 
-#### Arquitectura Propuesta
+**Paso 2: Autenticación**
+```typescript
+// AuthContext.tsx - signIn
+const { data, error } = await supabase.auth.signInWithPassword({
+  email,
+  password
+});
+
+// Verificación de rol
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('user_role')
+  .eq('user_id', data.user.id)
+  .single();
+
+if (profile.user_role !== 'client') {
+  throw new Error('Acceso denegado');
+}
+```
+
+**Paso 3: Establecimiento de Sesión**
+- Token JWT almacenado automáticamente por Supabase
+- Estado de autenticación actualizado en AuthContext
+- Redirección a ruta protegida según rol
+
+### Flujo de Registro e Inicio de Sesión para Propietarios
+
+#### 1. Registro de Propietario
+**Paso 1: Selección de Tipo de Usuario**
+- Usuario navega a `/register`
+- Selector muestra opciones: Cliente vs Propietario
+- Selección de "Propietario" redirige a `/register-owner`
+
+**Paso 2: Formulario Extendido**
+- Campos adicionales: `businessName`, `businessAddress`, `phoneNumber`
+- Campos opcionales: upload de documentos (licencia, identificación)
+
+**Paso 3: Validación de Datos**
+- Validación frontend: todos los campos requeridos
+- Validación backend: unicidad de email y nombre de negocio
+
+**Paso 4: Creación de Cuenta (Técnico)**
+```typescript
+// AuthContext.tsx - signUpOwner
+const { data, error } = await supabase.auth.signUp({
+  email,
+  password,
+  options: {
+    data: {
+      full_name: fullName,
+      user_role: 'owner'
+    }
+  }
+});
+
+// Inserción en tabla profiles
+const profileData = {
+  user_id: data.user.id,
+  full_name: fullName,
+  user_role: 'owner',
+  phone_number: phoneNumber,
+  created_at: new Date()
+};
+await supabase.from('profiles').insert(profileData);
+
+// Creación de negocio
+const businessData = {
+  name: businessName,
+  address: businessAddress,
+  owner_id: data.user.id,
+  active: false, // Pendiente de aprobación
+  subscription_status: 'pending'
+};
+const { data: business } = await supabase
+  .from('businesses')
+  .insert(businessData)
+  .select()
+  .single();
+
+// Creación de colaborador
+await supabase.from('collaborators').insert({
+  business_id: business.id,
+  user_id: data.user.id,
+  role: 'owner',
+  status: 'pending' // Pendiente de aprobación
+});
+```
+
+**Paso 5: Confirmación de Email**
+- Email de verificación enviado por Supabase
+
+**Paso 6: Estado Pendiente**
+- Redirección a `/owner/pending-approval`
+- Página muestra instrucciones para pago y aprobación
+
+**Paso 7: Proceso de Pago (Técnico)**
+```typescript
+// Integración con Stripe
+const { clientSecret, error } = await createSubscription(
+  businessId,
+  'price_monthly_owner' // ID del precio en Stripe
+);
+
+// Renderizar Stripe Elements
+<Elements stripe={stripePromise}>
+  <CheckoutForm clientSecret={clientSecret} />
+</Elements>
+```
+
+**Paso 8: Webhook de Pago Exitoso**
+```typescript
+// Supabase Edge Function - webhook handler
+export async function handlePaymentSuccess(event: StripeEvent) {
+  const { business_id } = event.data.object.metadata;
+
+  // Actualizar suscripción
+  await supabase
+    .from('subscriptions')
+    .update({
+      status: 'active',
+      paid_at: new Date(),
+      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    })
+    .eq('business_id', business_id);
+
+  // Notificar administrador
+  await sendAdminNotification(business_id, 'payment_completed');
+}
+```
+
+**Paso 9: Aprobación Manual**
+- Administrador revisa en panel de administración
+- Verificación de documentos y datos
+- Aprobación o rechazo manual
+
+**Paso 10: Activación Final (Técnico)**
+```typescript
+// Al aprobar
+await supabase
+  .from('businesses')
+  .update({ active: true })
+  .eq('id', businessId);
+
+await supabase
+  .from('collaborators')
+  .update({ status: 'approved' })
+  .eq('business_id', businessId);
+
+// Notificación al propietario
+await sendEmail(ownerEmail, 'approval_notification');
+```
+
+#### 2. Inicio de Sesión de Propietario
+**Paso 1: Acceso al Login**
+- Usuario navega a `/login`
+- Renderiza `Login.tsx`
+
+**Paso 2: Autenticación Básica**
+```typescript
+const { data, error } = await supabase.auth.signInWithPassword({
+  email,
+  password
+});
+```
+
+**Paso 3: Verificación de Estado**
+```typescript
+// Verificar rol y estado de aprobación
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('user_role')
+  .eq('user_id', data.user.id)
+  .single();
+
+if (profile.user_role !== 'owner') {
+  throw new Error('Acceso denegado');
+}
+
+// Verificar aprobación
+const { data: collaborator } = await supabase
+  .from('collaborators')
+  .select('status, business_id')
+  .eq('user_id', data.user.id)
+  .single();
+
+if (collaborator.status === 'pending') {
+  redirect('/owner/pending-approval');
+} else if (collaborator.status === 'rejected') {
+  throw new Error('Cuenta rechazada');
+} else if (collaborator.status === 'approved') {
+  // Verificar suscripción activa
+  const { data: subscription } = await supabase
+    .from('subscriptions')
+    .select('status, expires_at')
+    .eq('business_id', collaborator.business_id)
+    .single();
+
+  if (subscription.status !== 'active' || new Date() > new Date(subscription.expires_at)) {
+    redirect('/owner/setup-payment');
+  }
+}
+```
+
+**Paso 4: Establecimiento de Sesión**
+- Sesión completa establecida
+- Redirección a dashboard de propietario
+
+### Aspectos Técnicos del Proceso
+
+#### Gestión de Estados
+- **Cliente**: `null` → `authenticated` (inmediato)
+- **Propietario**: `null` → `pending_email` → `pending_payment` → `pending_approval` → `authenticated`
+
+#### Seguridad
+- **Hashing de Contraseñas**: Manejado automáticamente por Supabase Auth
+- **JWT Tokens**: Expiración automática, refresh tokens
+- **Rate Limiting**: Implementar en API routes para prevenir abuso
+- **Validación de Datos**: Frontend y backend validation
+
+#### Manejo de Errores
+- **Errores de Validación**: Mensajes específicos por campo
+- **Errores de Red**: Retry automático con exponential backoff
+- **Errores de Autenticación**: Mensajes genéricos para seguridad
+- **Errores de Pago**: Manejo específico por tipo de error de Stripe
+
+#### Optimización de Performance
+- **Lazy Loading**: Componentes de registro cargados bajo demanda
+- **Caching**: Perfiles de usuario cacheados en AuthContext
+- **Debounced Validation**: Validación en tiempo real sin sobrecargar API
+- **Progressive Enhancement**: Funcionalidad básica sin JavaScript
+
+#### Monitoreo y Logging
+- **Eventos de Registro**: Log de intentos exitosos/fallidos
+- **Métricas de Conversión**: Tasa de completación por paso
+- **Alertas**: Notificaciones para pagos fallidos o rechazos
+- **Auditoría**: Log completo de cambios de estado
 ```
 Flujo Cliente: /register → Cuenta activa inmediatamente
 Flujo Propietario: /register-owner → /pending-approval → Pago → Aprobación Manual → Activo
@@ -548,4 +805,3 @@ export default function BusinessApprovals() {
 **Fecha**: Enero 2025
 **Versión**: 1.0.0
 **Estado**: Documento de Análisis y Recomendaciones
-**Preparado por**: BLACKBOXAI

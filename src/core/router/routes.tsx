@@ -9,7 +9,7 @@ import { productsLoader } from "@core/router/loaders/productsLoader";
 import NotFound from "@presentation/pages/NotFound";
 import Favorites from "@presentation/pages/Favorites";
 import Activity from "@presentation/pages/Activity";
-import { Login, Register } from "@presentation/pages/auth";
+import { Login, Register, RegisterOwner, PendingApproval } from "@presentation/pages/auth";
 import { Account, UserProfile, EditProfile } from "@presentation/pages/profile";
 import {
   Settings,
@@ -34,6 +34,18 @@ export const routes: RouteObject[] = [
   {
     path: "/register",
     element: <Register />,
+  },
+  {
+    path: "/register-owner",
+    element: <RegisterOwner />,
+  },
+  {
+    path: "/pending-approval",
+    element: (
+      <ProtectedRoute allowedRoles={["owner"]}>
+        <PendingApproval />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/",
@@ -110,6 +122,10 @@ export const routes: RouteObject[] = [
       </ProtectedRoute>
     ),
     children: [
+      {
+        index: true,
+        element: <Dashboard />,
+      },
       {
         path: "dashboard",
         element: <Dashboard />,

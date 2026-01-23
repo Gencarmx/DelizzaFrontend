@@ -6,11 +6,20 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   role: "owner" | "client" | null;
+  businessActive: boolean | null;
   loading: boolean;
   signUp: (
     email: string,
     password: string,
     fullName: string
+  ) => Promise<{ error: AuthError | null }>;
+  signUpOwner: (
+    email: string,
+    password: string,
+    fullName: string,
+    businessName: string,
+    businessAddress: string,
+    phoneNumber: string
   ) => Promise<{ error: AuthError | null }>;
   signIn: (
     email: string,
@@ -27,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<"owner" | "client" | null>(null);
+  const [businessActive, setBusinessActive] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   const getCachedRole = (userId: string): "owner" | "client" | null => {
@@ -78,11 +88,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         const queryPromise = supabase
-          .from("collaborators")
-          .select("role")
+          .from("profiles")
+          .select("user_role")
           .eq("user_id", userId)
-          .eq("role", "owner")
-          .single();
+          .maybeSingle();
 
         const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
 
@@ -93,12 +102,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setCachedRole(userId, defaultRole);
             return defaultRole;
           }
+          console.error("Error fetching role:", error);
           const defaultRole = "client" as const;
           setCachedRole(userId, defaultRole);
           return defaultRole;
         }
 
-        const userRole = data ? "owner" : "client";
+        const userRole = data ? (data.user_role as "owner" | "client") : "client";
         setCachedRole(userId, userRole);
         return userRole;
       } catch (error: any) {
@@ -106,6 +116,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const defaultRole = "client" as const;
         setCachedRole(userId, defaultRole);
         return defaultRole;
+      }
+    };
+
+    const fetchBusinessStatus = async (userId: string) => {
+      try {
+        // First get the profile id
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (profileError || !profile) {
+          console.error('Error fetching profile for business status:', profileError);
+          return null;
+        }
+
+        // Get business active status using profile.id
+        const { data: business, error: businessError } = await supabase
+          .from('businesses')
+          .select('active')
+          .eq('owner_id', profile.id)
+          .maybeSingle();
+
+        if (businessError) {
+          console.error('Error fetching business status:', businessError);
+          return null;
+        }
+
+        return business?.active ?? null;
+      } catch (error) {
+        console.error('Error in fetchBusinessStatus:', error);
+        return null;
       }
     };
 
@@ -118,8 +161,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         const userRole = await fetchRole(session.user.id);
         setRole(userRole);
+        
+        // Fetch business status only for owners
+        if (userRole === 'owner') {
+          const active = await fetchBusinessStatus(session.user.id);
+          setBusinessActive(active);
+        } else {
+          setBusinessActive(null);
+        }
       } else {
         setRole(null);
+        setBusinessActive(null);
       }
       setLoading(false);
     };
@@ -134,8 +186,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         const userRole = await fetchRole(session.user.id);
         setRole(userRole);
+        
+        // Fetch business status only for owners
+        if (userRole === 'owner') {
+          const active = await fetchBusinessStatus(session.user.id);
+          setBusinessActive(active);
+        } else {
+          setBusinessActive(null);
+        }
       } else {
         setRole(null);
+        setBusinessActive(null);
       }
       setLoading(false);
     });
@@ -151,6 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         options: {
           data: {
             full_name: fullName,
+            user_role: 'client',
           },
         },
       });
@@ -178,6 +240,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signUpOwner = async (
+    email: string,
+    password: string,
+    fullName: string,
+    businessName: string,
+    businessAddress: string,
+    phoneNumber: string
+  ) => {
+    try {
+      console.log('SignUpOwner: Starting signup with data:', {
+        email,
+        fullName,
+        businessName,
+        businessAddress,
+        phoneNumber,
+      });
+
+      // Create user with phone number in metadata
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            phone_number: phoneNumber,
+            user_role: 'owner',
+            business_name: businessName,
+            business_address: businessAddress,
+          },
+        },
+      });
+
+      if (error) {
+        console.error('SignUpOwner: Auth signup error:', error);
+        return { error };
+      }
+
+      console.log('SignUpOwner: User created successfully:', data.user?.id);
+
+      // Profile and business will be created by Supabase triggers
+
+      return { error: null };
+    } catch (error) {
+      console.error('SignUpOwner: Unexpected error:', error);
+      return { error: error as AuthError };
+    }
+  };
+
   const signOut = async () => {
     if (user?.id) {
       clearRoleCache(user.id);
@@ -189,8 +299,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     session,
     role,
+    businessActive,
     loading,
     signUp,
+    signUpOwner,
     signIn,
     signOut,
   };
