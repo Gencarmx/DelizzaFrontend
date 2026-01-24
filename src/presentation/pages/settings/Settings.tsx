@@ -139,6 +139,18 @@ export default function Settings() {
       ],
     },
     {
+      title: "Preferencias",
+      items: [
+        {
+          icon: Moon,
+          label: "Modo oscuro",
+          type: "toggle",
+          value: darkMode,
+          onChange: handleDarkModeToggle,
+        },
+      ],
+    },
+    {
       title: "Pedidos",
       items: [
         {
@@ -196,13 +208,17 @@ export default function Settings() {
                   <div className="flex items-center gap-3">
                     <item.icon
                       className={`w-5 h-5 ${
-                        item.danger ? "text-red-500" : "text-gray-700 dark:text-gray-200"
+                        item.danger
+                          ? "text-red-500"
+                          : "text-gray-700 dark:text-gray-200"
                       }`}
                       strokeWidth={1.5}
                     />
                     <span
                       className={`text-sm font-medium ${
-                        item.danger ? "text-red-500" : "text-gray-700 dark:text-gray-200"
+                        item.danger
+                          ? "text-red-500"
+                          : "text-gray-700 dark:text-gray-200"
                       }`}
                     >
                       {item.label}
