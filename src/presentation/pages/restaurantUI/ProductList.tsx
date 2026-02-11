@@ -1,28 +1,39 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Plus, Search, Edit, Trash2, Copy } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Copy, Loader2 } from "lucide-react";
 import DataTable from "@components/restaurant-ui/tables/DataTable";
 import StatusBadge from "@components/restaurant-ui/badges/StatusBadge";
 import ActionDropdown from "@components/restaurant-ui/dropdowns/ActionDropdown";
 import Button from "@components/restaurant-ui/buttons/Button";
 import Input from "@components/restaurant-ui/forms/Input";
 import ConfirmModal from "@components/restaurant-ui/modals/ConfirmModal";
+import { useAuth } from "@core/context/AuthContext";
+import { getProductsByBusiness, createProduct } from "@core/services/productService";
+import { getBusinessByOwner } from "@core/services/businessService";
+import { deleteProduct } from "@core/services/productService";
 import type { Column } from "@components/restaurant-ui/tables/DataTable";
 import type { ActionItem } from "@components/restaurant-ui/dropdowns/ActionDropdown";
 
 interface Product {
   id: string;
   name: string;
-  category: string;
+  description: string | null;
   price: number;
-  stock: number;
-  status: "active" | "inactive";
-  image: string;
+  image_url: string | null;
+  active: boolean | null;
+  created_at: string | null;
+  updated_at: string | null;
+  business_id: string;
 }
 
 export default function ProductList() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [businessId, setBusinessId] = useState<string | null>(null);
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
     productId: string | null;
@@ -33,54 +44,42 @@ export default function ProductList() {
     productName: "",
   });
 
-  // Mock data
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: "PROD-001",
-      name: "Hamburguesa Clásica",
-      category: "Hamburguesas",
-      price: 120,
-      stock: 45,
-      status: "active",
-      image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd",
-    },
-    {
-      id: "PROD-002",
-      name: "Pizza Margarita",
-      category: "Pizzas",
-      price: 180,
-      stock: 30,
-      status: "active",
-      image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38",
-    },
-    {
-      id: "PROD-003",
-      name: "Tacos al Pastor",
-      category: "Tacos",
-      price: 85,
-      stock: 0,
-      status: "inactive",
-      image: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47",
-    },
-    {
-      id: "PROD-004",
-      name: "Sushi Roll California",
-      category: "Sushi",
-      price: 150,
-      stock: 25,
-      status: "active",
-      image: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c",
-    },
-    {
-      id: "PROD-005",
-      name: "Hot Dog Clásico",
-      category: "Hot Dogs",
-      price: 65,
-      stock: 50,
-      status: "active",
-      image: "https://images.unsplash.com/photo-1612392062798-2dbaa2c5e72",
-    },
-  ]);
+  // Cargar productos desde la base de datos
+  useEffect(() => {
+    const loadProducts = async () => {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Obtener el business del usuario
+        const business = await getBusinessByOwner(user.id);
+        if (!business) {
+          setError("No se encontró un restaurante asociado a tu cuenta");
+          setLoading(false);
+          return;
+        }
+
+        setBusinessId(business.id);
+
+        // Obtener productos del restaurante
+        const productsData = await getProductsByBusiness(business.id);
+        setProducts(productsData);
+
+      } catch (err) {
+        console.error("Error cargando productos:", err);
+        setError("Error al cargar los productos. Por favor, intenta de nuevo.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProducts();
+  }, [user?.id]);
 
   const handleEdit = (productId: string) => {
     navigate(`/restaurant/products/edit/${productId}`);
@@ -94,22 +93,40 @@ export default function ProductList() {
     });
   };
 
-  const confirmDelete = () => {
-    if (deleteModal.productId) {
+  const confirmDelete = async () => {
+    if (!deleteModal.productId) return;
+
+    try {
+      await deleteProduct(deleteModal.productId);
       setProducts((prev) => prev.filter((p) => p.id !== deleteModal.productId));
       setDeleteModal({ isOpen: false, productId: null, productName: "" });
+    } catch (err) {
+      console.error("Error eliminando producto:", err);
+      // Aquí podrías mostrar un toast de error
     }
   };
 
-  const handleDuplicate = (productId: string) => {
+  const handleDuplicate = async (productId: string) => {
     const product = products.find((p) => p.id === productId);
-    if (product) {
-      const newProduct = {
-        ...product,
-        id: `PROD-${String(products.length + 1).padStart(3, "0")}`,
+    if (!product || !businessId) return;
+
+    try {
+      // Crear una copia del producto con un nombre diferente
+      const duplicatedProduct = {
         name: `${product.name} (Copia)`,
+        description: product.description || undefined,
+        price: product.price,
+        business_id: businessId,
+        image_url: product.image_url || undefined,
+        active: product.active || true,
       };
+
+      const newProduct = await createProduct(duplicatedProduct);
       setProducts((prev) => [...prev, newProduct]);
+
+    } catch (err) {
+      console.error("Error duplicando producto:", err);
+      // Aquí podrías mostrar un toast de error
     }
   };
 
@@ -139,7 +156,7 @@ export default function ProductList() {
       width: "80px",
       render: (product) => (
         <img
-          src={product.image}
+          src={product.image_url || "https://via.placeholder.com/48"}
           alt={product.name}
           className="w-12 h-12 rounded-lg object-cover"
         />
@@ -151,7 +168,7 @@ export default function ProductList() {
       width: "120px",
       render: (product) => (
         <span className="font-mono text-sm text-gray-600 dark:text-gray-400">
-          {product.id}
+          {product.id.slice(0, 8)}...
         </span>
       ),
     },
@@ -165,12 +182,12 @@ export default function ProductList() {
       ),
     },
     {
-      key: "category",
-      header: "Categoría",
-      width: "150px",
+      key: "description",
+      header: "Descripción",
+      width: "200px",
       render: (product) => (
         <span className="text-gray-600 dark:text-gray-400 text-sm">
-          {product.category}
+          {product.description || "Sin descripción"}
         </span>
       ),
     },
@@ -180,25 +197,7 @@ export default function ProductList() {
       width: "100px",
       render: (product) => (
         <span className="font-bold text-gray-900 dark:text-white">
-          ${product.price}
-        </span>
-      ),
-    },
-    {
-      key: "stock",
-      header: "Stock",
-      width: "80px",
-      render: (product) => (
-        <span
-          className={`font-semibold ${
-            product.stock === 0
-              ? "text-red-600"
-              : product.stock < 20
-                ? "text-amber-600"
-                : "text-green-600"
-          }`}
-        >
-          {product.stock}
+          ${product.price.toFixed(2)}
         </span>
       ),
     },
@@ -206,7 +205,9 @@ export default function ProductList() {
       key: "status",
       header: "Estado",
       width: "120px",
-      render: (product) => <StatusBadge status={product.status} />,
+      render: (product) => (
+        <StatusBadge status={product.active ? "active" : "inactive"} />
+      ),
     },
     {
       key: "actions",
@@ -241,6 +242,22 @@ export default function ProductList() {
         </Button>
       </div>
 
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 text-red-600 dark:text-red-400">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <p className="text-red-800 dark:text-red-200 text-sm font-medium">
+              {error}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Search */}
       <div className="max-w-md">
         <Input
@@ -251,13 +268,23 @@ export default function ProductList() {
         />
       </div>
 
-      {/* Table */}
-      <DataTable
-        columns={columns}
-        data={filteredProducts}
-        keyExtractor={(product) => product.id}
-        emptyMessage="No se encontraron productos"
-      />
+      {/* Loading State */}
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-amber-600 mx-auto mb-4" />
+            <p className="text-gray-600 dark:text-gray-400">Cargando productos...</p>
+          </div>
+        </div>
+      ) : (
+        /* Table */
+        <DataTable
+          columns={columns}
+          data={filteredProducts}
+          keyExtractor={(product) => product.id}
+          emptyMessage="No se encontraron productos"
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal

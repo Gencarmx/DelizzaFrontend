@@ -6,32 +6,73 @@ import Input from "@components/restaurant-ui/forms/Input";
 import Select from "@components/restaurant-ui/forms/Select";
 import Textarea from "@components/restaurant-ui/forms/Textarea";
 import type { SelectOption } from "@components/restaurant-ui/forms/Select";
+import { 
+  getProductById, 
+  updateProduct, 
+  uploadProductImage 
+} from "@core/services/productService";
+import { useAuth } from "@core/context/AuthContext";
 
 export default function ProductEdit() {
   const navigate = useNavigate();
   const { productId } = useParams();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(
-    "https://images.unsplash.com/photo-1568901346375-23c9450c58cd",
-  );
+  const [isLoadingProduct, setIsLoadingProduct] = useState(true);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [businessId, setBusinessId] = useState<string>("");
 
   const [formData, setFormData] = useState({
-    name: "Hamburguesa Clásica",
-    category: "hamburguesas",
-    price: "120",
-    stock: "45",
-    description:
-      "Deliciosa hamburguesa con carne de res, lechuga, tomate, cebolla y queso cheddar. Servida con papas fritas.",
+    name: "",
+    category: "",
+    price: "",
+    stock: "",
+    description: "",
     status: "active",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Simulate loading product data
+  // Cargar datos del producto
   useEffect(() => {
-    // In a real app, fetch product data by productId
-    console.log("Loading product:", productId);
-  }, [productId]);
+    async function loadProduct() {
+      if (!productId) {
+        navigate("/restaurant/products");
+        return;
+      }
+
+      try {
+        setIsLoadingProduct(true);
+        const product = await getProductById(productId);
+        
+        if (!product) {
+          throw new Error("Producto no encontrado");
+        }
+
+        // Cargar datos del producto en el formulario
+        setFormData({
+          name: product.name || "",
+          category: "", // La tabla products no tiene category_id aún
+          price: product.price?.toString() || "",
+          stock: product.stock?.toString() || "0",
+          description: product.description || "",
+          status: product.active ? "active" : "inactive",
+        });
+
+        setImagePreview(product.image_url || null);
+        setBusinessId(product.business_id);
+      } catch (error) {
+        console.error("Error cargando producto:", error);
+        alert("Error al cargar el producto");
+        navigate("/restaurant/products");
+      } finally {
+        setIsLoadingProduct(false);
+      }
+    }
+
+    loadProduct();
+  }, [productId, navigate]);
 
   const categories: SelectOption[] = [
     { value: "", label: "Selecciona una categoría" },
@@ -59,6 +100,7 @@ export default function ProductEdit() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -69,6 +111,7 @@ export default function ProductEdit() {
 
   const removeImage = () => {
     setImagePreview(null);
+    setImageFile(null);
   };
 
   const validate = () => {
@@ -101,18 +144,74 @@ export default function ProductEdit() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validate()) {
+    if (!validate() || !productId) {
       return;
     }
 
-    setIsLoading(true);
+    try {
+      setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+      let imageUrl = imagePreview;
+
+      // Si hay una nueva imagen, subirla primero
+      if (imageFile && businessId) {
+        console.log("Subiendo nueva imagen...");
+        imageUrl = await uploadProductImage(imageFile, businessId, productId);
+        console.log("Imagen subida exitosamente:", imageUrl);
+      }
+
+      // Preparar datos para actualizar
+      const updateData: {
+        name: string;
+        description: string;
+        price: number;
+        active: boolean;
+        stock: number;
+        image_url?: string;
+      } = {
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        price: parseFloat(formData.price),
+        active: formData.status === "active",
+        stock: parseInt(formData.stock) || 0,
+      };
+
+      // Solo actualizar image_url si cambió
+      if (imageUrl && imageUrl !== imagePreview) {
+        updateData.image_url = imageUrl;
+      }
+
+      console.log("Actualizando producto con datos:", updateData);
+
+      // Actualizar producto
+      await updateProduct(productId, updateData);
+
+      console.log("Producto actualizado exitosamente");
+      alert("Producto actualizado exitosamente");
       navigate("/restaurant/products");
-    }, 1500);
+    } catch (error) {
+      console.error("Error actualizando producto:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Error al actualizar el producto"
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  // Mostrar loading mientras carga el producto
+  if (isLoadingProduct) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Cargando producto...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl">

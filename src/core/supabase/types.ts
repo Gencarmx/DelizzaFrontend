@@ -162,6 +162,7 @@ export type Database = {
           order_id: string | null
           price: number
           product_id: string | null
+          product_name: string | null
           quantity: number
           updated_at: string | null
         }
@@ -172,6 +173,7 @@ export type Database = {
           order_id?: string | null
           price: number
           product_id?: string | null
+          product_name?: string | null
           quantity: number
           updated_at?: string | null
         }
@@ -182,9 +184,11 @@ export type Database = {
           order_id?: string | null
           price?: number
           product_id?: string | null
+          product_name?: string | null
           quantity?: number
           updated_at?: string | null
         }
+
         Relationships: [
           {
             foreignKeyName: "order_items_order_id_fkey"
@@ -353,6 +357,7 @@ export type Database = {
           image_url: string | null
           name: string
           price: number
+          stock: number
           updated_at: string | null
         }
         Insert: {
@@ -364,6 +369,7 @@ export type Database = {
           image_url?: string | null
           name: string
           price: number
+          stock?: number
           updated_at?: string | null
         }
         Update: {
@@ -375,6 +381,7 @@ export type Database = {
           image_url?: string | null
           name?: string
           price?: number
+          stock?: number
           updated_at?: string | null
         }
         Relationships: [

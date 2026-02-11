@@ -1,16 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ChevronLeft, Upload, X } from "lucide-react";
 import Button from "@components/restaurant-ui/buttons/Button";
 import Input from "@components/restaurant-ui/forms/Input";
 import Select from "@components/restaurant-ui/forms/Select";
 import Textarea from "@components/restaurant-ui/forms/Textarea";
+import { useAuth } from "@core/context/AuthContext";
+import { createProduct, uploadProductImage } from "@core/services/productService";
+import { getBusinessByOwner } from "@core/services/businessService";
+import { getActiveProductCategories } from "@core/services/productCategoryService";
 import type { SelectOption } from "@components/restaurant-ui/forms/Select";
 
 export default function ProductAdd() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [businessId, setBusinessId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<SelectOption[]>([
+    { value: "", label: "Selecciona una categoría" }
+  ]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -23,16 +33,39 @@ export default function ProductAdd() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const categories: SelectOption[] = [
-    { value: "", label: "Selecciona una categoría" },
-    { value: "hamburguesas", label: "Hamburguesas" },
-    { value: "pizzas", label: "Pizzas" },
-    { value: "tacos", label: "Tacos" },
-    { value: "sushi", label: "Sushi" },
-    { value: "hot-dogs", label: "Hot Dogs" },
-    { value: "bebidas", label: "Bebidas" },
-    { value: "postres", label: "Postres" },
-  ];
+  // Cargar categorías dinámicas y obtener businessId
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user?.id) return;
+
+      try {
+        // Obtener el business del usuario
+        const business = await getBusinessByOwner(user.id);
+        if (!business) {
+          setErrors({ general: "No se encontró un restaurante asociado a tu cuenta" });
+          return;
+        }
+        setBusinessId(business.id);
+
+        // Cargar categorías dinámicas
+        const categoriesData = await getActiveProductCategories();
+        const categoryOptions: SelectOption[] = [
+          { value: "", label: "Selecciona una categoría" },
+          ...categoriesData.map(cat => ({
+            value: cat.id,
+            label: cat.name
+          }))
+        ];
+        setCategories(categoryOptions);
+
+      } catch (err) {
+        console.error("Error cargando datos:", err);
+        setErrors({ general: "Error al cargar los datos necesarios" });
+      }
+    };
+
+    loadData();
+  }, [user?.id]);
 
   const statusOptions: SelectOption[] = [
     { value: "active", label: "Activo" },
@@ -50,6 +83,7 @@ export default function ProductAdd() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -60,6 +94,7 @@ export default function ProductAdd() {
 
   const removeImage = () => {
     setImagePreview(null);
+    setSelectedImageFile(null);
   };
 
   const validate = () => {
@@ -92,17 +127,45 @@ export default function ProductAdd() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validate()) {
+    if (!validate() || !businessId) {
       return;
     }
 
     setIsLoading(true);
+    setErrors({});
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      let imageUrl: string | undefined;
+
+      // Subir imagen si se seleccionó una
+      if (selectedImageFile) {
+        imageUrl = await uploadProductImage(selectedImageFile, businessId);
+      }
+
+      // Crear el producto
+      const productData = {
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        price: parseFloat(formData.price),
+        business_id: businessId,
+        image_url: imageUrl,
+        active: formData.status === "active",
+        stock: parseInt(formData.stock) || 0,
+      };
+
+      await createProduct(productData);
+
+      // Redirigir a la lista de productos
       navigate("/restaurant/products");
-    }, 1500);
+
+    } catch (err) {
+      console.error("Error creando producto:", err);
+      setErrors({
+        general: err instanceof Error ? err.message : "Error desconocido al crear el producto"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -124,6 +187,22 @@ export default function ProductAdd() {
           </p>
         </div>
       </div>
+
+      {/* Error Message */}
+      {errors.general && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 text-red-600 dark:text-red-400">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <p className="text-red-800 dark:text-red-200 text-sm font-medium">
+              {errors.general}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
