@@ -11,13 +11,13 @@ import {
   updateProduct, 
   uploadProductImage 
 } from "@core/services/productService";
-import { useAuth } from "@core/context/AuthContext";
+
 
 export default function ProductEdit() {
   const navigate = useNavigate();
   const { productId } = useParams();
-  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+
   const [isLoadingProduct, setIsLoadingProduct] = useState(true);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);

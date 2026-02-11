@@ -286,7 +286,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // ⚠️ CONSIDERACIÓN DE SEGURIDAD:
       // La fuente de verdad es la tabla 'profiles' manejada por triggers del servidor.
       // Los metadatos son solo para conveniencia y para que los triggers los procesen.
-      const { data, error } = await supabase.auth.signUp({
+      const { data: _data, error } = await supabase.auth.signUp({
+
         email,
         password,
         options: {
