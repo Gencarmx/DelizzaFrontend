@@ -3,7 +3,6 @@ import { ChevronLeft, Save, Loader2, Store, MapPin, Image as ImageIcon, Phone, U
 import { useNavigate } from "react-router";
 import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
 import { getBusinessById, updateBusiness, uploadBusinessLogo, deleteBusinessLogo } from "@core/services/businessService";
-import { supabase } from "@core/supabase/client";
 
 interface BusinessFormData {
   name: string;

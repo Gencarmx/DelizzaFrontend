@@ -224,8 +224,7 @@ export async function markOrderAsPaid(orderId: string): Promise<Order> {
  */
 export async function cancelOrder(
   orderId: string,
-  reason: string,
-  // cancelledBy?: string // Not used currently
+  _reason: string,
 ): Promise<Order> {
   try {
     // Verificar que el pedido puede ser cancelado
