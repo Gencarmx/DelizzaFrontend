@@ -81,8 +81,6 @@ export default function Home() {
             code: favoritesError.code
           });
         } else {
-          console.log('Productos cargados:', favoritesData);
-          
           // Cargar nombres de restaurantes por separado
           const businessIds = [...new Set(favoritesData?.map(p => p.business_id) || [])];
           const { data: businessesData } = await supabase
@@ -125,7 +123,6 @@ export default function Home() {
             code: restaurantsError.code
           });
         } else {
-          console.log('Restaurantes cargados:', restaurantsData);
           const mappedRestaurants = restaurantsData?.map(b => ({
             id: b.id,
             name: b.name,

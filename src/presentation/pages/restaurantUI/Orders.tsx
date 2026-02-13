@@ -1,27 +1,37 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, Eye, Loader2, Wifi, WifiOff } from "lucide-react";
+import { Search, Filter, Eye, Loader2, Wifi, WifiOff, ChefHat, Package, X } from "lucide-react";
 import DataTable from "@components/restaurant-ui/tables/DataTable";
 import StatusBadge from "@components/restaurant-ui/badges/StatusBadge";
 import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
-import { getRecentOrders } from "@core/services/orderService";
+import { getRecentOrders, updateOrderStatus } from "@core/services/orderService";
+import { getBusinessById } from "@core/services/businessService";
+import { PrintButton } from "@presentation/components/printing";
 import type { Column } from "@components/restaurant-ui/tables/DataTable";
 
 
 interface Order {
   id: string;
+  fullId: string; // ID completo para operaciones de base de datos
   customer: string;
   items: string;
   total: number;
-  status: "pending" | "completed" | "cancelled" | "in_progress";
+  status: "pending" | "completed" | "cancelled" | "in_progress" | "ready" | "preparing";
   date: string;
   paymentMethod: string;
+  originalStatus?: string;
 }
 
 export default function Orders() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("pending");
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatingOrders, setUpdatingOrders] = useState<Set<string>>(new Set());
+  const [businessInfo, setBusinessInfo] = useState<{
+    name: string;
+    address: string;
+    phone: string;
+  } | null>(null);
   
   // Obtener notificaciones en tiempo real y estado de conexión
   const { 
@@ -31,6 +41,62 @@ export default function Orders() {
     businessId,
     markAsRead 
   } = useRestaurantNotifications();
+
+  // Cargar información del negocio cuando cambia el businessId
+  useEffect(() => {
+    const loadBusinessInfo = async () => {
+      if (!businessId) {
+        setBusinessInfo(null);
+        return;
+      }
+
+      try {
+        const business = await getBusinessById(businessId);
+        if (business) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const businessData = business as any;
+          setBusinessInfo({
+            name: business.name || "Mi Restaurante",
+            address: business.address || "Dirección del restaurante",
+            phone: businessData.phone_number || business.profile?.phone_number || "Teléfono",
+          });
+        }
+      } catch (error) {
+        console.error('Error cargando información del negocio:', error);
+        setBusinessInfo(null);
+      }
+    };
+
+    loadBusinessInfo();
+  }, [businessId]);
+
+  // Función para actualizar el estado de un pedido
+  const handleStatusChange = async (fullId: string, displayId: string, newStatus: string) => {
+    if (!fullId || fullId === 'undefined') {
+      console.error('❌ Error: fullId es undefined o inválido');
+      return;
+    }
+    
+    try {
+      setUpdatingOrders(prev => new Set(prev).add(displayId));
+      await updateOrderStatus(fullId, newStatus as any);
+      
+      // Actualizar el estado local
+      setOrders(prev => prev.map(order => 
+        order.fullId === fullId 
+          ? { ...order, status: mapOrderStatus(newStatus) }
+          : order
+      ));
+    } catch (error) {
+      console.error('Error actualizando estado:', error);
+    } finally {
+      setUpdatingOrders(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(displayId);
+        return newSet;
+      });
+    }
+  };
 
   // Cargar pedidos iniciales
   useEffect(() => {
@@ -42,28 +108,33 @@ export default function Orders() {
 
       try {
         setLoading(true);
-        const ordersData = await getRecentOrders(businessId, 50); // Cargar más pedidos
+        const ordersData = await getRecentOrders(businessId, 50);
         
-        const formattedOrders: Order[] = ordersData.map(order => ({
-          id: order.id.slice(-8).toUpperCase(), // Mostrar últimos 8 caracteres
-          customer: order.customer_name || 'Cliente',
-          items: order.order_items?.map(item => 
-            `${item.quantity}x ${item.product_name || 'Producto'}`
-          ).join(', ') || 'Sin items',
+        const formattedOrders: Order[] = ordersData.map(order => {
+          const formattedOrder = {
+            id: order.id.slice(-8).toUpperCase(),
+            fullId: order.id, // Guardar el ID completo
+            customer: order.customer_name || 'Cliente',
+            items: order.order_items?.map(item => 
+              `${item.quantity}x ${item.product_name || 'Producto'}`
+            ).join(', ') || 'Sin items',
+            total: order.total,
+            status: mapOrderStatus(order.status || 'pending'),
+            originalStatus: order.status || undefined,
+            date: order.created_at 
+              ? new Date(order.created_at).toLocaleString('es-ES', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              : 'Sin fecha',
+            paymentMethod: order.payment_method || 'No especificado',
+          };
 
-          total: order.total,
-          status: mapOrderStatus(order.status || 'pending'),
-          date: order.created_at 
-            ? new Date(order.created_at).toLocaleString('es-ES', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })
-            : 'Sin fecha',
-          paymentMethod: order.payment_method || 'No especificado',
-        }));
+          return formattedOrder;
+        });
         
         setOrders(formattedOrders);
       } catch (error) {
@@ -79,34 +150,38 @@ export default function Orders() {
   // Escuchar nuevos pedidos en tiempo real
   useEffect(() => {
     if (hasNewOrder && latestOrder && businessId) {
-      // Recargar la lista de pedidos cuando llegue uno nuevo
       const reloadOrders = async () => {
         try {
           const ordersData = await getRecentOrders(businessId, 50);
           
-          const formattedOrders: Order[] = ordersData.map(order => ({
-            id: order.id.slice(-8).toUpperCase(),
-            customer: order.customer_name || 'Cliente',
-            items: order.order_items?.map(item => 
-              `${item.quantity}x ${item.product_name || 'Producto'}`
-            ).join(', ') || 'Sin items',
-
-            total: order.total,
-            status: mapOrderStatus(order.status || 'pending'),
-            date: order.created_at 
-              ? new Date(order.created_at).toLocaleString('es-ES', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })
-              : 'Sin fecha',
-            paymentMethod: order.payment_method || 'No especificado',
-          }));
+          const formattedOrders: Order[] = ordersData.map(order => {
+            const formattedOrder = {
+              id: order.id.slice(-8).toUpperCase(),
+              fullId: order.id, // Guardar el ID completo
+              customer: order.customer_name || 'Cliente',
+              items: order.order_items?.map(item => 
+                `${item.quantity}x ${item.product_name || 'Producto'}`
+              ).join(', ') || 'Sin items',
+              total: order.total,
+              status: mapOrderStatus(order.status || 'pending'),
+              originalStatus: order.status || undefined,
+              date: order.created_at 
+                ? new Date(order.created_at).toLocaleString('es-ES', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })
+                : 'Sin fecha',
+              paymentMethod: order.payment_method || 'No especificado',
+            };
+            
+            return formattedOrder;
+          });
           
           setOrders(formattedOrders);
-          markAsRead(); // Marcar como leída la notificación
+          markAsRead();
         } catch (error) {
           console.error('Error recargando pedidos:', error);
         }
@@ -123,8 +198,9 @@ export default function Orders() {
         return 'pending';
       case 'confirmed':
       case 'preparing':
-        return 'in_progress';
+        return 'preparing';
       case 'ready':
+        return 'ready';
       case 'completed':
         return 'completed';
       case 'cancelled':
@@ -134,6 +210,95 @@ export default function Orders() {
     }
   }
 
+  // Determina qué acciones mostrar según el estado
+  const getActionsForStatus = (order: Order) => {
+    const { status } = order;
+    const isUpdating = updatingOrders.has(order.id);
+    
+    // Debug: verificar que fullId existe
+    if (!order.fullId) {
+      console.error('❌ Error: order.fullId es undefined para el pedido:', order);
+    }
+    
+    // No mostrar acciones si está completado o cancelado
+    if (status === 'completed' || status === 'cancelled') {
+      return (
+        <div className="flex items-center gap-1">
+        {/* Botón: Imprimir ticket */}
+        <PrintButton 
+          order={order} 
+          variant="icon"
+          businessName={businessInfo?.name || "Mi Restaurante"}
+          businessAddress={businessInfo?.address || "Dirección del restaurante"}
+          businessPhone={businessInfo?.phone || "Teléfono"}
+        />
+          
+          {/* Botón: Ver detalles - siempre visible */}
+          <button
+            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            title="Ver detalles"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-1">
+        {/* Botón: En preparación (ChefHat) - visible cuando está pendiente */}
+        {status === 'pending' && (
+          <button
+            onClick={() => handleStatusChange(order.fullId, order.id, 'preparing')}
+            disabled={isUpdating}
+            className="p-1.5 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-full text-orange-500 hover:text-orange-600 dark:hover:text-orange-400 transition-colors disabled:opacity-50"
+            title="Marcar en preparación"
+          >
+            <ChefHat className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Botón: Listo para entrega (Package) - visible cuando está pendiente o en preparación */}
+        {(status === 'pending' || status === 'preparing') && (
+          <button
+            onClick={() => handleStatusChange(order.fullId, order.id, 'ready')}
+            disabled={isUpdating}
+            className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-full text-green-500 hover:text-green-600 dark:hover:text-green-400 transition-colors disabled:opacity-50"
+            title="Marcar listo para entrega"
+          >
+            <Package className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Botón: Cancelar (X) - siempre visible para pedidos activos */}
+        <button
+          onClick={() => handleStatusChange(order.fullId, order.id, 'cancelled')}
+          disabled={isUpdating}
+          className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-full text-red-500 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
+          title="Cancelar pedido"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+          {/* Botón: Imprimir ticket */}
+          <PrintButton 
+            order={order} 
+            variant="icon"
+            businessName={businessInfo?.name || "Mi Restaurante"}
+            businessAddress={businessInfo?.address || "Dirección del restaurante"}
+            businessPhone={businessInfo?.phone || "Teléfono"}
+          />
+
+        {/* Botón: Ver detalles - siempre visible */}
+        <button
+          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          title="Ver detalles"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  };
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
@@ -203,7 +368,7 @@ export default function Orders() {
     {
       key: "status",
       header: "Estado",
-      width: "130px",
+      width: "150px",
       render: (order) => <StatusBadge status={order.status} />,
     },
     {
@@ -219,12 +384,8 @@ export default function Orders() {
     {
       key: "actions",
       header: "Acciones",
-      width: "80px",
-      render: () => (
-        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-          <Eye className="w-5 h-5" />
-        </button>
-      ),
+      width: "120px",
+      render: (order) => getActionsForStatus(order),
     },
 
   ];
@@ -280,7 +441,8 @@ export default function Orders() {
           >
             <option value="all">Todos los estados</option>
             <option value="pending">Pendientes</option>
-            <option value="in_progress">En preparación</option>
+            <option value="preparing">En preparación</option>
+            <option value="ready">Listo para entrega</option>
             <option value="completed">Completados</option>
             <option value="cancelled">Cancelados</option>
           </select>
@@ -298,7 +460,7 @@ export default function Orders() {
           <DataTable
             columns={columns}
             data={filteredOrders}
-            keyExtractor={(order) => order.id}
+            keyExtractor={(order) => order.fullId || order.id}
             emptyMessage="No se encontraron pedidos"
           />
         )}

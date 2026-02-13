@@ -155,9 +155,7 @@ export default function ProductEdit() {
 
       // Si hay una nueva imagen, subirla primero
       if (imageFile && businessId) {
-        console.log("Subiendo nueva imagen...");
         imageUrl = await uploadProductImage(imageFile, businessId, productId);
-        console.log("Imagen subida exitosamente:", imageUrl);
       }
 
       // Preparar datos para actualizar
@@ -181,12 +179,9 @@ export default function ProductEdit() {
         updateData.image_url = imageUrl;
       }
 
-      console.log("Actualizando producto con datos:", updateData);
-
       // Actualizar producto
       await updateProduct(productId, updateData);
 
-      console.log("Producto actualizado exitosamente");
       alert("Producto actualizado exitosamente");
       navigate("/restaurant/products");
     } catch (error) {

@@ -164,16 +164,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return business?.active ?? null;
       };
 
-      // Add 3 second timeout to prevent hanging
+      // Add 10 second timeout to prevent hanging
       const timeoutPromise = new Promise<null>((_, reject) => {
-        setTimeout(() => reject(new Error("Business status fetch timeout")), 3000);
+        setTimeout(() => reject(new Error("Business status fetch timeout")), 10000);
       });
 
       try {
         const result = await Promise.race([fetchWithTimeout(), timeoutPromise]);
         return result;
       } catch (error) {
-        console.error('Business status fetch timeout or error:', error);
+        console.warn('Business status fetch timeout or error:', error);
         return null;
       }
     };
@@ -282,7 +282,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Los metadatos (user_role, business_name, etc.) se establecen aquí para:
       // 1. Que los triggers tengan acceso a esta información
       // 2. Proporcionar acceso inmediato sin consultar la BD
-      // 
+      //
       // ⚠️ CONSIDERACIÓN DE SEGURIDAD:
       // La fuente de verdad es la tabla 'profiles' manejada por triggers del servidor.
       // Los metadatos son solo para conveniencia y para que los triggers los procesen.
@@ -297,6 +297,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             user_role: 'owner', // Metadatos para triggers y acceso rápido
             business_name: businessName,
             business_address: businessAddress,
+            business_phone: phoneNumber,
           },
         },
       });

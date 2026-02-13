@@ -23,8 +23,6 @@ export default function PendingApproval() {
       if (!user?.id) return;
 
       attempts++;
-      console.log(`Attempt ${attempts}/${MAX_RETRIES} to fetch business status`);
-      console.log('🔍 USER ID:', user.id); // ← AGREGAR ESTE LOG
 
       try {
         // First get the profile id
@@ -41,11 +39,8 @@ export default function PendingApproval() {
 
         // If profile doesn't exist yet, keep polling
         if (!profile) {
-          console.log('Profile not created yet, will retry...');
-          
           // After max retries, show pending state anyway
           if (attempts >= MAX_RETRIES) {
-            console.log('Max retries reached, showing pending state without business');
             setBusinessStatus({
               name: 'Tu Restaurante',
               active: false,
@@ -61,14 +56,11 @@ export default function PendingApproval() {
         }
 
         // Get business info using profile.id
-        console.log('🔍 Searching business with owner_id:', profile.id);
         const { data: business, error: businessError } = await supabase
           .from('businesses')
           .select('name, active')
           .eq('owner_id', profile.id)
           .maybeSingle();
-
-        console.log('🏢 Business query result:', { business, businessError });
 
         // Handle business not found (still being created)
         if (businessError && businessError.code !== 'PGRST116') {
@@ -77,11 +69,8 @@ export default function PendingApproval() {
 
         // If business doesn't exist yet
         if (!business) {
-          console.log('Business not created yet, will retry...');
-          
           // After max retries, show pending state anyway
           if (attempts >= MAX_RETRIES) {
-            console.log('Max retries reached, showing pending state');
             setBusinessStatus({
               name: 'Tu Restaurante',
               active: false,
@@ -97,7 +86,6 @@ export default function PendingApproval() {
         }
 
         // Business found! Set status and stop polling
-        console.log('Business found:', business.name);
         setBusinessStatus({
           name: business.name,
           active: business.active,
@@ -129,7 +117,6 @@ export default function PendingApproval() {
         }
         // If we hit max retries and still no business, show pending state
         if (!businessStatus && attempts >= MAX_RETRIES) {
-          console.log('Polling stopped: max retries reached');
           setBusinessStatus({
             name: 'Tu Restaurante',
             active: false,

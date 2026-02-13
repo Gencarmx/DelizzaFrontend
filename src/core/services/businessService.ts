@@ -239,39 +239,25 @@ export async function toggleBusinessStatus(businessId: string): Promise<Business
 }
 
 /**
- * Sube un logo de restaurante a Supabase Storage
+ * Sube una imagen de logo para un negocio a Supabase Storage
  */
 export async function uploadBusinessLogo(
-  file: File,
-  businessId: string
+  businessId: string,
+  file: File
 ): Promise<string> {
   try {
-    // Validar tipo de archivo
-    if (!file.type.startsWith('image/')) {
-      throw new Error('El archivo debe ser una imagen');
-    }
-
-    // Validar tamaño (máximo 2MB para logos)
-    const maxSize = 2 * 1024 * 1024; // 2MB
-    if (file.size > maxSize) {
-      throw new Error('El logo no puede ser mayor a 2MB');
-    }
-
-    // Generar nombre único para el archivo
     const fileExt = file.name.split('.').pop();
-    const fileName = `logos/${businessId}_${Date.now()}.${fileExt}`;
+    const fileName = `${businessId}/logo.${fileExt}`;
 
-    // Subir archivo a Supabase Storage
-    const { error } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('business-logos')
       .upload(fileName, file, {
         cacheControl: '3600',
-        upsert: true // Permitir sobreescribir logos anteriores
+        upsert: true
       });
 
-    if (error) throw error;
+    if (uploadError) throw uploadError;
 
-    // Obtener URL pública del archivo
     const { data: urlData } = supabase.storage
       .from('business-logos')
       .getPublicUrl(fileName);
@@ -284,6 +270,25 @@ export async function uploadBusinessLogo(
   } catch (error) {
     console.error('Error subiendo logo:', error);
     throw error instanceof Error ? error : new Error('Error desconocido al subir logo');
+  }
+}
+
+/**
+ * Elimina el logo de un negocio de Supabase Storage
+ */
+export async function deleteBusinessLogo(logoUrl: string): Promise<void> {
+  try {
+    const fileName = logoUrl.split('/business-logos/')[1];
+    if (!fileName) return;
+
+    const { error } = await supabase.storage
+      .from('business-logos')
+      .remove([fileName]);
+
+    if (error) throw error;
+
+  } catch (error) {
+    console.error('Error eliminando logo:', error);
   }
 }
 

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "@core/context/AuthContext";
 import { Eye, EyeOff, Upload } from "lucide-react";
+import { uploadBusinessLogo } from "@core/services/businessService";
+import { getBusinessByOwner } from "@core/services/businessService";
 
 export default function RegisterOwner() {
   const [fullName, setFullName] = useState("");
@@ -11,14 +13,12 @@ export default function RegisterOwner() {
   const [businessName, setBusinessName] = useState("");
   const [businessAddress, setBusinessAddress] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [licenseFile, setLicenseFile] = useState<File | null>(null);
-  const [idFile, setIdFile] = useState<File | null>(null);
-  const [photos, setPhotos] = useState<File[]>([]);
+  const [restaurantPhoto, setRestaurantPhoto] = useState<File | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signUpOwner } = useAuth();
+  const { signUpOwner, user } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,14 +35,14 @@ export default function RegisterOwner() {
       return;
     }
 
-    if (!licenseFile || !idFile || photos.length === 0) {
-      setError("Debe subir todos los documentos requeridos");
+    if (!restaurantPhoto) {
+      setError("Debe subir una foto del restaurante");
       return;
     }
 
     setLoading(true);
 
-    const { error } = await signUpOwner(
+    const { error: signUpError } = await signUpOwner(
       email,
       password,
       fullName,
@@ -51,25 +51,20 @@ export default function RegisterOwner() {
       phoneNumber
     );
 
-    if (error) {
-      // Parse error message to provide user-friendly feedback with specific field information
-      let errorMessage = error.message;
+    if (signUpError) {
+      let errorMessage = signUpError.message;
       const originalError = errorMessage.toLowerCase();
 
-      // Check for duplicate email
       if (originalError.includes("user already registered") || 
           (originalError.includes("email") && originalError.includes("already"))) {
         errorMessage = `❌ El correo electrónico "${email}" ya está registrado. Por favor usa otro correo o inicia sesión.`;
       }
-      // Check for duplicate phone number
       else if (originalError.includes("users_phone_number_key") || 
                (originalError.includes("phone") && originalError.includes("duplicate"))) {
         errorMessage = `❌ El número de teléfono "${phoneNumber}" ya está registrado. Por favor usa otro número.`;
       }
-      // Check for both duplicates (if error message contains both)
       else if (originalError.includes("duplicate") && 
                (originalError.includes("email") || originalError.includes("phone"))) {
-        // Try to determine which fields are duplicated
         const duplicatedFields = [];
         if (originalError.includes("email")) duplicatedFields.push(`correo "${email}"`);
         if (originalError.includes("phone")) duplicatedFields.push(`teléfono "${phoneNumber}"`);
@@ -80,15 +75,12 @@ export default function RegisterOwner() {
           errorMessage = "❌ Algunos datos ya están registrados. Por favor verifica el correo y número de teléfono.";
         }
       }
-      // Check for database errors
       else if (originalError.includes("database error")) {
         errorMessage = "❌ Error al crear la cuenta. Por favor verifica que el correo y número de teléfono no estén ya registrados.";
       }
-      // Generic network error
       else if (originalError.includes("failed to fetch") || originalError.includes("network")) {
         errorMessage = "❌ Error de conexión. Por favor verifica tu conexión a internet e intenta nuevamente.";
       }
-      // Keep original error if we can't parse it
       else if (!errorMessage.startsWith("❌")) {
         errorMessage = `❌ ${errorMessage}`;
       }
@@ -96,22 +88,24 @@ export default function RegisterOwner() {
       setError(errorMessage);
       setLoading(false);
     } else {
-      // Navigate to pending approval page
+      try {
+        if (user?.id && restaurantPhoto) {
+          const business = await getBusinessByOwner(user.id);
+          if (business) {
+            await uploadBusinessLogo(business.id, restaurantPhoto);
+          }
+        }
+      } catch (uploadError) {
+        console.error('Error subiendo logo del restaurante:', uploadError);
+      }
+      
       navigate("/pending-approval");
     }
   };
 
-  const handleFileChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    setter: (file: File | null) => void
-  ) => {
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
-    setter(file);
-  };
-
-  const handlePhotosChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setPhotos(files);
+    setRestaurantPhoto(file);
   };
 
   return (
@@ -267,87 +261,29 @@ export default function RegisterOwner() {
             />
           </div>
 
-          {/* Documents Section */}
-          <div className="flex flex-col gap-4">
-            <h3 className="text-lg font-semibold text-gray-900">Documentos Requeridos</h3>
-
-            {/* License Upload */}
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-700">
-                Licencia comercial
+          {/* Restaurant Photo Upload */}
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-gray-700">
+              Foto del restaurante
+            </label>
+            <div className="relative">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                className="hidden"
+                id="restaurantPhoto"
+                required
+              />
+              <label
+                htmlFor="restaurantPhoto"
+                className="flex items-center gap-3 w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-all"
+              >
+                <Upload className="w-5 h-5 text-gray-400" />
+                <span className="text-gray-600">
+                  {restaurantPhoto ? restaurantPhoto.name : "Seleccionar archivo"}
+                </span>
               </label>
-              <div className="relative">
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={(e) => handleFileChange(e, setLicenseFile)}
-                  className="hidden"
-                  id="license"
-                  required
-                />
-                <label
-                  htmlFor="license"
-                  className="flex items-center gap-3 w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-all"
-                >
-                  <Upload className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-600">
-                    {licenseFile ? licenseFile.name : "Seleccionar archivo"}
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            {/* ID Upload */}
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-700">
-                Identificación personal
-              </label>
-              <div className="relative">
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={(e) => handleFileChange(e, setIdFile)}
-                  className="hidden"
-                  id="id"
-                  required
-                />
-                <label
-                  htmlFor="id"
-                  className="flex items-center gap-3 w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-all"
-                >
-                  <Upload className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-600">
-                    {idFile ? idFile.name : "Seleccionar archivo"}
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            {/* Photos Upload */}
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-700">
-                Fotos del restaurante
-              </label>
-              <div className="relative">
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handlePhotosChange}
-                  className="hidden"
-                  id="photos"
-                  required
-                />
-                <label
-                  htmlFor="photos"
-                  className="flex items-center gap-3 w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-all"
-                >
-                  <Upload className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-600">
-                    {photos.length > 0 ? `${photos.length} archivo(s) seleccionado(s)` : "Seleccionar archivos"}
-                  </span>
-                </label>
-              </div>
             </div>
           </div>
 

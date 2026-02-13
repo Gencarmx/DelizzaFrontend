@@ -1,0 +1,235 @@
+/* Estilos para visualización en pantalla */
+.order-ticket {
+  font-family: 'Courier New', Courier, monospace;
+  max-width: 300px;
+  margin: 0 auto;
+  padding: 20px;
+  background: white;
+  color: black;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ticket-header {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.business-name {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0 0 8px 0;
+  text-transform: uppercase;
+}
+
+.business-info {
+  font-size: 11px;
+  margin: 2px 0;
+}
+
+.divider {
+  margin: 8px 0;
+  font-size: 10px;
+  overflow: hidden;
+}
+
+.divider-thin {
+  margin: 5px 0;
+  font-size: 10px;
+  overflow: hidden;
+}
+
+.ticket-order-info {
+  margin-bottom: 15px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 4px 0;
+  font-size: 11px;
+}
+
+.label {
+  font-weight: bold;
+}
+
+.value {
+  text-align: right;
+}
+
+.ticket-items {
+  margin-bottom: 15px;
+}
+
+.items-header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+  font-size: 11px;
+  margin-bottom: 5px;
+}
+
+.col-qty {
+  width: 15%;
+  text-align: left;
+}
+
+.col-item {
+  width: 60%;
+  text-align: left;
+}
+
+.col-price {
+  width: 25%;
+  text-align: right;
+}
+
+.item-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 0;
+  font-size: 11px;
+}
+
+.ticket-total {
+  margin-bottom: 15px;
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 16px;
+  font-weight: bold;
+  margin: 10px 0;
+}
+
+.total-label {
+  font-size: 16px;
+}
+
+.total-value {
+  font-size: 18px;
+}
+
+.ticket-footer {
+  text-align: center;
+  margin-top: 15px;
+}
+
+.footer-text {
+  margin: 5px 0;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.footer-small {
+  margin: 5px 0;
+  font-size: 10px;
+  color: #666;
+}
+
+/* Estilos específicos para impresión */
+@media print {
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  .order-ticket {
+    width: 80mm; /* Ancho estándar de impresora térmica */
+    max-width: 80mm;
+    margin: 0;
+    padding: 5mm;
+    font-size: 11px;
+    page-break-after: always;
+  }
+
+  /* Ocultar todo excepto el ticket */
+  body * {
+    visibility: hidden;
+  }
+
+  .order-ticket,
+  .order-ticket * {
+    visibility: visible;
+  }
+
+  .order-ticket {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+
+  /* Ajustes de tamaño para impresión */
+  .business-name {
+    font-size: 16px;
+  }
+
+  .business-info {
+    font-size: 10px;
+  }
+
+  .info-row,
+  .items-header,
+  .item-row {
+    font-size: 10px;
+  }
+
+  .total-row {
+    font-size: 14px;
+  }
+
+  .total-value {
+    font-size: 16px;
+  }
+
+  .footer-text {
+    font-size: 11px;
+  }
+
+  .footer-small {
+    font-size: 9px;
+  }
+
+  /* Eliminar márgenes y padding innecesarios */
+  @page {
+    margin: 0;
+    size: 80mm auto; /* Ancho fijo, alto automático */
+  }
+}
+
+/* Estilos para impresoras de 58mm (más pequeñas) */
+@media print and (max-width: 58mm) {
+  .order-ticket {
+    width: 58mm;
+    max-width: 58mm;
+    font-size: 10px;
+  }
+
+  .business-name {
+    font-size: 14px;
+  }
+
+  .business-info {
+    font-size: 9px;
+  }
+
+  .info-row,
+  .items-header,
+  .item-row {
+    font-size: 9px;
+  }
+
+  .total-row {
+    font-size: 12px;
+  }
+
+  .total-value {
+    font-size: 14px;
+  }
+
+  @page {
+    size: 58mm auto;
+  }
+}

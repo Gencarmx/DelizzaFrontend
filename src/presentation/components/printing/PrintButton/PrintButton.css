@@ -1,0 +1,67 @@
+/* Botón de impresión estilo icono */
+.print-button-icon {
+  padding: 6px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  color: #6b7280;
+}
+
+.print-button-icon:hover {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.dark .print-button-icon:hover {
+  background-color: #374151;
+  color: #d1d5db;
+}
+
+/* Botón de impresión estilo completo */
+.print-button-full {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: #f59e0b;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.print-button-full:hover {
+  background-color: #d97706;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.print-button-full:active {
+  transform: translateY(0);
+}
+
+/* Ocultar el ticket en la pantalla */
+.print-hidden {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  visibility: hidden;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* Asegurar que el ticket solo sea visible durante la impresión */
+@media screen {
+  .print-hidden {
+    display: none !important;
+  }
+}

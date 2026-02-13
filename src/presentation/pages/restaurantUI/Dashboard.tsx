@@ -142,21 +142,8 @@ export default function Dashboard() {
 
         // Cargar pedidos recientes
         const orders = await getRecentOrders(businessId, 5);
-        console.log('📦 Pedidos recibidos de API:', orders);
-        console.log('👤 Primer pedido:', orders[0]);
-        console.log('👤 Primer pedido customer_name:', orders[0]?.customer_name);
-        console.log('👤 Primer pedido keys:', orders[0] ? Object.keys(orders[0]) : 'N/A');
-        
-        const formattedOrders: Order[] = orders.map((order, index) => {
-          // Log para debuggear el problema con customer_name
-          if (index === 0) {
-            console.log('🔍 Dashboard - Mapeando primer pedido:', {
-              id: order.id,
-              customer_name: order.customer_name,
-              tipo: typeof order.customer_name,
-              keys: Object.keys(order)
-            });
-          }
+
+        const formattedOrders: Order[] = orders.map((order) => {
           return {
             id: order.id,
             customer: order.customer_name || 'Cliente',
@@ -170,7 +157,6 @@ export default function Dashboard() {
             }) : 'Sin fecha'
           };
         });
-        console.log('📝 Pedidos formateados:', formattedOrders);
         setRecentOrders(formattedOrders);
 
 
@@ -185,7 +171,6 @@ export default function Dashboard() {
 
         setHasData(hasRelevantData);
       } catch (error) {
-        console.error('Error cargando datos del dashboard:', error);
         // En caso de error, usar datos por defecto
         setMetrics([
           {
@@ -230,19 +215,12 @@ export default function Dashboard() {
 
   // Efecto para recargar pedidos cuando llega uno nuevo
   useEffect(() => {
-    console.log('🔔 Efecto de notificación ejecutado:', { hasNewOrder, latestOrder: latestOrder?.id, businessId });
-    
     if (hasNewOrder && latestOrder && businessId) {
-      console.log('✅ Condiciones cumplidas, recargando pedidos...');
-      
       // Recargar la lista de pedidos automáticamente
       const reloadOrders = async () => {
         try {
-          console.log('🔄 Iniciando recarga de pedidos para businessId:', businessId);
           const orders = await getRecentOrders(businessId, 5);
-          console.log('🔄 Recarga - Pedidos recibidos:', orders);
-          console.log('🔄 Recarga - Primer pedido customer_name:', orders[0]?.customer_name);
-          
+
           const formattedOrders: Order[] = orders.map(order => ({
             id: order.id,
             customer: order.customer_name || 'Cliente',
@@ -255,22 +233,14 @@ export default function Dashboard() {
               minute: '2-digit'
             }) : 'Sin fecha'
           }));
-          console.log('🔄 Recarga - Pedidos formateados:', formattedOrders);
           setRecentOrders(formattedOrders);
 
         } catch (error) {
-          console.error('❌ Error recargando pedidos:', error);
+          // Error silently handled
         }
       };
 
-      
       reloadOrders();
-    } else {
-      console.log('❌ Condiciones NO cumplidas:', { 
-        hasNewOrder, 
-        hasLatestOrder: !!latestOrder, 
-        hasBusinessId: !!businessId 
-      });
     }
   }, [hasNewOrder, latestOrder, businessId]);
 
@@ -291,14 +261,11 @@ export default function Dashboard() {
     {
       key: "customer",
       header: "Cliente",
-      render: (order) => {
-        console.log('🎨 Renderizando cliente:', order.id, order.customer);
-        return (
-          <span className="font-medium text-gray-900 dark:text-white">
-            {order.customer}
-          </span>
-        );
-      },
+      render: (order) => (
+        <span className="font-medium text-gray-900 dark:text-white">
+          {order.customer}
+        </span>
+      ),
     },
 
     {

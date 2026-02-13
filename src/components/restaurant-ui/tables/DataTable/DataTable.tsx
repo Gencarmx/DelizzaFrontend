@@ -20,8 +20,6 @@ export default function DataTable<T>({
   keyExtractor,
   emptyMessage = "No hay datos disponibles",
 }: DataTableProps<T>) {
-  console.log('📋 DataTable recibió data:', data);
-  console.log('📋 DataTable primer item:', data[0]);
   return (
 
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700 overflow-hidden">

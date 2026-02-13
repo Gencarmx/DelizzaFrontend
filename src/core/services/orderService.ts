@@ -166,13 +166,15 @@ export async function updateOrderStatus(
       .from('orders')
       .update(updateData)
       .eq('id', orderId)
-      .select()
-      .single();
+      .select();
 
     if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      throw new Error('No se pudo actualizar el pedido. Verifica los permisos o que el pedido existe.');
+    }
 
-    console.log(`Estado del pedido ${orderId} actualizado a: ${status}`);
-    return data;
+    return data[0];
   } catch (error) {
     console.error('Error actualizando estado del pedido:', error);
     throw error instanceof Error ? error : new Error('Error desconocido al actualizar pedido');
@@ -210,7 +212,6 @@ export async function markOrderAsPaid(orderId: string): Promise<Order> {
 
     if (error) throw error;
 
-    console.log(`Pedido ${orderId} marcado como pagado`);
     return data;
   } catch (error) {
     console.error('Error marcando pedido como pagado:', error);
@@ -253,7 +254,6 @@ export async function cancelOrder(
 
     if (error) throw error;
 
-    console.log(`Pedido ${orderId} cancelado. Razón: ${reason}`);
     return data;
   } catch (error) {
     console.error('Error cancelando pedido:', error);
@@ -321,17 +321,11 @@ export async function getRecentOrders(
 
     if (error) throw error;
 
-    console.log('📦 getRecentOrders - Datos recibidos:', data);
-    console.log('📦 getRecentOrders - Primer pedido:', data?.[0]);
-    console.log('📦 getRecentOrders - Primer pedido customer_name:', data?.[0]?.customer_name);
-    
     // Ensure customer_name is properly extracted and attached
     const processedData = (data || []).map(order => ({
       ...order,
       customer_name: extractCustomerName(order) || order.customer_name
     }));
-    
-    console.log('📦 getRecentOrders - Después de procesar, primer pedido customer_name:', processedData?.[0]?.customer_name);
 
     return processedData as OrderWithItems[];
 

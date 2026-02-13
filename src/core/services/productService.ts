@@ -119,7 +119,6 @@ export async function createProduct(productData: ProductData): Promise<Product> 
 
     if (error) throw error;
 
-    console.log('Producto creado exitosamente:', data.id);
     return data;
   } catch (error) {
     console.error('Error creando producto:', error);
@@ -163,7 +162,6 @@ export async function updateProduct(
 
     if (error) throw error;
 
-    console.log('Producto actualizado exitosamente:', productId);
     return data;
   } catch (error) {
     console.error('Error actualizando producto:', error);
@@ -192,8 +190,6 @@ export async function deleteProduct(productId: string): Promise<void> {
       .eq('id', productId);
 
     if (error) throw error;
-
-    console.log('Producto desactivado exitosamente:', productId);
   } catch (error) {
     console.error('Error eliminando producto:', error);
     throw error instanceof Error ? error : new Error('Error desconocido al eliminar producto');
@@ -225,7 +221,6 @@ export async function toggleProductStatus(productId: string): Promise<Product> {
 
     if (error) throw error;
 
-    console.log(`Producto ${newStatus ? 'activado' : 'desactivado'} exitosamente:`, productId);
     return data;
   } catch (error) {
     console.error('Error cambiando estado del producto:', error);
@@ -276,7 +271,6 @@ export async function uploadProductImage(
       throw new Error('No se pudo obtener la URL de la imagen');
     }
 
-    console.log('Imagen subida exitosamente:', urlData.publicUrl);
     return urlData.publicUrl;
   } catch (error) {
     console.error('Error subiendo imagen:', error);
