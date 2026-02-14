@@ -6,16 +6,23 @@
 import { supabase } from "@core/supabase/client";
 import type { Database } from "@core/supabase/types";
 
-type Order = Database['public']['Tables']['orders']['Row'];
+type Order = Database["public"]["Tables"]["orders"]["Row"];
 // type OrderInsert = Database['public']['Tables']['orders']['Insert']; // Not used currently
-type OrderUpdate = Database['public']['Tables']['orders']['Update'];
-type OrderItem = Database['public']['Tables']['order_items']['Row'];
+type OrderUpdate = Database["public"]["Tables"]["orders"]["Update"];
+type OrderItem = Database["public"]["Tables"]["order_items"]["Row"];
 
-export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled';
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "preparing"
+  | "ready"
+  | "completed"
+  | "cancelled";
 
 export interface OrderWithItems extends Order {
   order_items: OrderItem[];
   customer_name?: string;
+  business_name?: string;
   customer?: {
     full_name: string;
     phone_number: string;
@@ -32,15 +39,18 @@ function extractCustomerName(order: any): string | undefined {
   if (order.customerName) return order.customerName;
   if (order.customer?.full_name) return order.customer.full_name;
   if (order.customer?.name) return order.customer.name;
-  
+
   // Check if it's in a nested structure
   const rawData = order as Record<string, any>;
   for (const key of Object.keys(rawData)) {
-    if (key.toLowerCase().includes('customer') && typeof rawData[key] === 'string') {
+    if (
+      key.toLowerCase().includes("customer") &&
+      typeof rawData[key] === "string"
+    ) {
       return rawData[key];
     }
   }
-  
+
   return undefined;
 }
 
@@ -65,34 +75,35 @@ export interface OrderStats {
  */
 export async function getOrdersByBusiness(
   businessId: string,
-  filters?: OrderFilters
+  filters?: OrderFilters,
 ): Promise<OrderWithItems[]> {
   try {
     let query = supabase
-      .from('orders')
-      .select(`
+      .from("orders")
+      .select(
+        `
         *,
         order_items (*)
-      `)
-      .eq('business_id', businessId)
-      .order('created_at', { ascending: false });
-
+      `,
+      )
+      .eq("business_id", businessId)
+      .order("created_at", { ascending: false });
 
     // Aplicar filtros
     if (filters?.status) {
-      query = query.eq('status', filters.status);
+      query = query.eq("status", filters.status);
     }
 
     if (filters?.date_from) {
-      query = query.gte('created_at', filters.date_from);
+      query = query.gte("created_at", filters.date_from);
     }
 
     if (filters?.date_to) {
-      query = query.lte('created_at', filters.date_to);
+      query = query.lte("created_at", filters.date_to);
     }
 
     if (filters?.customer_id) {
-      query = query.eq('customer_id', filters.customer_id);
+      query = query.eq("customer_id", filters.customer_id);
     }
 
     const { data, error } = await query;
@@ -100,38 +111,39 @@ export async function getOrdersByBusiness(
     if (error) throw error;
 
     return (data || []) as OrderWithItems[];
-
   } catch (error) {
-    console.error('Error obteniendo pedidos:', error);
-    throw new Error('No se pudieron obtener los pedidos');
+    console.error("Error obteniendo pedidos:", error);
+    throw new Error("No se pudieron obtener los pedidos");
   }
 }
 
 /**
  * Obtiene un pedido específico con detalles completos
  */
-export async function getOrderDetails(orderId: string): Promise<OrderWithItems | null> {
+export async function getOrderDetails(
+  orderId: string,
+): Promise<OrderWithItems | null> {
   try {
     const { data, error } = await supabase
-      .from('orders')
-      .select(`
+      .from("orders")
+      .select(
+        `
         *,
         order_items (*)
-      `)
-      .eq('id', orderId)
+      `,
+      )
+      .eq("id", orderId)
       .single();
 
-
     if (error) {
-      if (error.code === 'PGRST116') return null; // No encontrado
+      if (error.code === "PGRST116") return null; // No encontrado
       throw error;
     }
 
     return data as OrderWithItems;
-
   } catch (error) {
-    console.error('Error obteniendo detalles del pedido:', error);
-    throw new Error('No se pudo obtener el detalle del pedido');
+    console.error("Error obteniendo detalles del pedido:", error);
+    throw new Error("No se pudo obtener el detalle del pedido");
   }
 }
 
@@ -141,13 +153,20 @@ export async function getOrderDetails(orderId: string): Promise<OrderWithItems |
 export async function updateOrderStatus(
   orderId: string,
   status: OrderStatus,
-  notes?: string
+  notes?: string,
 ): Promise<Order> {
   try {
     // Validar estado
-    const validStatuses: OrderStatus[] = ['pending', 'confirmed', 'preparing', 'ready', 'completed', 'cancelled'];
+    const validStatuses: OrderStatus[] = [
+      "pending",
+      "confirmed",
+      "preparing",
+      "ready",
+      "completed",
+      "cancelled",
+    ];
     if (!validStatuses.includes(status)) {
-      throw new Error('Estado de pedido inválido');
+      throw new Error("Estado de pedido inválido");
     }
 
     const updateData: OrderUpdate = {
@@ -156,28 +175,32 @@ export async function updateOrderStatus(
     };
 
     // Si se cancela el pedido, podríamos agregar notas
-    if (status === 'cancelled' && notes) {
+    if (status === "cancelled" && notes) {
       // Nota: La tabla orders no tiene campo para notas de cancelación
       // Podríamos agregarlo o usar un sistema de logs separado
       console.log(`Pedido ${orderId} cancelado. Notas: ${notes}`);
     }
 
     const { data, error } = await supabase
-      .from('orders')
+      .from("orders")
       .update(updateData)
-      .eq('id', orderId)
+      .eq("id", orderId)
       .select();
 
     if (error) throw error;
-    
+
     if (!data || data.length === 0) {
-      throw new Error('No se pudo actualizar el pedido. Verifica los permisos o que el pedido existe.');
+      throw new Error(
+        "No se pudo actualizar el pedido. Verifica los permisos o que el pedido existe.",
+      );
     }
 
     return data[0];
   } catch (error) {
-    console.error('Error actualizando estado del pedido:', error);
-    throw error instanceof Error ? error : new Error('Error desconocido al actualizar pedido');
+    console.error("Error actualizando estado del pedido:", error);
+    throw error instanceof Error
+      ? error
+      : new Error("Error desconocido al actualizar pedido");
   }
 }
 
@@ -189,11 +212,11 @@ export async function markOrderAsPaid(orderId: string): Promise<Order> {
     // Verificar que el pedido existe y está en estado válido
     const order = await getOrderDetails(orderId);
     if (!order) {
-      throw new Error('Pedido no encontrado');
+      throw new Error("Pedido no encontrado");
     }
 
-    if (order.status === 'cancelled') {
-      throw new Error('No se puede marcar como pagado un pedido cancelado');
+    if (order.status === "cancelled") {
+      throw new Error("No se puede marcar como pagado un pedido cancelado");
     }
 
     // Nota: La tabla payments existe, pero para MVP simplificado
@@ -201,12 +224,12 @@ export async function markOrderAsPaid(orderId: string): Promise<Order> {
     // En una implementación completa, crearíamos un registro en payments
 
     const { data, error } = await supabase
-      .from('orders')
+      .from("orders")
       .update({
-        status: 'completed',
-        updated_at: new Date().toISOString()
+        status: "completed",
+        updated_at: new Date().toISOString(),
       })
-      .eq('id', orderId)
+      .eq("id", orderId)
       .select()
       .single();
 
@@ -214,8 +237,10 @@ export async function markOrderAsPaid(orderId: string): Promise<Order> {
 
     return data;
   } catch (error) {
-    console.error('Error marcando pedido como pagado:', error);
-    throw error instanceof Error ? error : new Error('Error desconocido al marcar pedido como pagado');
+    console.error("Error marcando pedido como pagado:", error);
+    throw error instanceof Error
+      ? error
+      : new Error("Error desconocido al marcar pedido como pagado");
   }
 }
 
@@ -230,24 +255,24 @@ export async function cancelOrder(
     // Verificar que el pedido puede ser cancelado
     const order = await getOrderDetails(orderId);
     if (!order) {
-      throw new Error('Pedido no encontrado');
+      throw new Error("Pedido no encontrado");
     }
 
-    if (order.status === 'completed') {
-      throw new Error('No se puede cancelar un pedido completado');
+    if (order.status === "completed") {
+      throw new Error("No se puede cancelar un pedido completado");
     }
 
-    if (order.status === 'cancelled') {
-      throw new Error('El pedido ya está cancelado');
+    if (order.status === "cancelled") {
+      throw new Error("El pedido ya está cancelado");
     }
 
     const { data, error } = await supabase
-      .from('orders')
+      .from("orders")
       .update({
-        status: 'cancelled',
-        updated_at: new Date().toISOString()
+        status: "cancelled",
+        updated_at: new Date().toISOString(),
       })
-      .eq('id', orderId)
+      .eq("id", orderId)
       .select()
       .single();
 
@@ -255,8 +280,10 @@ export async function cancelOrder(
 
     return data;
   } catch (error) {
-    console.error('Error cancelando pedido:', error);
-    throw error instanceof Error ? error : new Error('Error desconocido al cancelar pedido');
+    console.error("Error cancelando pedido:", error);
+    throw error instanceof Error
+      ? error
+      : new Error("Error desconocido al cancelar pedido");
   }
 }
 
@@ -265,18 +292,16 @@ export async function cancelOrder(
  */
 export async function getOrderStats(
   businessId: string,
-  period?: { from: string; to: string }
+  period?: { from: string; to: string },
 ): Promise<OrderStats> {
   try {
     let query = supabase
-      .from('orders')
-      .select('status, total')
-      .eq('business_id', businessId);
+      .from("orders")
+      .select("status, total")
+      .eq("business_id", businessId);
 
     if (period) {
-      query = query
-        .gte('created_at', period.from)
-        .lte('created_at', period.to);
+      query = query.gte("created_at", period.from).lte("created_at", period.to);
     }
 
     const { data, error } = await query;
@@ -285,18 +310,18 @@ export async function getOrderStats(
 
     const stats: OrderStats = {
       total_orders: data.length,
-      pending_orders: data.filter(o => o.status === 'pending').length,
-      completed_orders: data.filter(o => o.status === 'completed').length,
-      cancelled_orders: data.filter(o => o.status === 'cancelled').length,
+      pending_orders: data.filter((o) => o.status === "pending").length,
+      completed_orders: data.filter((o) => o.status === "completed").length,
+      cancelled_orders: data.filter((o) => o.status === "cancelled").length,
       total_revenue: data
-        .filter(o => o.status === 'completed')
-        .reduce((sum, o) => sum + o.total, 0)
+        .filter((o) => o.status === "completed")
+        .reduce((sum, o) => sum + o.total, 0),
     };
 
     return stats;
   } catch (error) {
-    console.error('Error obteniendo estadísticas de pedidos:', error);
-    throw new Error('No se pudieron obtener las estadísticas de pedidos');
+    console.error("Error obteniendo estadísticas de pedidos:", error);
+    throw new Error("No se pudieron obtener las estadísticas de pedidos");
   }
 }
 
@@ -305,32 +330,33 @@ export async function getOrderStats(
  */
 export async function getRecentOrders(
   businessId: string,
-  limit: number = 10
+  limit: number = 10,
 ): Promise<OrderWithItems[]> {
   try {
     const { data, error } = await supabase
-      .from('orders')
-      .select(`
+      .from("orders")
+      .select(
+        `
         *,
         order_items (*)
-      `)
-      .eq('business_id', businessId)
-      .order('created_at', { ascending: false })
+      `,
+      )
+      .eq("business_id", businessId)
+      .order("created_at", { ascending: false })
       .limit(limit);
 
     if (error) throw error;
 
     // Ensure customer_name is properly extracted and attached
-    const processedData = (data || []).map(order => ({
+    const processedData = (data || []).map((order) => ({
       ...order,
-      customer_name: extractCustomerName(order) || order.customer_name
+      customer_name: extractCustomerName(order) || order.customer_name,
     }));
 
     return processedData as OrderWithItems[];
-
   } catch (error) {
-    console.error('Error obteniendo pedidos recientes:', error);
-    throw new Error('No se pudieron obtener los pedidos recientes');
+    console.error("Error obteniendo pedidos recientes:", error);
+    throw new Error("No se pudieron obtener los pedidos recientes");
   }
 }
 
@@ -339,27 +365,27 @@ export async function getRecentOrders(
  */
 export async function getOrdersByStatus(
   businessId: string,
-  status: OrderStatus
+  status: OrderStatus,
 ): Promise<OrderWithItems[]> {
   try {
     const { data, error } = await supabase
-      .from('orders')
-      .select(`
+      .from("orders")
+      .select(
+        `
         *,
         order_items (*)
-      `)
-      .eq('business_id', businessId)
-      .eq('status', status)
-      .order('created_at', { ascending: false });
-
+      `,
+      )
+      .eq("business_id", businessId)
+      .eq("status", status)
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
 
     return (data || []) as OrderWithItems[];
-
   } catch (error) {
-    console.error('Error obteniendo pedidos por estado:', error);
-    throw new Error('No se pudieron obtener los pedidos por estado');
+    console.error("Error obteniendo pedidos por estado:", error);
+    throw new Error("No se pudieron obtener los pedidos por estado");
   }
 }
 
@@ -368,31 +394,33 @@ export async function getOrdersByStatus(
  */
 export async function getOrdersByCustomer(
   customerId: string,
-  limit: number = 20
+  limit: number = 20,
 ): Promise<OrderWithItems[]> {
   try {
     const { data, error } = await supabase
-      .from('orders')
-      .select(`
+      .from("orders")
+      .select(
+        `
         *,
         order_items (*),
         businesses:business_id (
           name
         )
-      `)
-      .eq('customer_id', customerId)
-      .order('created_at', { ascending: false })
+      `,
+      )
+      .eq("customer_id", customerId)
+      .order("created_at", { ascending: false })
       .limit(limit);
 
     if (error) throw error;
 
-    return (data || []).map(order => ({
+    return (data || []).map((order) => ({
       ...order,
-      business_name: order.businesses?.name
+      business_name: order.businesses?.name,
     })) as OrderWithItems[];
   } catch (error) {
-    console.error('Error obteniendo pedidos del cliente:', error);
-    throw new Error('No se pudieron obtener tus pedidos');
+    console.error("Error obteniendo pedidos del cliente:", error);
+    throw new Error("No se pudieron obtener tus pedidos");
   }
 }
 
@@ -401,27 +429,29 @@ export async function getOrdersByCustomer(
  */
 export async function canUserManageOrder(
   userId: string,
-  orderId: string
+  orderId: string,
 ): Promise<boolean> {
   try {
     const { data, error } = await supabase
-      .from('orders')
-      .select(`
+      .from("orders")
+      .select(
+        `
         business_id,
         businesses!inner(owner_id)
-      `)
-      .eq('id', orderId)
-      .eq('businesses.owner_id', userId)
+      `,
+      )
+      .eq("id", orderId)
+      .eq("businesses.owner_id", userId)
       .single();
 
     if (error) {
-      if (error.code === 'PGRST116') return false; // No encontrado
+      if (error.code === "PGRST116") return false; // No encontrado
       throw error;
     }
 
     return !!data;
   } catch (error) {
-    console.error('Error verificando permisos del pedido:', error);
+    console.error("Error verificando permisos del pedido:", error);
     return false;
   }
 }
