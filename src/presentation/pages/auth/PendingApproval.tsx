@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@core/context/AuthContext";
 import { supabase } from "@core/supabase/client";
-import { CheckCircle, Clock, Mail, Phone, AlertCircle, LogOut } from "lucide-react";
+import {
+  CheckCircle,
+  Clock,
+  Mail,
+  Phone,
+  AlertCircle,
+  LogOut,
+} from "lucide-react";
 
 export default function PendingApproval() {
   const { user, signOut } = useAuth();
@@ -23,28 +30,37 @@ export default function PendingApproval() {
       if (!user?.id) return;
 
       attempts++;
+      console.log(
+        `Attempt ${attempts}/${MAX_RETRIES} to fetch business status`,
+      );
+      console.log("🔍 USER ID:", user.id); // ← AGREGAR ESTE LOG
 
       try {
         // First get the profile id
         const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .eq('user_id', user.id)
+          .from("profiles")
+          .select("id, full_name")
+          .eq("user_id", user.id)
           .maybeSingle();
 
         if (profileError) {
-          console.error('Error fetching profile:', profileError);
+          console.error("Error fetching profile:", profileError);
           return;
         }
 
         // If profile doesn't exist yet, keep polling
         if (!profile) {
+          console.log("Profile not created yet, will retry...");
+
           // After max retries, show pending state anyway
           if (attempts >= MAX_RETRIES) {
+            console.log(
+              "Max retries reached, showing pending state without business",
+            );
             setBusinessStatus({
-              name: 'Tu Restaurante',
+              name: "Tu Restaurante",
               active: false,
-              status: 'pending'
+              status: "pending",
             });
             if (pollInterval) {
               clearInterval(pollInterval);
@@ -56,25 +72,31 @@ export default function PendingApproval() {
         }
 
         // Get business info using profile.id
+        console.log("🔍 Searching business with owner_id:", profile.id);
         const { data: business, error: businessError } = await supabase
-          .from('businesses')
-          .select('name, active')
-          .eq('owner_id', profile.id)
+          .from("businesses")
+          .select("name, active")
+          .eq("owner_id", profile.id)
           .maybeSingle();
 
+        console.log("🏢 Business query result:", { business, businessError });
+
         // Handle business not found (still being created)
-        if (businessError && businessError.code !== 'PGRST116') {
-          console.error('Error fetching business:', businessError);
+        if (businessError && businessError.code !== "PGRST116") {
+          console.error("Error fetching business:", businessError);
         }
 
         // If business doesn't exist yet
         if (!business) {
+          console.log("Business not created yet, will retry...");
+
           // After max retries, show pending state anyway
           if (attempts >= MAX_RETRIES) {
+            console.log("Max retries reached, showing pending state");
             setBusinessStatus({
-              name: 'Tu Restaurante',
+              name: "Tu Restaurante",
               active: false,
-              status: 'pending'
+              status: "pending",
             });
             if (pollInterval) {
               clearInterval(pollInterval);
@@ -86,12 +108,13 @@ export default function PendingApproval() {
         }
 
         // Business found! Set status and stop polling
+        console.log("Business found:", business.name);
         setBusinessStatus({
           name: business.name,
           active: business.active,
-          status: business.active ? 'approved' : 'pending'
+          status: business.active ? "approved" : "pending",
         });
-        
+
         // Stop polling once we have the business
         if (pollInterval) {
           clearInterval(pollInterval);
@@ -99,7 +122,7 @@ export default function PendingApproval() {
         }
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching status:', error);
+        console.error("Error fetching status:", error);
       }
     };
 
@@ -117,10 +140,11 @@ export default function PendingApproval() {
         }
         // If we hit max retries and still no business, show pending state
         if (!businessStatus && attempts >= MAX_RETRIES) {
+          console.log("Polling stopped: max retries reached");
           setBusinessStatus({
-            name: 'Tu Restaurante',
+            name: "Tu Restaurante",
             active: false,
-            status: 'pending'
+            status: "pending",
           });
           setLoading(false);
         }
@@ -147,32 +171,39 @@ export default function PendingApproval() {
   }
 
   const getStatusInfo = () => {
-    if (!businessStatus) return { title: "Estado desconocido", description: "", color: "gray" as const };
+    if (!businessStatus)
+      return {
+        title: "Estado desconocido",
+        description: "",
+        color: "gray" as const,
+      };
 
     switch (businessStatus.status) {
-      case 'pending':
+      case "pending":
         return {
           title: "Registro en Revisión",
           description: "Tu solicitud está siendo revisada por nuestro equipo.",
-          color: "yellow" as const
+          color: "yellow" as const,
         };
-      case 'approved':
+      case "approved":
         return {
           title: "¡Aprobado!",
-          description: "Tu restaurante ha sido aprobado. Ya puedes acceder a tu panel.",
-          color: "green" as const
+          description:
+            "Tu restaurante ha sido aprobado. Ya puedes acceder a tu panel.",
+          color: "green" as const,
         };
-      case 'rejected':
+      case "rejected":
         return {
           title: "Solicitud Rechazada",
-          description: "Tu solicitud ha sido rechazada. Contacta con soporte para más información.",
-          color: "red" as const
+          description:
+            "Tu solicitud ha sido rechazada. Contacta con soporte para más información.",
+          color: "red" as const,
         };
       default:
         return {
           title: "Estado Pendiente",
           description: "Estamos procesando tu solicitud.",
-          color: "blue" as const
+          color: "blue" as const,
         };
     }
   };
@@ -181,7 +212,7 @@ export default function PendingApproval() {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/login');
+    navigate("/login");
   };
 
   return (
@@ -208,18 +239,23 @@ export default function PendingApproval() {
 
       {/* Status Card */}
       <div className="px-6 mb-8">
-        <div className={`p-6 rounded-xl border-2 ${
-          statusInfo.color === 'green' ? 'border-green-200 bg-green-50' :
-          statusInfo.color === 'yellow' ? 'border-yellow-200 bg-yellow-50' :
-          statusInfo.color === 'red' ? 'border-red-200 bg-red-50' :
-          'border-blue-200 bg-blue-50'
-        }`}>
+        <div
+          className={`p-6 rounded-xl border-2 ${
+            statusInfo.color === "green"
+              ? "border-green-200 bg-green-50"
+              : statusInfo.color === "yellow"
+                ? "border-yellow-200 bg-yellow-50"
+                : statusInfo.color === "red"
+                  ? "border-red-200 bg-red-50"
+                  : "border-blue-200 bg-blue-50"
+          }`}
+        >
           <div className="flex items-center gap-4 mb-4">
-            {statusInfo.color === 'green' ? (
+            {statusInfo.color === "green" ? (
               <CheckCircle className="w-8 h-8 text-green-600" />
-            ) : statusInfo.color === 'yellow' ? (
+            ) : statusInfo.color === "yellow" ? (
               <Clock className="w-8 h-8 text-yellow-600" />
-            ) : statusInfo.color === 'red' ? (
+            ) : statusInfo.color === "red" ? (
               <AlertCircle className="w-8 h-8 text-red-600" />
             ) : (
               <Clock className="w-8 h-8 text-blue-600" />
@@ -228,11 +264,21 @@ export default function PendingApproval() {
               <h2 className="text-xl font-semibold text-gray-900">
                 {statusInfo.title}
               </h2>
-              <p className="text-gray-600 mt-1">
-                {statusInfo.description}
-              </p>
+              <p className="text-gray-600 mt-1">{statusInfo.description}</p>
             </div>
           </div>
+
+          {businessStatus?.status === "approved" && (
+            <div className="mt-4 pt-4 border-t border-green-200">
+              <button
+                onClick={() => (window.location.href = "/restaurant/dashboard")}
+                className="w-full sm:w-auto px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
+              >
+                <span>Continuar al Dashboard</span>
+                <CheckCircle className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -248,31 +294,45 @@ export default function PendingApproval() {
             </div>
             <div>
               <p className="font-medium text-gray-900">Registro Completado</p>
-              <p className="text-sm text-gray-500">Información y documentos enviados</p>
+              <p className="text-sm text-gray-500">
+                Información y documentos enviados
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-              businessStatus?.status === 'pending' || businessStatus?.status === 'approved' || businessStatus?.status === 'rejected'
-                ? 'bg-yellow-500' : 'bg-gray-300'
-            }`}>
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                businessStatus?.status === "pending" ||
+                businessStatus?.status === "approved" ||
+                businessStatus?.status === "rejected"
+                  ? "bg-yellow-500"
+                  : "bg-gray-300"
+              }`}
+            >
               <Clock className="w-5 h-5 text-white" />
             </div>
             <div>
               <p className="font-medium text-gray-900">Revisión en Progreso</p>
-              <p className="text-sm text-gray-500">Nuestro equipo está verificando tu información</p>
+              <p className="text-sm text-gray-500">
+                Nuestro equipo está verificando tu información
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-              businessStatus?.status === 'approved' ? 'bg-green-500' :
-              businessStatus?.status === 'rejected' ? 'bg-red-500' : 'bg-gray-300'
-            }`}>
-              {businessStatus?.status === 'approved' ? (
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                businessStatus?.status === "approved"
+                  ? "bg-green-500"
+                  : businessStatus?.status === "rejected"
+                    ? "bg-red-500"
+                    : "bg-gray-300"
+              }`}
+            >
+              {businessStatus?.status === "approved" ? (
                 <CheckCircle className="w-5 h-5 text-white" />
-              ) : businessStatus?.status === 'rejected' ? (
+              ) : businessStatus?.status === "rejected" ? (
                 <AlertCircle className="w-5 h-5 text-white" />
               ) : (
                 <Clock className="w-5 h-5 text-gray-400" />
@@ -280,7 +340,9 @@ export default function PendingApproval() {
             </div>
             <div>
               <p className="font-medium text-gray-900">Aprobación Final</p>
-              <p className="text-sm text-gray-500">Acceso completo a la plataforma</p>
+              <p className="text-sm text-gray-500">
+                Acceso completo a la plataforma
+              </p>
             </div>
           </div>
         </div>
@@ -319,7 +381,10 @@ export default function PendingApproval() {
             <li>• Si su estatus es aprovado por favor presione salir e ingrese con las credenciales que usó al registrarse</li>
             <li>• Revisaremos tu información y documentos en 24-48 horas</li>
             <li>• Te notificaremos por email cuando haya una actualización</li>
-            <li>• Una vez aprobado, podrás configurar tu menú y comenzar a recibir pedidos</li>
+            <li>
+              • Una vez aprobado, podrás configurar tu menú y comenzar a recibir
+              pedidos
+            </li>
           </ul>
         </div>
       </div>
