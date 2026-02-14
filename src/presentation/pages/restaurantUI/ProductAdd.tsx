@@ -169,7 +169,7 @@ export default function ProductAdd() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-4xl">
+    <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
@@ -315,16 +315,22 @@ export default function ProductAdd() {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 justify-end">
+        <div className="flex flex-col sm:flex-row gap-3 sm:justify-end pb-24 sm:pb-12">
           <Button
             type="button"
             variant="secondary"
             onClick={() => navigate("/restaurant/products")}
             disabled={isLoading}
+            className="w-full sm:w-auto"
           >
             Cancelar
           </Button>
-          <Button type="submit" variant="primary" isLoading={isLoading}>
+          <Button
+            type="submit"
+            variant="primary"
+            isLoading={isLoading}
+            className="w-full sm:w-auto"
+          >
             Guardar producto
           </Button>
         </div>

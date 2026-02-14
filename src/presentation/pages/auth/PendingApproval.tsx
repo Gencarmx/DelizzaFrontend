@@ -198,7 +198,7 @@ export default function PendingApproval() {
             title="Cerrar sesión"
           >
             <LogOut className="w-5 h-5" />
-            <span className="text-sm font-medium">Salir</span>
+            <span className="text-sm font-medium">Cerrar sesión</span>
           </button>
         </div>
         <p className="text-gray-500 text-base">
@@ -316,6 +316,7 @@ export default function PendingApproval() {
             ¿Qué sucede ahora?
           </h4>
           <ul className="text-sm text-blue-800 space-y-1">
+            <li>• Si su estatus es aprovado por favor presione salir e ingrese con las credenciales que usó al registrarse</li>
             <li>• Revisaremos tu información y documentos en 24-48 horas</li>
             <li>• Te notificaremos por email cuando haya una actualización</li>
             <li>• Una vez aprobado, podrás configurar tu menú y comenzar a recibir pedidos</li>

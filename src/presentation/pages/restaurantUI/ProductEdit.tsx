@@ -6,11 +6,12 @@ import Input from "@components/restaurant-ui/forms/Input";
 import Select from "@components/restaurant-ui/forms/Select";
 import Textarea from "@components/restaurant-ui/forms/Textarea";
 import type { SelectOption } from "@components/restaurant-ui/forms/Select";
-import { 
-  getProductById, 
-  updateProduct, 
-  uploadProductImage 
+import {
+  getProductById,
+  updateProduct,
+  uploadProductImage
 } from "@core/services/productService";
+import { getActiveProductCategories } from "@core/services/productCategoryService";
 
 
 export default function ProductEdit() {
@@ -22,6 +23,9 @@ export default function ProductEdit() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [businessId, setBusinessId] = useState<string>("");
+  const [categories, setCategories] = useState<SelectOption[]>([
+    { value: "", label: "Selecciona una categoría" }
+  ]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -33,6 +37,27 @@ export default function ProductEdit() {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Cargar categorías dinámicas
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const categoriesData = await getActiveProductCategories();
+        const categoryOptions: SelectOption[] = [
+          { value: "", label: "Selecciona una categoría" },
+          ...categoriesData.map(cat => ({
+            value: cat.id,
+            label: cat.name
+          }))
+        ];
+        setCategories(categoryOptions);
+      } catch (err) {
+        console.error("Error cargando categorías:", err);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   // Cargar datos del producto
   useEffect(() => {
@@ -73,17 +98,6 @@ export default function ProductEdit() {
 
     loadProduct();
   }, [productId, navigate]);
-
-  const categories: SelectOption[] = [
-    { value: "", label: "Selecciona una categoría" },
-    { value: "hamburguesas", label: "Hamburguesas" },
-    { value: "pizzas", label: "Pizzas" },
-    { value: "tacos", label: "Tacos" },
-    { value: "sushi", label: "Sushi" },
-    { value: "hot-dogs", label: "Hot Dogs" },
-    { value: "bebidas", label: "Bebidas" },
-    { value: "postres", label: "Postres" },
-  ];
 
   const statusOptions: SelectOption[] = [
     { value: "active", label: "Activo" },
@@ -209,7 +223,7 @@ export default function ProductEdit() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-4xl">
+    <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
@@ -339,16 +353,22 @@ export default function ProductEdit() {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 justify-end">
+        <div className="flex flex-col sm:flex-row gap-3 sm:justify-end pb-24 sm:pb-12">
           <Button
             type="button"
             variant="secondary"
             onClick={() => navigate("/restaurant/products")}
             disabled={isLoading}
+            className="w-full sm:w-auto"
           >
             Cancelar
           </Button>
-          <Button type="submit" variant="primary" isLoading={isLoading}>
+          <Button
+            type="submit"
+            variant="primary"
+            isLoading={isLoading}
+            className="w-full sm:w-auto"
+          >
             Guardar cambios
           </Button>
         </div>

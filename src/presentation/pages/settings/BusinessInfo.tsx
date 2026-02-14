@@ -224,7 +224,7 @@ export default function BusinessInfo() {
         </div>
       </div>
 
-      <div className="p-4 max-w-2xl mx-auto">
+      <div className="p-4 max-w-2xl mx-auto pb-24 sm:pb-8">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="p-6 space-y-6">
             <div className="space-y-4">

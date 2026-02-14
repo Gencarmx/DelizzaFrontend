@@ -484,7 +484,7 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Orders */}
-      <div>
+      <div className="pb-24 sm:pb-8">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
           Pedidos recientes
         </h2>

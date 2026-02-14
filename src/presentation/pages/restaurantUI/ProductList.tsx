@@ -222,9 +222,9 @@ export default function ProductList() {
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 px-4 sm:px-6 lg:px-8 py-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
             Productos
@@ -236,6 +236,7 @@ export default function ProductList() {
         <Button
           variant="primary"
           onClick={() => navigate("/restaurant/products/add")}
+          className="w-full sm:w-auto"
         >
           <Plus className="w-5 h-5" />
           Agregar producto
@@ -278,12 +279,14 @@ export default function ProductList() {
         </div>
       ) : (
         /* Table */
-        <DataTable
-          columns={columns}
-          data={filteredProducts}
-          keyExtractor={(product) => product.id}
-          emptyMessage="No se encontraron productos"
-        />
+        <div className="pb-24 sm:pb-8">
+          <DataTable
+            columns={columns}
+            data={filteredProducts}
+            keyExtractor={(product) => product.id}
+            emptyMessage="No se encontraron productos"
+          />
+        </div>
       )}
 
       {/* Delete Confirmation Modal */}
@@ -293,9 +296,9 @@ export default function ProductList() {
           setDeleteModal({ isOpen: false, productId: null, productName: "" })
         }
         onConfirm={confirmDelete}
-        title="Eliminar producto"
-        message={`¿Estás seguro de que deseas eliminar "${deleteModal.productName}"? Esta acción no se puede deshacer.`}
-        confirmText="Eliminar"
+        title="Desactivar producto"
+        message={`¿Estás seguro de que deseas desactivar "${deleteModal.productName}"? El producto no se eliminará de la base de datos por razones de integridad de datos, solo se desactivará y dejará de estar visible para los clientes.`}
+        confirmText="Desactivar"
         cancelText="Cancelar"
         variant="danger"
       />
