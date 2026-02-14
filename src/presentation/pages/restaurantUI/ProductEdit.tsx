@@ -6,43 +6,98 @@ import Input from "@components/restaurant-ui/forms/Input";
 import Select from "@components/restaurant-ui/forms/Select";
 import Textarea from "@components/restaurant-ui/forms/Textarea";
 import type { SelectOption } from "@components/restaurant-ui/forms/Select";
+import {
+  getProductById,
+  updateProduct,
+  uploadProductImage
+} from "@core/services/productService";
+import { getActiveProductCategories } from "@core/services/productCategoryService";
+
 
 export default function ProductEdit() {
   const navigate = useNavigate();
   const { productId } = useParams();
   const [isLoading, setIsLoading] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(
-    "https://images.unsplash.com/photo-1568901346375-23c9450c58cd",
-  );
+
+  const [isLoadingProduct, setIsLoadingProduct] = useState(true);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [businessId, setBusinessId] = useState<string>("");
+  const [categories, setCategories] = useState<SelectOption[]>([
+    { value: "", label: "Selecciona una categoría" }
+  ]);
 
   const [formData, setFormData] = useState({
-    name: "Hamburguesa Clásica",
-    category: "hamburguesas",
-    price: "120",
-    stock: "45",
-    description:
-      "Deliciosa hamburguesa con carne de res, lechuga, tomate, cebolla y queso cheddar. Servida con papas fritas.",
+    name: "",
+    category: "",
+    price: "",
+    stock: "",
+    description: "",
     status: "active",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Simulate loading product data
+  // Cargar categorías dinámicas
   useEffect(() => {
-    // In a real app, fetch product data by productId
-    console.log("Loading product:", productId);
-  }, [productId]);
+    const loadCategories = async () => {
+      try {
+        const categoriesData = await getActiveProductCategories();
+        const categoryOptions: SelectOption[] = [
+          { value: "", label: "Selecciona una categoría" },
+          ...categoriesData.map(cat => ({
+            value: cat.id,
+            label: cat.name
+          }))
+        ];
+        setCategories(categoryOptions);
+      } catch (err) {
+        console.error("Error cargando categorías:", err);
+      }
+    };
 
-  const categories: SelectOption[] = [
-    { value: "", label: "Selecciona una categoría" },
-    { value: "hamburguesas", label: "Hamburguesas" },
-    { value: "pizzas", label: "Pizzas" },
-    { value: "tacos", label: "Tacos" },
-    { value: "sushi", label: "Sushi" },
-    { value: "hot-dogs", label: "Hot Dogs" },
-    { value: "bebidas", label: "Bebidas" },
-    { value: "postres", label: "Postres" },
-  ];
+    loadCategories();
+  }, []);
+
+  // Cargar datos del producto
+  useEffect(() => {
+    async function loadProduct() {
+      if (!productId) {
+        navigate("/restaurant/products");
+        return;
+      }
+
+      try {
+        setIsLoadingProduct(true);
+        const product = await getProductById(productId);
+        
+        if (!product) {
+          throw new Error("Producto no encontrado");
+        }
+
+        // Cargar datos del producto en el formulario
+        setFormData({
+          name: product.name || "",
+          category: "", // La tabla products no tiene category_id aún
+          price: product.price?.toString() || "",
+          stock: product.stock?.toString() || "0",
+          description: product.description || "",
+          status: product.active ? "active" : "inactive",
+        });
+
+        setImagePreview(product.image_url || null);
+        setBusinessId(product.business_id);
+      } catch (error) {
+        console.error("Error cargando producto:", error);
+        alert("Error al cargar el producto");
+        navigate("/restaurant/products");
+      } finally {
+        setIsLoadingProduct(false);
+      }
+    }
+
+    loadProduct();
+  }, [productId, navigate]);
 
   const statusOptions: SelectOption[] = [
     { value: "active", label: "Activo" },
@@ -59,6 +114,7 @@ export default function ProductEdit() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -69,6 +125,7 @@ export default function ProductEdit() {
 
   const removeImage = () => {
     setImagePreview(null);
+    setImageFile(null);
   };
 
   const validate = () => {
@@ -101,21 +158,72 @@ export default function ProductEdit() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validate()) {
+    if (!validate() || !productId) {
       return;
     }
 
-    setIsLoading(true);
+    try {
+      setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+      let imageUrl = imagePreview;
+
+      // Si hay una nueva imagen, subirla primero
+      if (imageFile && businessId) {
+        imageUrl = await uploadProductImage(imageFile, businessId, productId);
+      }
+
+      // Preparar datos para actualizar
+      const updateData: {
+        name: string;
+        description: string;
+        price: number;
+        active: boolean;
+        stock: number;
+        image_url?: string;
+      } = {
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        price: parseFloat(formData.price),
+        active: formData.status === "active",
+        stock: parseInt(formData.stock) || 0,
+      };
+
+      // Solo actualizar image_url si cambió
+      if (imageUrl && imageUrl !== imagePreview) {
+        updateData.image_url = imageUrl;
+      }
+
+      // Actualizar producto
+      await updateProduct(productId, updateData);
+
+      alert("Producto actualizado exitosamente");
       navigate("/restaurant/products");
-    }, 1500);
+    } catch (error) {
+      console.error("Error actualizando producto:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Error al actualizar el producto"
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  // Mostrar loading mientras carga el producto
+  if (isLoadingProduct) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Cargando producto...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-6 max-w-4xl">
+    <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
@@ -245,16 +353,22 @@ export default function ProductEdit() {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 justify-end">
+        <div className="flex flex-col sm:flex-row gap-3 sm:justify-end pb-24 sm:pb-12">
           <Button
             type="button"
             variant="secondary"
             onClick={() => navigate("/restaurant/products")}
             disabled={isLoading}
+            className="w-full sm:w-auto"
           >
             Cancelar
           </Button>
-          <Button type="submit" variant="primary" isLoading={isLoading}>
+          <Button
+            type="submit"
+            variant="primary"
+            isLoading={isLoading}
+            className="w-full sm:w-auto"
+          >
             Guardar cambios
           </Button>
         </div>

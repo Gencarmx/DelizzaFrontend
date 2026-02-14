@@ -16,6 +16,8 @@ import {
   PaymentMethods,
   SavedAddresses,
   Notifications,
+  BusinessHours,
+  BusinessInfo,
 } from "@presentation/pages/settings";
 import Cart from "@presentation/pages/Cart";
 import {
@@ -149,6 +151,14 @@ export const routes: RouteObject[] = [
       {
         path: "settings",
         element: <Settings />,
+      },
+      {
+        path: "settings/business-hours",
+        element: <BusinessHours />,
+      },
+      {
+        path: "settings/business-info",
+        element: <BusinessInfo />,
       },
     ],
   },

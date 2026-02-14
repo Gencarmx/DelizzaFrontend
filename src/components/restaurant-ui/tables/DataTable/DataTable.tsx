@@ -21,6 +21,7 @@ export default function DataTable<T>({
   emptyMessage = "No hay datos disponibles",
 }: DataTableProps<T>) {
   return (
+
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">

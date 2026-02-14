@@ -8,6 +8,7 @@ interface AuthContextType {
   role: "owner" | "client" | null;
   businessActive: boolean | null;
   loading: boolean;
+  isAuthReady: boolean;
   signUp: (
     email: string,
     password: string,
@@ -28,6 +29,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const ROLE_CACHE_KEY = "dlizza-role";
@@ -38,6 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<"owner" | "client" | null>(null);
   const [businessActive, setBusinessActive] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+
 
   const getCachedRole = (userId: string): "owner" | "client" | null => {
     try {
@@ -85,7 +89,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // This is set during registration and persists even if profiles table isn't ready
       if (userMetadata?.user_role) {
         const metadataRole = userMetadata.user_role as "owner" | "client";
-        console.log('Role found in user metadata:', metadataRole);
         setCachedRole(userId, metadataRole);
         return metadataRole;
       }
@@ -107,8 +110,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (error) {
           console.error("Error fetching role from profiles:", error);
-          // If profiles query fails, default to client as last resort
-          // NOTE: This should rarely happen now that we check metadata first
           const defaultRole = "client" as const;
           setCachedRole(userId, defaultRole);
           return defaultRole;
@@ -134,7 +135,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const fetchBusinessStatus = async (userId: string) => {
-      try {
+      // Helper function to fetch business status with timeout
+      const fetchWithTimeout = async () => {
         // First get the profile id
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
@@ -160,24 +162,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         return business?.active ?? null;
+      };
+
+      // Add 10 second timeout to prevent hanging
+      const timeoutPromise = new Promise<null>((_, reject) => {
+        setTimeout(() => reject(new Error("Business status fetch timeout")), 10000);
+      });
+
+      try {
+        const result = await Promise.race([fetchWithTimeout(), timeoutPromise]);
+        return result;
       } catch (error) {
-        console.error('Error in fetchBusinessStatus:', error);
+        console.warn('Business status fetch timeout or error:', error);
         return null;
       }
     };
 
-    const initializeAuth = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    // Track if we've completed initial auth setup
+    let initialAuthComplete = false;
+    
+    const handleAuthState = async (session: Session | null) => {
       setSession(session);
       setUser(session?.user ?? null);
+      
       if (session?.user) {
-        // Pass user metadata to fetchRole for reliable role detection
         const userRole = await fetchRole(session.user.id, session.user.user_metadata);
         setRole(userRole);
         
-        // Fetch business status only for owners
         if (userRole === 'owner') {
           const active = await fetchBusinessStatus(session.user.id);
           setBusinessActive(active);
@@ -188,37 +199,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRole(null);
         setBusinessActive(null);
       }
-      setLoading(false);
+      
+      // Only update loading/isAuthReady on initial auth
+      if (!initialAuthComplete) {
+        setLoading(false);
+        setIsAuthReady(true);
+        initialAuthComplete = true;
+      }
     };
 
-    initializeAuth();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        // Pass user metadata to fetchRole for reliable role detection
-        const userRole = await fetchRole(session.user.id, session.user.user_metadata);
-        setRole(userRole);
-        
-        // Fetch business status only for owners
-        if (userRole === 'owner') {
-          const active = await fetchBusinessStatus(session.user.id);
-          setBusinessActive(active);
-        } else {
-          setBusinessActive(null);
-        }
-      } else {
-        setRole(null);
-        setBusinessActive(null);
+    // Set up onAuthStateChange listener first
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        await handleAuthState(session);
       }
-      setLoading(false);
-    });
+    );
 
-    return () => subscription.unsubscribe();
+    // Cleanup function
+    return () => {
+      subscription.unsubscribe();
+    };
+
   }, []);
+
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
@@ -274,24 +277,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     phoneNumber: string
   ) => {
     try {
-      console.log('SignUpOwner: Starting signup with data:', {
-        email,
-        fullName,
-        businessName,
-        businessAddress,
-        phoneNumber,
-      });
-
       // ℹ️ NOTA: Los triggers de Supabase ya manejan la asignación de roles en la tabla 'profiles'
       // y la creación del registro en la tabla 'businesses'.
       // Los metadatos (user_role, business_name, etc.) se establecen aquí para:
       // 1. Que los triggers tengan acceso a esta información
       // 2. Proporcionar acceso inmediato sin consultar la BD
-      // 
+      //
       // ⚠️ CONSIDERACIÓN DE SEGURIDAD:
       // La fuente de verdad es la tabla 'profiles' manejada por triggers del servidor.
       // Los metadatos son solo para conveniencia y para que los triggers los procesen.
-      const { data, error } = await supabase.auth.signUp({
+      const { data: _data, error } = await supabase.auth.signUp({
+
         email,
         password,
         options: {
@@ -301,6 +297,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             user_role: 'owner', // Metadatos para triggers y acceso rápido
             business_name: businessName,
             business_address: businessAddress,
+            business_phone: phoneNumber,
           },
         },
       });
@@ -309,8 +306,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('SignUpOwner: Auth signup error:', error);
         return { error };
       }
-
-      console.log('SignUpOwner: User created successfully:', data.user?.id);
 
       // Profile and business will be created by Supabase triggers
 
@@ -334,11 +329,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     role,
     businessActive,
     loading,
+    isAuthReady,
     signUp,
     signUpOwner,
     signIn,
     signOut,
   };
+
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

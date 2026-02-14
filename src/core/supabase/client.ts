@@ -18,7 +18,22 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Crear cliente con valores por defecto si no están configurados
 export const supabase = createClient(
   supabaseUrl || "https://placeholder.supabase.co",
-  supabaseAnonKey || "placeholder-key"
+  supabaseAnonKey || "placeholder-key",
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10,
+      },
+    },
+  }
 );
+
+
+
 
 export default supabase;

@@ -1,44 +1,25 @@
 import { ChevronLeft, Minus, Plus, Trash2, MapPin, Store } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useCart } from "@core/context/CartContext";
-import { useState } from "react";
+import { useCartLogic } from "@presentation/logic/CartLogic";
 
 export default function Cart() {
   const navigate = useNavigate();
   const {
     items,
     deliveryOption,
+    distance,
+    isProcessing,
+    subtotal,
+    deliveryFee,
+    total,
+    ordersByRestaurant,
+    hasMultipleRestaurants,
     updateQuantity,
     removeFromCart,
-    setDeliveryOption,
-    getSubtotal,
-    getDeliveryFee,
-    getTotal,
-  } = useCart();
-
-  const [distance, setDistance] = useState(deliveryOption.distance || 0);
-
-  const handleDeliveryTypeChange = (type: "pickup" | "delivery") => {
-    if (type === "pickup") {
-      setDeliveryOption({ type: "pickup" });
-      setDistance(0);
-    } else {
-      setDeliveryOption({
-        type: "delivery",
-        distance: distance,
-      });
-    }
-  };
-
-  const handleDistanceChange = (newDistance: number) => {
-    setDistance(newDistance);
-    if (deliveryOption.type === "delivery") {
-      setDeliveryOption({
-        type: "delivery",
-        distance: newDistance,
-      });
-    }
-  };
+    handleDeliveryTypeChange,
+    handleDistanceChange,
+    handleCheckout,
+  } = useCartLogic();
 
   if (items.length === 0) {
     return (
@@ -92,6 +73,26 @@ export default function Cart() {
         </span>
       </div>
 
+      {/* Multiple Restaurants Notice */}
+      {hasMultipleRestaurants && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="text-white text-xs font-bold">ℹ</span>
+            </div>
+            <div>
+              <h4 className="font-semibold text-blue-900 dark:text-blue-100 text-sm mb-1">
+                Pedido múltiple
+              </h4>
+              <p className="text-blue-700 dark:text-blue-200 text-xs">
+                Tu carrito incluye productos de {ordersByRestaurant.length} restaurantes diferentes.
+                Se procesarán como pedidos separados.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cart Items */}
       <div className="flex flex-col gap-4 mb-6">
         {items.map((item) => (
@@ -114,7 +115,7 @@ export default function Cart() {
                 <div>
                   {item.restaurant && (
                     <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                      {item.restaurant}
+                      {item.restaurant.name}
                     </span>
                   )}
                   <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
@@ -216,14 +217,14 @@ export default function Cart() {
                   placeholder="Ingresa la distancia"
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Costo de envío: ${getDeliveryFee()}
+                  Costo de envío: ${deliveryFee.toFixed(2)}
                 </p>
               </div>
             )}
           </div>
           {deliveryOption.type === "delivery" && (
             <span className="font-bold text-amber-500">
-              ${getDeliveryFee()}
+              ${deliveryFee.toFixed(2)}
             </span>
           )}
         </label>
@@ -237,14 +238,14 @@ export default function Cart() {
           <div className="flex justify-between text-sm">
             <span className="text-gray-600 dark:text-gray-300">Subtotal</span>
             <span className="font-semibold text-gray-900 dark:text-white">
-              ${getSubtotal().toFixed(2)}
+              ${subtotal.toFixed(2)}
             </span>
           </div>
 
           <div className="flex justify-between text-sm">
             <span className="text-gray-600 dark:text-gray-300">Envío</span>
             <span className="font-semibold text-gray-900 dark:text-white">
-              ${getDeliveryFee().toFixed(2)}
+              ${deliveryFee.toFixed(2)}
             </span>
           </div>
 
@@ -253,15 +254,27 @@ export default function Cart() {
           <div className="flex justify-between">
             <span className="font-bold text-gray-900 dark:text-white">Total</span>
             <span className="font-bold text-amber-500 text-xl">
-              ${getTotal().toFixed(2)}
+              ${total.toFixed(2)}
             </span>
           </div>
         </div>
       </div>
 
       {/* Checkout Button */}
-      <button className="w-full bg-amber-400 hover:bg-amber-500 text-white font-bold py-4 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-[0.98]">
-        Proceder al pago
+      <button
+        onClick={handleCheckout}
+        disabled={isProcessing}
+        className="w-full bg-amber-400 hover:bg-amber-500 disabled:bg-amber-300 text-white font-bold py-4 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2"
+      >
+        {isProcessing ? (
+          <>
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <span>Procesando...</span>
+          </>
+        ) : (
+          <span>Realizar pedido</span>
+        )}
+
       </button>
     </div>
   );

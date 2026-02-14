@@ -8,7 +8,6 @@ import {
   HelpCircle,
   FileText,
   LogOut,
-  Store,
   Clock,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router";
@@ -31,7 +30,6 @@ export default function Settings() {
   const { signOut } = useAuth();
   const { effectiveTheme, setTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [active, setActive] = useState(true);
 
   // Determine context based on URL
   const isRestaurant = location.pathname.includes("/restaurant");
@@ -120,21 +118,23 @@ export default function Settings() {
       title: "Negocio",
       items: [
         {
-          icon: Store,
-          label: "Estado del restaurante",
+          icon: Moon,
+          label: "Modo oscuro",
           type: "toggle",
-          value: active,
-          onChange: setActive,
+          value: darkMode,
+          onChange: handleDarkModeToggle,
         },
         {
           icon: Globe,
           label: "Información del negocio",
           type: "link",
+          onChange: () => navigate("/restaurant/settings/business-info"),
         },
         {
           icon: Clock,
           label: "Horarios de atención",
           type: "link",
+          onChange: () => navigate("/restaurant/settings/business-hours"),
         },
       ],
     },
@@ -170,7 +170,7 @@ export default function Settings() {
   ];
 
   return (
-    <div className="flex flex-col pt-2 pb-6">
+    <div className="flex flex-col pt-2 pb-24 sm:pb-8">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4 bg-white dark:bg-gray-800 sticky top-0 z-10 py-2">
         <button

@@ -42,13 +42,27 @@ export interface CartItem {
   price: number;
   quantity: number;
   image: string;
-  restaurant?: string;
+  restaurant?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface DeliveryOption {
   type: "pickup" | "delivery";
   address?: string;
   distance?: number; // en kilómetros
+}
+
+export interface CartOrder {
+  restaurant: {
+    id: string;
+    name: string;
+  };
+  items: CartItem[];
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
 }
 
 interface CartContextType {
@@ -58,12 +72,16 @@ interface CartContextType {
   updateQuantity: (id: string, quantity: number) => void;
   removeFromCart: (id: string) => void;
   clearCart: () => void;
+  clearCartByRestaurantId: (restaurantId: string) => void;
   setDeliveryOption: (option: DeliveryOption) => void;
   getTotalItems: () => number;
   getSubtotal: () => number;
   getDeliveryFee: () => number;
   getTotal: () => number;
+  getOrdersByRestaurant: () => CartOrder[];
+  hasMultipleRestaurants: () => boolean;
 }
+
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
@@ -208,6 +226,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // syncWithSupabase();
   };
 
+  /**
+   * LIMPIAR CARRITO POR RESTAURANTE:
+   * 
+   * Elimina solo los items de un restaurante específico del carrito.
+   * Útil cuando hay pedidos múltiples y algunos fallan.
+   */
+  const clearCartByRestaurantId = (restaurantId: string) => {
+    setItems((prevItems) => prevItems.filter((item) => item.restaurant?.id !== restaurantId));
+    
+    // TODO: Descomentar para sincronizar con Supabase
+    // syncWithSupabase();
+  };
+
+
   const getTotalItems = () => {
     return items.reduce((total, item) => total + item.quantity, 0);
   };
@@ -257,6 +289,57 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return getSubtotal() + getDeliveryFee();
   };
 
+  /**
+   * AGRUPACIÓN DE ITEMS POR RESTAURANTE:
+   *
+   * Esta función agrupa los items del carrito por restaurante para manejar
+   * pedidos múltiples (similar a Uber Eats).
+   *
+   * LÓGICA:
+   * - Agrupa items por restaurant.id
+   * - Calcula subtotal por restaurante
+   * - Aplica costo de envío por restaurante
+   * - Retorna array de órdenes separadas
+   */
+  const getOrdersByRestaurant = (): CartOrder[] => {
+    const restaurantGroups = items.reduce((acc, item) => {
+      if (!item.restaurant) return acc;
+
+      const restaurantId = item.restaurant.id;
+      if (!acc[restaurantId]) {
+        acc[restaurantId] = {
+          restaurant: item.restaurant,
+          items: [],
+          subtotal: 0,
+          deliveryFee: getDeliveryFee(),
+          total: 0
+        };
+      }
+
+      acc[restaurantId].items.push(item);
+      acc[restaurantId].subtotal += item.price * item.quantity;
+      acc[restaurantId].total = acc[restaurantId].subtotal + acc[restaurantId].deliveryFee;
+
+      return acc;
+    }, {} as Record<string, CartOrder>);
+
+    return Object.values(restaurantGroups);
+  };
+
+  /**
+   * VERIFICACIÓN DE MÚLTIPLES RESTAURANTES:
+   *
+   * Determina si el carrito contiene items de diferentes restaurantes.
+   * Esto es crucial para mostrar la UI apropiada en el checkout.
+   */
+  const hasMultipleRestaurants = (): boolean => {
+    const restaurantIds = items
+      .map(item => item.restaurant?.id)
+      .filter(Boolean);
+
+    return new Set(restaurantIds).size > 1;
+  };
+
   const value: CartContextType = {
     items,
     deliveryOption,
@@ -264,12 +347,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
     updateQuantity,
     removeFromCart,
     clearCart,
+    clearCartByRestaurantId,
     setDeliveryOption,
     getTotalItems,
     getSubtotal,
     getDeliveryFee,
     getTotal,
+    getOrdersByRestaurant,
+    hasMultipleRestaurants,
   };
+
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

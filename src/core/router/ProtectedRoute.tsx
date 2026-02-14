@@ -11,11 +11,11 @@ export const ProtectedRoute = ({
   allowedRoles,
   children,
 }: ProtectedRouteProps) => {
-  const { user, role, businessActive, loading } = useAuth();
+  const { user, role, businessActive, isAuthReady } = useAuth();
   const location = useLocation();
 
-  if (loading) {
-    // You might want to replace this with a proper LoadingSpinner component if available
+  // Wait for auth to be ready before making any decisions
+  if (!isAuthReady) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -23,6 +23,7 @@ export const ProtectedRoute = ({
     );
   }
 
+  // After auth is ready, check if user is authenticated
   if (!user) {
     return <Navigate to="/login" replace />;
   }
