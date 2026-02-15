@@ -46,31 +46,65 @@ export function useCustomerNotifications() {
     }
   }, []);
 
+  // Solicitar permiso de notificaciones
+  const requestPermission = useCallback(async () => {
+    if (!("Notification" in window)) return false;
+
+    // Si ya está concedido, retornar true
+    if (Notification.permission === "granted") return true;
+
+    // Si no, pedir permiso
+    const permission = await Notification.requestPermission();
+    return permission === "granted";
+  }, []);
+
   // Mostrar notificación del navegador
-  const showBrowserNotification = useCallback((order: any) => {
-    if (!("Notification" in window)) return;
+  const showBrowserNotification = useCallback(
+    async (order: any) => {
+      if (!("Notification" in window)) return;
 
-    const title = "¡Tu pedido ha sido actualizado!";
-    const body = `Tu pedido está ahora: ${translateStatus(order.status)}`;
+      if (Notification.permission !== "granted") {
+        // Intentar pedir permiso si no está concedido (esto podría fallar sin user gesture, pero intentamos)
+        const granted = await requestPermission();
+        if (!granted) return;
+      }
 
-    if (Notification.permission === "granted") {
+      const title = "¡Tu pedido ha sido actualizado!";
+      const body = `Tu pedido está ahora: ${translateStatus(order.status)}`;
+      const icon = "/favicon.svg";
+      const tag = `order-update-${order.id}`;
+
+      // Intentar usar ServiceWorkerRegistration si está disponible (Mejor para Android)
+      if ("serviceWorker" in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          if (registration) {
+            await registration.showNotification(title, {
+              body,
+              icon,
+              tag,
+              vibrate: [200, 100, 200],
+              badge: "/favicon.svg",
+            });
+            return;
+          }
+        } catch (e) {
+          console.warn(
+            "No se pudo usar SW para notificación, usando fallback",
+            e,
+          );
+        }
+      }
+
+      // Fallback a new Notification()
       new Notification(title, {
         body,
-        icon: "/favicon.svg",
-        tag: `order-update-${order.id}`,
+        icon,
+        tag,
       });
-    } else if (Notification.permission !== "denied") {
-      Notification.requestPermission().then((permission) => {
-        if (permission === "granted") {
-          new Notification(title, {
-            body,
-            icon: "/favicon.svg",
-            tag: `order-update-${order.id}`,
-          });
-        }
-      });
-    }
-  }, []);
+    },
+    [requestPermission],
+  );
 
   const setupSubscription = useCallback(async () => {
     if (!user) return;
@@ -138,6 +172,8 @@ export function useCustomerNotifications() {
       isSubscribedRef.current = false;
     };
   }, [setupSubscription]);
+
+  return { requestPermission };
 }
 
 function translateStatus(status: string): string {

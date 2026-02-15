@@ -1,13 +1,20 @@
 import { useState, useEffect, useRef } from "react";
-import { CheckCircle2, Clock, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, Loader2, Bell } from "lucide-react";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import {
   getOrdersByCustomer,
   type OrderWithItems,
 } from "@core/services/orderService";
 import { supabase } from "@core/supabase/client";
+import { useCustomerNotificationsContext } from "@core/context/CustomerNotificationsContext";
 
 export default function Activity() {
+  const { requestPermission } = useCustomerNotificationsContext();
+  const [permissionStatus, setPermissionStatus] =
+    useState<NotificationPermission>(
+      "Notification" in window ? Notification.permission : "default",
+    );
+
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -206,6 +213,33 @@ export default function Activity() {
       <h2 className="font-bold text-lg text-gray-900 dark:text-white mb-4 bg-white dark:bg-gray-800 sticky top-0 z-10 py-2">
         Actividad
       </h2>
+
+      {permissionStatus === "default" && (
+        <div className="mb-6 bg-amber-50 dark:bg-amber-900/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-800 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="bg-amber-100 dark:bg-amber-800/50 p-2 rounded-full">
+              <Bell className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold text-gray-900 dark:text-white text-sm">
+                Activar notificaciones
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Entérate cuando tu pedido esté listo
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              const granted = await requestPermission();
+              setPermissionStatus(granted ? "granted" : "denied");
+            }}
+            className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+          >
+            Activar
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4">
         {orders.map((order) => {

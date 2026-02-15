@@ -5,8 +5,9 @@
 import { createContext, useContext } from "react";
 import { useCustomerNotifications } from "@presentation/logic/useCustomerNotifications";
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-interface CustomerNotificationsContextType {}
+interface CustomerNotificationsContextType {
+  requestPermission: () => Promise<boolean>;
+}
 
 const CustomerNotificationsContext = createContext<
   CustomerNotificationsContextType | undefined
@@ -18,10 +19,10 @@ export function CustomerNotificationsProvider({
   children: React.ReactNode;
 }) {
   // Inicializamos el hook aquí para que esté activo mientras la app esté montada
-  useCustomerNotifications();
+  const { requestPermission } = useCustomerNotifications();
 
   return (
-    <CustomerNotificationsContext.Provider value={{}}>
+    <CustomerNotificationsContext.Provider value={{ requestPermission }}>
       {children}
     </CustomerNotificationsContext.Provider>
   );
