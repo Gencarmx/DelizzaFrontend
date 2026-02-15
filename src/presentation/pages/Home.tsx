@@ -6,7 +6,7 @@ import { getActiveProductCategories, type ProductCategory } from "@core/services
 import { useAddress } from "@core/context/AddressContext";
 
 export default function Home() {
-  const { selectedAddress, addresses, loading: addressLoading } = useAddress();
+  const { selectedAddress, loading: addressLoading } = useAddress();
   const [selectedProduct, setSelectedProduct] = useState<{
     id: string;
     name: string;
