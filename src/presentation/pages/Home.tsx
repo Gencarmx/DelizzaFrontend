@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { ChevronDown, Heart, Star, Clock, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronDown, Heart, Star, Clock, ChevronLeft, ChevronRight, Loader2, MapPin } from "lucide-react";
 import ProductModal from "@presentation/components/common/ProductModal";
 import { supabase } from "@core/supabase/client";
 import { getActiveProductCategories, type ProductCategory } from "@core/services/productCategoryService";
+import { useAddress } from "@core/context/AddressContext";
 
 export default function Home() {
+  const { selectedAddress, addresses, loading: addressLoading } = useAddress();
   const [selectedProduct, setSelectedProduct] = useState<{
     id: string;
     name: string;
@@ -152,6 +154,18 @@ export default function Home() {
     scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
   };
 
+  const getAddressDisplay = () => {
+    if (addressLoading) {
+      return "Cargando...";
+    }
+
+    if (!selectedAddress) {
+      return "No tienes direcciones guardadas. Agrega una en tu perfil.";
+    }
+
+    return `${selectedAddress.line1}, ${selectedAddress.city}, ${selectedAddress.state}`;
+  };
+
   return (
     <div className="flex flex-col gap-6 pt-2">
       {/* Error Message */}
@@ -172,11 +186,9 @@ export default function Home() {
 
       {/* Address Selector */}
       <button className="flex items-center gap-1 bg-white dark:bg-gray-800 px-4 py-2 rounded-full w-fit shadow-sm border border-gray-100 dark:border-gray-700 cursor-pointer">
-        <div className="w-5 h-5 flex items-center justify-center rounded-full border border-gray-800">
-          <div className="w-1.5 h-1.5 bg-gray-800 rounded-full"></div>
-        </div>
+        <MapPin className="w-5 h-5 text-gray-800 dark:text-gray-200" />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-          Calle 25 77517 Izamal
+          {getAddressDisplay()}
         </span>
         <ChevronDown className="w-4 h-4 text-gray-500" />
       </button>

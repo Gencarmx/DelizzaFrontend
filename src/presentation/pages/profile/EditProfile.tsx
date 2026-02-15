@@ -21,7 +21,7 @@ export default function EditProfile() {
   } = useEditProfileLogic();
 
   return (
-    <div className="flex flex-col pt-2 pb-6">
+    <div className="flex flex-col pt-2 pb-24">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 bg-white dark:bg-gray-800 sticky top-0 z-10 py-2">
         <div className="flex items-center gap-3">

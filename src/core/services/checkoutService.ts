@@ -22,6 +22,7 @@ export interface CheckoutData {
   deliveryOption: {
     type: "pickup" | "delivery";
     address?: string;
+    addressId?: string;
     distance?: number;
   };
   paymentMethod: string;
@@ -120,12 +121,13 @@ async function createRestaurantOrder(
       .insert({
         business_id: order.restaurant.id,
         customer_id: customerProfile.id,
-        customer_name: customerProfile.full_name, // Guardar nombre del cliente
+        customer_name: customerProfile.full_name,
         status: 'pending',
         total: order.total,
         delivery_type: checkoutData.deliveryOption.type,
+        delivery_address: checkoutData.deliveryOption.address,
+        address_id: checkoutData.deliveryOption.addressId,
         payment_method: checkoutData.paymentMethod,
-        // Nota: delivery_address se puede agregar después con user_addresses
       })
       .select()
       .single();

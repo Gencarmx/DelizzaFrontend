@@ -6,10 +6,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useCart } from "@core/context/CartContext";
+import { useAddress } from "@core/context/AddressContext";
 import { processMultiRestaurantCheckout } from "@core/services/checkoutService";
 
 export function useCartLogic() {
   const navigate = useNavigate();
+  const { selectedAddress } = useAddress();
   const {
     items,
     deliveryOption,
@@ -59,12 +61,26 @@ export function useCartLogic() {
   const handleCheckout = async () => {
     if (isProcessing) return;
 
+    if (deliveryOption.type === "delivery" && !selectedAddress) {
+      alert("Por favor selecciona una dirección de entrega antes de continuar.");
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
       const orders = getOrdersByRestaurant();
+
+      const addressString = selectedAddress
+        ? `${selectedAddress.line1}, ${selectedAddress.city}, ${selectedAddress.state} ${selectedAddress.postal_code || ''}`
+        : undefined;
+
       const checkoutData = {
-        deliveryOption,
+        deliveryOption: {
+          ...deliveryOption,
+          address: addressString,
+          addressId: selectedAddress?.id,
+        },
         paymentMethod: "cash", // TODO: Implementar selección de método de pago
         specialInstructions: "", // TODO: Implementar campo de instrucciones especiales
       };

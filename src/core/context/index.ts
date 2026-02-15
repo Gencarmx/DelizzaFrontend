@@ -6,3 +6,4 @@ export {
   RestaurantNotificationsProvider,
   useRestaurantNotifications,
 } from "./RestaurantNotificationsContext";
+export { AddressProvider, useAddress } from "./AddressContext";

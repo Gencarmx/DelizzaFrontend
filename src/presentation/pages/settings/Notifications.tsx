@@ -58,7 +58,7 @@ export default function Notifications() {
   ];
 
   return (
-    <div className="flex flex-col pt-2 pb-6">
+    <div className="flex flex-col pt-2 pb-24">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4 bg-white sticky top-0 z-10 py-2">
         <button
