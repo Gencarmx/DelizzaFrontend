@@ -16,8 +16,6 @@ import { useAuth } from "@core/context";
 import { addressService, type Address } from "@core/services/addressService";
 import { supabase } from "@core/supabase/client";
 
-type AddressType = "home" | "work" | "other";
-
 interface AddressFormData {
   label: string;
   line1: string;
