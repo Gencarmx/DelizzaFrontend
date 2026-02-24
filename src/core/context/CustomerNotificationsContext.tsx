@@ -2,11 +2,21 @@
  * CustomerNotificationsContext - Contexto global para notificaciones del cliente
  */
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, useCallback, useRef } from "react";
 import { useCustomerNotifications } from "@presentation/logic/useCustomerNotifications";
 
 interface CustomerNotificationsContextType {
   requestPermission: () => Promise<boolean>;
+  permissionStatus: NotificationPermission;
+  isConnected: boolean;
+  isReconnecting: boolean;
+  reconnectAttempt: number;
+  maxReconnectReached: boolean;
+  reconnect: () => void;
+  registerOrderUpdateCallback: (cb: (() => void) | null) => void;
+  registerInAppNotificationCallback: (
+    cb: ((title: string, body: string) => void) | null,
+  ) => void;
 }
 
 const CustomerNotificationsContext = createContext<
@@ -18,11 +28,57 @@ export function CustomerNotificationsProvider({
 }: {
   children: React.ReactNode;
 }) {
-  // Inicializamos el hook aquí para que esté activo mientras la app esté montada
-  const { requestPermission } = useCustomerNotifications();
+  const orderUpdateCallbackRef = useRef<(() => void) | null>(null);
+  const inAppNotificationCallbackRef = useRef<
+    ((title: string, body: string) => void) | null
+  >(null);
+
+  const onOrderUpdate = useCallback(() => {
+    orderUpdateCallbackRef.current?.();
+  }, []);
+
+  const onInAppNotification = useCallback((title: string, body: string) => {
+    inAppNotificationCallbackRef.current?.(title, body);
+  }, []);
+
+  const {
+    requestPermission,
+    permissionStatus,
+    isConnected,
+    isReconnecting,
+    reconnectAttempt,
+    maxReconnectReached,
+    reconnect,
+  } = useCustomerNotifications(onOrderUpdate, onInAppNotification);
+
+  const registerOrderUpdateCallback = useCallback(
+    (cb: (() => void) | null) => {
+      orderUpdateCallbackRef.current = cb;
+    },
+    [],
+  );
+
+  const registerInAppNotificationCallback = useCallback(
+    (cb: ((title: string, body: string) => void) | null) => {
+      inAppNotificationCallbackRef.current = cb;
+    },
+    [],
+  );
 
   return (
-    <CustomerNotificationsContext.Provider value={{ requestPermission }}>
+    <CustomerNotificationsContext.Provider
+      value={{
+        requestPermission,
+        permissionStatus,
+        isConnected,
+        isReconnecting,
+        reconnectAttempt,
+        maxReconnectReached,
+        reconnect,
+        registerOrderUpdateCallback,
+        registerInAppNotificationCallback,
+      }}
+    >
       {children}
     </CustomerNotificationsContext.Provider>
   );

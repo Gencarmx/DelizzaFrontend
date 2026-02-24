@@ -1,35 +1,57 @@
-/**
- * useCustomerNotifications - Hook para manejar notificaciones de pedidos para clientes
- * Escucha cambios en el estado de los pedidos en tiempo real
- */
-
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { supabase } from "@core/supabase/client";
 import { useAuth } from "@core/context/AuthContext";
 
-/**
- * Hook para manejar notificaciones de actualizaciones de pedidos para clientes
- */
-export function useCustomerNotifications() {
+const MAX_RECONNECT_ATTEMPTS = 5;
+
+export function useCustomerNotifications(
+  onOrderUpdate?: () => void,
+  onInAppNotification?: (title: string, body: string) => void,
+) {
   const { user } = useAuth();
 
-  // Usar ref para mantener estados entre renders sin causar re-renders
   const subscriptionRef = useRef<any>(null);
   const isSubscribedRef = useRef(false);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptRef = useRef(0);
+  const profileIdRef = useRef<string | null>(null);
+  const onOrderUpdateRef = useRef(onOrderUpdate);
+  const onInAppNotificationRef = useRef(onInAppNotification);
 
-  // Reproducir sonido
-  const playNotificationSound = useCallback(() => {
+  const [permissionStatus, setPermissionStatus] =
+    useState<NotificationPermission>(
+      "Notification" in window ? Notification.permission : "denied",
+    );
+
+  const [isConnected, setIsConnected] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [maxReconnectReached, setMaxReconnectReached] = useState(false);
+
+  useEffect(() => {
+    onOrderUpdateRef.current = onOrderUpdate;
+  }, [onOrderUpdate]);
+
+  useEffect(() => {
+    onInAppNotificationRef.current = onInAppNotification;
+  }, [onInAppNotification]);
+
+  const playNotificationSound = useCallback(async () => {
     try {
       const audioContext = new (
         window.AudioContext || (window as any).webkitAudioContext
       )();
+
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
 
-      // Sonido diferente al del restaurante (más suave)
       oscillator.frequency.setValueAtTime(500, audioContext.currentTime);
       oscillator.type = "sine";
 
@@ -46,35 +68,42 @@ export function useCustomerNotifications() {
     }
   }, []);
 
-  // Solicitar permiso de notificaciones
   const requestPermission = useCallback(async () => {
     if (!("Notification" in window)) return false;
 
-    // Si ya está concedido, retornar true
-    if (Notification.permission === "granted") return true;
+    if (Notification.permission === "granted") {
+      setPermissionStatus("granted");
+      return true;
+    }
 
-    // Si no, pedir permiso
+    if (Notification.permission === "denied") {
+      setPermissionStatus("denied");
+      return false;
+    }
+
     const permission = await Notification.requestPermission();
+    setPermissionStatus(permission);
     return permission === "granted";
   }, []);
 
-  // Mostrar notificación del navegador
   const showBrowserNotification = useCallback(
     async (order: any) => {
-      if (!("Notification" in window)) return;
-
-      if (Notification.permission !== "granted") {
-        // Intentar pedir permiso si no está concedido (esto podría fallar sin user gesture, pero intentamos)
-        const granted = await requestPermission();
-        if (!granted) return;
-      }
-
       const title = "¡Tu pedido ha sido actualizado!";
       const body = `Tu pedido está ahora: ${translateStatus(order.status)}`;
+
+      if (!("Notification" in window)) {
+        onInAppNotificationRef.current?.(title, body);
+        return;
+      }
+
+      if (Notification.permission !== "granted") {
+        onInAppNotificationRef.current?.(title, body);
+        return;
+      }
+
       const icon = "/favicon.svg";
       const tag = `order-update-${order.id}`;
 
-      // Intentar usar ServiceWorkerRegistration si está disponible (Mejor para Android)
       if ("serviceWorker" in navigator) {
         try {
           const registration = await navigator.serviceWorker.ready;
@@ -83,9 +112,8 @@ export function useCustomerNotifications() {
               body,
               icon,
               tag,
-              vibrate: [200, 100, 200],
               badge: "/favicon.svg",
-            });
+            } as NotificationOptions & { vibrate?: number[] });
             return;
           }
         } catch (e) {
@@ -96,84 +124,120 @@ export function useCustomerNotifications() {
         }
       }
 
-      // Fallback a new Notification()
-      new Notification(title, {
-        body,
-        icon,
-        tag,
-      });
+      new Notification(title, { body, icon, tag });
     },
-    [requestPermission],
+    [],
   );
 
-  const setupSubscription = useCallback(async () => {
-    if (!user) return;
-
-    // Obtener profile.id
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (!profile) return;
-
+  const setupSubscription = useCallback(async (profileId: string) => {
     if (isSubscribedRef.current) return;
 
-    // Limpiar suscripción anterior
     if (subscriptionRef.current) {
-      subscriptionRef.current.unsubscribe();
+      try { subscriptionRef.current.unsubscribe(); } catch { /* ignore */ }
     }
 
     isSubscribedRef.current = true;
 
-    // Suscribirse a cambios en orders para este cliente
     const subscription = supabase
-      .channel(`customer_orders_${profile.id}`)
+      .channel(`customer_orders_${profileId}`)
       .on(
         "postgres_changes",
         {
-          event: "UPDATE", // Solo nos interesan actualizaciones de estado
+          event: "*",
           schema: "public",
           table: "orders",
-          filter: `customer_id=eq.${profile.id}`,
+          filter: `customer_id=eq.${profileId}`,
         },
         async (payload) => {
-          // Verificar si el estado cambió
-          if (payload.old.status !== payload.new.status) {
-            console.log("📦 Pedido actualizado:", payload.new.status);
+          onOrderUpdateRef.current?.();
 
-            // Reproducir sonido
+          if (
+            payload.eventType === "UPDATE" &&
+            payload.old.status !== payload.new.status
+          ) {
             playNotificationSound();
-
-            // Mostrar notificación
             showBrowserNotification(payload.new);
           }
         },
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          console.log("🔔 Suscrito a notificaciones de cliente");
-        } else if (status === "CLOSED" || status === "CHANNEL_ERROR") {
+          reconnectAttemptRef.current = 0;
+          setIsConnected(true);
+          setIsReconnecting(false);
+          setReconnectAttempt(0);
+          setMaxReconnectReached(false);
+        } else if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          setIsConnected(false);
+          setIsReconnecting(false);
           isSubscribedRef.current = false;
+
+          if (reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
+            setMaxReconnectReached(true);
+            return;
+          }
+
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
+          reconnectAttemptRef.current += 1;
+          setReconnectAttempt(reconnectAttemptRef.current);
+          setIsReconnecting(true);
+
+          if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (profileIdRef.current) setupSubscription(profileIdRef.current);
+          }, delay);
         }
       });
 
     subscriptionRef.current = subscription;
-  }, [user, playNotificationSound, showBrowserNotification]);
+  }, [playNotificationSound, showBrowserNotification]);
 
   useEffect(() => {
-    setupSubscription();
+    if (!user) return;
+
+    let cancelled = false;
+
+    supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data: profile }) => {
+        if (cancelled || !profile) return;
+        profileIdRef.current = profile.id;
+        setupSubscription(profile.id);
+      });
 
     return () => {
+      cancelled = true;
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe();
+        try { subscriptionRef.current.unsubscribe(); } catch { /* ignore */ }
       }
       isSubscribedRef.current = false;
+      profileIdRef.current = null;
     };
+  }, [user, setupSubscription]);
+
+  const reconnect = useCallback(() => {
+    if (!profileIdRef.current) return;
+    reconnectAttemptRef.current = 0;
+    isSubscribedRef.current = false;
+    setReconnectAttempt(0);
+    setMaxReconnectReached(false);
+    setIsReconnecting(true);
+    setupSubscription(profileIdRef.current);
   }, [setupSubscription]);
 
-  return { requestPermission };
+  return {
+    requestPermission,
+    permissionStatus,
+    isConnected,
+    isReconnecting,
+    reconnectAttempt,
+    maxReconnectReached,
+    reconnect,
+  };
 }
 
 function translateStatus(status: string): string {

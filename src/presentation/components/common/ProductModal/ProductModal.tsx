@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { X, Minus, Plus, ShoppingCart, AlertCircle } from "lucide-react";
+import { X, Minus, Plus, ShoppingCart, AlertCircle, Zap } from "lucide-react";
 import { useCart } from "@core/context/CartContext";
+import { useNavigate } from "react-router-dom";
 
 
 export interface ProductModalProps {
@@ -23,6 +24,7 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const { addToCart } = useCart();
+  const navigate = useNavigate();
 
   if (!isOpen) return null;
 
@@ -59,6 +61,26 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
     onClose();
     setQuantity(1);
     setError(null);
+  };
+
+  const handleOrderNow = () => {
+    if (!hasValidRestaurant) {
+      setError("No se puede agregar este producto: información del restaurante no disponible. Por favor, intenta con otro producto.");
+      return;
+    }
+
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.image,
+      restaurant: product.restaurant,
+      quantity,
+    });
+    onClose();
+    setQuantity(1);
+    setError(null);
+    navigate("/cart");
   };
 
 
@@ -165,26 +187,33 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
             </div>
           </div>
 
-          {/* Add to Cart Button - Fixed at bottom above BottomNav */}
-          <div className="fixed bottom-16 left-0 right-0 px-6 py-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 z-[60]">
+          {/* Buttons - Fixed at bottom above BottomNav */}
+          <div className="fixed bottom-16 left-0 right-0 px-6 py-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 z-[60] flex gap-3">
             <button
               onClick={handleAddToCart}
               disabled={!hasValidRestaurant}
-              className={`w-full font-bold py-4 px-6 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-between ${
+              className={`flex-1 font-bold py-4 px-4 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2 ${
                 hasValidRestaurant
                   ? "bg-amber-400 hover:bg-amber-500 text-white"
                   : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <ShoppingCart className="w-5 h-5" strokeWidth={2.5} />
-                <span className="text-base">
-                  {hasValidRestaurant ? "Agregar al carrito" : "No disponible"}
-                </span>
-              </div>
-              <span className="text-lg font-bold">
-                ${totalPrice.toFixed(2)}
+              <ShoppingCart className="w-5 h-5" strokeWidth={2.5} />
+              <span className="text-sm">
+                {hasValidRestaurant ? "Agregar" : "No disponible"}
               </span>
+            </button>
+            <button
+              onClick={handleOrderNow}
+              disabled={!hasValidRestaurant}
+              className={`flex-1 font-bold py-4 px-4 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2 ${
+                hasValidRestaurant
+                  ? "bg-gray-900 hover:bg-gray-700 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900"
+                  : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+              }`}
+            >
+              <Zap className="w-5 h-5" strokeWidth={2.5} />
+              <span className="text-sm">Pedir ahora</span>
             </button>
           </div>
 

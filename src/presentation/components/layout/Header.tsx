@@ -2,6 +2,7 @@ import type { ComponentProps } from "react";
 import { ShoppingCart } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useCart } from "@core/context/CartContext";
+import { CustomerConnectionStatus } from "@presentation/components/common/CustomerConnectionStatus";
 
 export function Header(props: ComponentProps<"header">) {
   const navigate = useNavigate();
@@ -26,17 +27,20 @@ export function Header(props: ComponentProps<"header">) {
           </span>
         </div>
       </div>
-      <button
-        onClick={() => navigate("/cart")}
-        className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors cursor-pointer"
-      >
-        <ShoppingCart className="w-6 h-6 text-gray-900 dark:text-white" />
-        {totalItems > 0 && (
-          <span className="absolute -top-1 -right-1 bg-amber-400 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-md">
-            {totalItems > 9 ? "9+" : totalItems}
-          </span>
-        )}
-      </button>
+      <div className="flex items-center gap-2">
+        <CustomerConnectionStatus />
+        <button
+          onClick={() => navigate("/cart")}
+          className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors cursor-pointer"
+        >
+          <ShoppingCart className="w-6 h-6 text-gray-900 dark:text-white" />
+          {totalItems > 0 && (
+            <span className="absolute -top-1 -right-1 bg-amber-400 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-md">
+              {totalItems > 9 ? "9+" : totalItems}
+            </span>
+          )}
+        </button>
+      </div>
     </header>
   );
 }

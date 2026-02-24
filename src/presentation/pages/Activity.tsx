@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { CheckCircle2, Clock, XCircle, Loader2, Bell } from "lucide-react";
-import { RealtimeChannel } from "@supabase/supabase-js";
+import { useState, useEffect, useCallback } from "react";
+import { CheckCircle2, Clock, XCircle, Loader2, Bell, X } from "lucide-react";
 import {
   getOrdersByCustomer,
   type OrderWithItems,
@@ -9,18 +8,27 @@ import { supabase } from "@core/supabase/client";
 import { useCustomerNotificationsContext } from "@core/context/CustomerNotificationsContext";
 
 export default function Activity() {
-  const { requestPermission } = useCustomerNotificationsContext();
-  const [permissionStatus, setPermissionStatus] =
-    useState<NotificationPermission>(
-      "Notification" in window ? Notification.permission : "default",
-    );
+  const {
+    registerOrderUpdateCallback,
+    registerInAppNotificationCallback,
+  } = useCustomerNotificationsContext();
 
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [inAppNotification, setInAppNotification] = useState<{
+    title: string;
+    body: string;
+  } | null>(null);
 
-  // Referencia para la suscripción
-  const subscriptionRef = useRef<RealtimeChannel | null>(null);
+  const reloadOrders = useCallback(
+    async (pid: string) => {
+      const updatedOrders = await getOrdersByCustomer(pid, 20);
+      setOrders(updatedOrders);
+    },
+    [],
+  );
 
   useEffect(() => {
     let isSubscribed = true;
@@ -30,7 +38,6 @@ export default function Activity() {
         setLoading(true);
         setError(null);
 
-        // Obtener el usuario actual
         const {
           data: { user },
         } = await supabase.auth.getUser();
@@ -40,7 +47,6 @@ export default function Activity() {
           return;
         }
 
-        // Obtener el profile.id del usuario
         const { data: profile } = await supabase
           .from("profiles")
           .select("id")
@@ -53,41 +59,11 @@ export default function Activity() {
           return;
         }
 
-        // Obtener pedidos del cliente
         const ordersData = await getOrdersByCustomer(profile.id, 20);
         if (isSubscribed) {
           setOrders(ordersData);
-        } else {
-          return;
+          setProfileId(profile.id);
         }
-
-        // Suscribirse a cambios en tiempo real
-        if (subscriptionRef.current) {
-          subscriptionRef.current.unsubscribe();
-        }
-
-        subscriptionRef.current = supabase
-          .channel(`activity_orders_${profile.id}`)
-          .on(
-            "postgres_changes",
-            {
-              event: "*", // Escuchar INSERT y UPDATE
-              schema: "public",
-              table: "orders",
-              filter: `customer_id=eq.${profile.id}`,
-            },
-            async (payload) => {
-              console.log("🔄 Actividad actualizada:", payload);
-
-              // Recargar pedidos para tener la información más fresca (incluyendo relaciones)
-              // Podríamos optimizar actualizando solo el item cambiado, pero esto asegura consistencia
-              const updatedOrders = await getOrdersByCustomer(profile.id, 20);
-              if (isSubscribed) {
-                setOrders(updatedOrders);
-              }
-            },
-          )
-          .subscribe();
       } catch (err) {
         console.error("Error cargando pedidos:", err);
         setError("Error al cargar tu historial de pedidos");
@@ -102,11 +78,31 @@ export default function Activity() {
 
     return () => {
       isSubscribed = false;
-      if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe();
-      }
     };
   }, []);
+
+  useEffect(() => {
+    if (!profileId) return;
+
+    registerOrderUpdateCallback(() => {
+      reloadOrders(profileId);
+    });
+
+    return () => {
+      registerOrderUpdateCallback(null);
+    };
+  }, [profileId, registerOrderUpdateCallback, reloadOrders]);
+
+  useEffect(() => {
+    registerInAppNotificationCallback((title, body) => {
+      setInAppNotification({ title, body });
+      setTimeout(() => setInAppNotification(null), 5000);
+    });
+
+    return () => {
+      registerInAppNotificationCallback(null);
+    };
+  }, [registerInAppNotificationCallback]);
 
   // Función para formatear la fecha
   const formatDate = (dateString: string) => {
@@ -214,29 +210,28 @@ export default function Activity() {
         Actividad
       </h2>
 
-      {permissionStatus === "default" && (
-        <div className="mb-6 bg-amber-50 dark:bg-amber-900/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-800 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="bg-amber-100 dark:bg-amber-800/50 p-2 rounded-full">
-              <Bell className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+
+
+      {inAppNotification && (
+        <div className="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 flex items-start justify-between shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="bg-blue-100 dark:bg-blue-800/50 p-2 rounded-full shrink-0">
+              <Bell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col gap-0.5">
               <span className="font-semibold text-gray-900 dark:text-white text-sm">
-                Activar notificaciones
+                {inAppNotification.title}
               </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                Entérate cuando tu pedido esté listo
+              <span className="text-xs text-gray-600 dark:text-gray-300">
+                {inAppNotification.body}
               </span>
             </div>
           </div>
           <button
-            onClick={async () => {
-              const granted = await requestPermission();
-              setPermissionStatus(granted ? "granted" : "denied");
-            }}
-            className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+            onClick={() => setInAppNotification(null)}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 shrink-0 ml-2"
           >
-            Activar
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}

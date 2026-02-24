@@ -20,6 +20,7 @@ import {
   BusinessInfo,
 } from "@presentation/pages/settings";
 import Cart from "@presentation/pages/Cart";
+import RestaurantDetail from "@presentation/pages/RestaurantDetail";
 import {
   Dashboard,
   ProductList,
@@ -109,6 +110,10 @@ export const routes: RouteObject[] = [
         path: "products",
         element: <Products />,
         loader: productsLoader,
+      },
+      {
+        path: "restaurant-detail/:restaurantId",
+        element: <RestaurantDetail />,
       },
       {
         path: "*",

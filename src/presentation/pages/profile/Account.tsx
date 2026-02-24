@@ -1,8 +1,8 @@
 import {
   User,
   MapPin,
-  CreditCard,
-  Heart,
+  // CreditCard,
+  // Heart,
   Bell,
   Settings,
   LogOut,
@@ -18,8 +18,8 @@ export default function Account() {
   const menuItems = [
     { icon: User, label: "Editar perfil", path: "/edit-profile" },
     { icon: MapPin, label: "Direcciones guardadas", path: "/saved-addresses" },
-    { icon: CreditCard, label: "Métodos de pago", path: "/payment-methods" },
-    { icon: Heart, label: "Favoritos", path: "/favorites" },
+    // { icon: CreditCard, label: "Métodos de pago", path: "/payment-methods" },
+    // { icon: Heart, label: "Favoritos", path: "/favorites" },
     { icon: Bell, label: "Notificaciones", path: "/notifications" },
     { icon: Settings, label: "Configuración", path: "/settings" },
   ];

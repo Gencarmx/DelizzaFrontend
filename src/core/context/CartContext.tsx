@@ -269,19 +269,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
    */
   const getDeliveryFee = () => {
     if (deliveryOption.type === "pickup") {
-      return 0;
+      return 10;
     }
-    
+
     // Costo base de envío a domicilio
-    const baseFee = 20;
-    
+    const baseFee = 15;
+
     // Costo adicional por kilómetro
     const perKmFee = 5;
-    
+
     // Distancia en kilómetros (por defecto 0 si no se especifica)
     const distance = deliveryOption.distance || 0;
-    
-    // Cálculo total: $20 base + $5 por cada km
+
+    // Cálculo total: $15 base + $5 por cada km
     return baseFee + (perKmFee * distance);
   };
 

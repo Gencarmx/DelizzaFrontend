@@ -118,13 +118,6 @@ export default function Settings() {
       title: "Negocio",
       items: [
         {
-          icon: Moon,
-          label: "Modo oscuro",
-          type: "toggle",
-          value: darkMode,
-          onChange: handleDarkModeToggle,
-        },
-        {
           icon: Globe,
           label: "Información del negocio",
           type: "link",
@@ -147,18 +140,6 @@ export default function Settings() {
           type: "toggle",
           value: darkMode,
           onChange: handleDarkModeToggle,
-        },
-      ],
-    },
-    {
-      title: "Pedidos",
-      items: [
-        {
-          icon: Bell,
-          label: "Notificaciones de pedidos",
-          type: "toggle",
-          value: notificationsEnabled,
-          onChange: setNotificationsEnabled,
         },
       ],
     },

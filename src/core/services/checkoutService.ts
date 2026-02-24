@@ -115,18 +115,15 @@ async function createRestaurantOrder(
       throw new Error(`ID de restaurante inválido: ${order.restaurant.id}`);
     }
 
-    // 2. Crear el pedido en la base de datos con customer_name
+    // 2. Crear el pedido en la base de datos
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert({
         business_id: order.restaurant.id,
         customer_id: customerProfile.id,
-        customer_name: customerProfile.full_name,
         status: 'pending',
         total: order.total,
         delivery_type: checkoutData.deliveryOption.type,
-        delivery_address: checkoutData.deliveryOption.address,
-        address_id: checkoutData.deliveryOption.addressId,
         payment_method: checkoutData.paymentMethod,
       })
       .select()

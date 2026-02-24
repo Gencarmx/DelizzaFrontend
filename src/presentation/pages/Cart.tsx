@@ -178,9 +178,8 @@ export default function Cart() {
             <p className="font-semibold text-gray-900 dark:text-white text-sm">
               Recoger en persona
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Sin costo de envío</p>
           </div>
-          <span className="font-bold text-green-600">$0</span>
+          {/* <span className="font-bold text-amber-500">$10.00</span> */}
         </label>
 
         {/* Delivery Option */}
@@ -197,36 +196,17 @@ export default function Cart() {
             <p className="font-semibold text-gray-900 dark:text-white text-sm">
               Envío a domicilio
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-              $20 base + $5 por kilómetro
-            </p>
-
             {/* Distance Input */}
             {deliveryOption.type === "delivery" && (
               <div className="flex flex-col gap-2 mt-3">
-                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                  Distancia (km)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={distance}
-                  onChange={(e) => handleDistanceChange(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
-                  placeholder="Ingresa la distancia"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Costo de envío: ${deliveryFee.toFixed(2)}
-                </p>
               </div>
             )}
           </div>
-          {deliveryOption.type === "delivery" && (
+          {/* {deliveryOption.type === "delivery" && (
             <span className="font-bold text-amber-500">
               ${deliveryFee.toFixed(2)}
             </span>
-          )}
+          )} */}
         </label>
       </div>
 
@@ -242,12 +222,14 @@ export default function Cart() {
             </span>
           </div>
 
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600 dark:text-gray-300">Envío</span>
+          {/* <div className="flex justify-between text-sm">
+            <span className="text-gray-600 dark:text-gray-300">
+              {deliveryOption.type === "pickup" ? "Cargo por recoger" : "Envío a domicilio"}
+            </span>
             <span className="font-semibold text-gray-900 dark:text-white">
               ${deliveryFee.toFixed(2)}
             </span>
-          </div>
+          </div> */}
 
           <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
 
