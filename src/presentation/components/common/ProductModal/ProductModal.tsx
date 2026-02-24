@@ -84,7 +84,7 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
   };
 
 
-  const totalPrice = product.price * quantity;
+  // const totalPrice = product.price * quantity;
 
   return (
     <>
