@@ -7,17 +7,17 @@ export default function Cart() {
   const {
     items,
     deliveryOption,
-    distance,
+    // distance,
     isProcessing,
     subtotal,
-    deliveryFee,
+    // deliveryFee,
     total,
     ordersByRestaurant,
     hasMultipleRestaurants,
     updateQuantity,
     removeFromCart,
     handleDeliveryTypeChange,
-    handleDistanceChange,
+    // handleDistanceChange,
     handleCheckout,
   } = useCartLogic();
 
