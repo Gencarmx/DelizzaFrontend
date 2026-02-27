@@ -3,6 +3,7 @@ import { Loader2, Bell, X } from "lucide-react";
 import { RestaurantBottomNav } from "@presentation/components/layout/RestaurantBottomNav";
 import { RestaurantNotificationsProvider, useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
 import { useAuth } from "@core/context/AuthContext";
+import { AndroidInstallButton } from "@presentation/components/common/AndroidInstallButton";
 import { useEffect, useState } from "react";
 import { getBusinessByOwner } from "@core/services/businessService";
 
@@ -147,7 +148,8 @@ function RestaurantLayoutContent() {
       </main>
 
       <RestaurantBottomNav />
-      
+      <AndroidInstallButton />
+
       {/* Estilos para animación de notificación */}
       <style>{`
         @keyframes slide-in {
