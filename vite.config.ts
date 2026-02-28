@@ -15,10 +15,10 @@ export default defineConfig({
       injectRegister: "auto",
 
       manifest: {
-        name: "dlizza-frontend",
-        short_name: "dlizza-frontend",
-        description: "dlizza-frontend",
-        theme_color: "#ffffff",
+        name: "Delizza - Delivery App",
+        short_name: "Delizza",
+        description: "Pide tu comida favorita con Delizza",
+        theme_color: "#fbbf24",
         background_color: "#ffffff",
         display: "standalone", // ✅ Cambiado
         orientation: "portrait", // ✅ Agregado
@@ -59,7 +59,7 @@ export default defineConfig({
       },
 
       devOptions: {
-        enabled: false,
+        enabled: true,
         navigateFallback: "index.html",
         suppressWarnings: true,
         type: "module",
