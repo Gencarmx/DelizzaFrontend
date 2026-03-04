@@ -12,6 +12,8 @@
   max-width: 195px;
   min-width: 195px;
 
+  font-family: "Courier New", Courier, monospace;
+  max-width: 300px;
   margin: 0 auto;
   padding: 8px 4px;
   /* Un poco de respiro visual */
@@ -126,6 +128,10 @@
   padding: 0 4px;
   word-break: break-word;
   line-height: 1.25;
+  word-wrap: break-word;
+  word-break: break-word; /* prevent long words from shifting columns */
+  white-space: normal;
+  padding-right: 5px;
 }
 
 .col-price {
@@ -142,6 +148,13 @@
   margin: 4px 0;
   font-size: 10px;
   font-weight: 600;
+  align-items: flex-start; /* align to top instead of center to handle wrapping lines */
+  margin: 6px 0;
+  font-size: 11px;
+}
+
+.ticket-total {
+  margin-bottom: 15px;
 }
 
 .total-row {

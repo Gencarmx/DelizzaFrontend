@@ -18,8 +18,8 @@ export default function OrderTicket({
     order.deliveryType === "delivery"
       ? "Domicilio"
       : order.deliveryType === "pickup"
-      ? "Recoger en tienda"
-      : order.deliveryType || null;
+        ? "Recoger en tienda"
+        : order.deliveryType || null;
 
   return (
     <div className="order-ticket">
@@ -69,7 +69,9 @@ export default function OrderTicket({
         <div className="ticket-section">
           <p className="section-title">DIRECCIÓN DE ENTREGA</p>
           {order.deliveryAddress.recipientName && (
-            <p className="address-line">{order.deliveryAddress.recipientName}</p>
+            <p className="address-line">
+              {order.deliveryAddress.recipientName}
+            </p>
           )}
           <p className="address-line">{order.deliveryAddress.line1}</p>
           {order.deliveryAddress.line2 && (
@@ -88,7 +90,9 @@ export default function OrderTicket({
             <p className="address-line">{order.deliveryAddress.country}</p>
           )}
           {order.deliveryAddress.recipientPhone && (
-            <p className="address-line">Tel: {order.deliveryAddress.recipientPhone}</p>
+            <p className="address-line">
+              Tel: {order.deliveryAddress.recipientPhone}
+            </p>
           )}
           <div className="divider" />
         </div>
@@ -99,7 +103,9 @@ export default function OrderTicket({
         <div className="ticket-section">
           <p className="section-title">RECOGER EN TIENDA</p>
           <p className="address-line">{businessAddress}</p>
-          {businessPhone && <p className="address-line">Tel: {businessPhone}</p>}
+          {businessPhone && (
+            <p className="address-line">Tel: {businessPhone}</p>
+          )}
           <div className="divider" />
         </div>
       )}
@@ -113,21 +119,33 @@ export default function OrderTicket({
         </div>
         <div className="divider-thin" />
 
-        {order.items.split(", ").map((item: string, index: number) => {
-          const match = item.match(/(\d+)x\s(.+)/);
-          if (match) {
-            const [, quantity, productName] = match;
-            const itemPrice = (order.total / order.items.split(", ").length).toFixed(2);
-            return (
+        {order.ticketItems
+          ? order.ticketItems.map((item, index) => (
               <div key={index} className="item-row">
-                <span className="col-qty">{quantity}</span>
-                <span className="col-item">{productName}</span>
-                <span className="col-price">${itemPrice}</span>
+                <span className="col-qty">{item.quantity}</span>
+                <span className="col-item">{item.productName}</span>
+                <span className="col-price">${item.price.toFixed(2)}</span>
               </div>
-            );
-          }
-          return null;
-        })}
+            ))
+          : order.items.split(", ").map((item: string, index: number) => {
+              const match = item.match(/(\d+)x\s(.+)/);
+              if (match) {
+                const [, quantity, productName] = match;
+                // Calcular precio por item (esto es una aproximación)
+                const itemPrice = (
+                  order.total / order.items.split(", ").length
+                ).toFixed(2);
+
+                return (
+                  <div key={index} className="item-row">
+                    <span className="col-qty">{quantity}</span>
+                    <span className="col-item">{productName}</span>
+                    <span className="col-price">${itemPrice}</span>
+                  </div>
+                );
+              }
+              return null;
+            })}
 
         <div className="divider" />
       </div>

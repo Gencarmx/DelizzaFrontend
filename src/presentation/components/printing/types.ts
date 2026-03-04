@@ -9,14 +9,27 @@ export interface OrderDeliveryAddress {
   recipientPhone?: string;
 }
 
+export interface OrderTicketItem {
+  quantity: number;
+  productName: string;
+  price: number;
+}
+
 export interface Order {
   id: string;
   fullId: string;
   customer: string;
   customerPhone?: string;
   items: string;
+  ticketItems?: OrderTicketItem[]; // Structured items for the printed ticket
   total: number;
-  status: "pending" | "completed" | "cancelled" | "in_progress" | "ready" | "preparing";
+  status:
+    | "pending"
+    | "completed"
+    | "cancelled"
+    | "in_progress"
+    | "ready"
+    | "preparing";
   date: string;
   paymentMethod: string;
   originalStatus?: string;
