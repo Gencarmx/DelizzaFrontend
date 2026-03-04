@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@core/supabase/client";
-import type { User, Session, AuthError } from "@supabase/supabase-js";
+import { type User, type Session, type AuthError } from "@supabase/supabase-js";
 
 interface AuthContextType {
   user: User | null;
@@ -21,14 +21,13 @@ interface AuthContextType {
     businessName: string,
     businessAddress: string,
     phoneNumber: string
-  ) => Promise<{ error: AuthError | null }>;
+  ) => Promise<{ error: AuthError | null; userId?: string }>;
   signIn: (
     email: string,
     password: string
   ) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
 }
-
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -41,7 +40,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [businessActive, setBusinessActive] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthReady, setIsAuthReady] = useState(false);
-
 
   const getCachedRole = (userId: string): "owner" | "client" | null => {
     try {
@@ -56,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem(`${ROLE_CACHE_KEY}-${userId}`, userRole);
     } catch {
-      // Ignore localStorage errors
+      // ignore
     }
   };
 
@@ -65,7 +63,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (userId) {
         localStorage.removeItem(`${ROLE_CACHE_KEY}-${userId}`);
       } else {
-        // Clear all role caches
         Object.keys(localStorage).forEach(key => {
           if (key.startsWith(ROLE_CACHE_KEY)) {
             localStorage.removeItem(key);
@@ -73,124 +70,130 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       }
     } catch {
-      // Ignore localStorage errors
+      // ignore
     }
   };
 
   useEffect(() => {
-    const fetchRole = async (userId: string, userMetadata?: any) => {
-      // Check cache first
-      const cachedRole = getCachedRole(userId);
-      if (cachedRole) {
-        return cachedRole;
+    let cancelled = false;
+
+    const fetchRole = async (userId: string, userMetadata?: Record<string, unknown>): Promise<"owner" | "client"> => {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("user_role")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (!error && data?.user_role) {
+          const userRole = data.user_role as "owner" | "client";
+          setCachedRole(userId, userRole);
+          return userRole;
+        }
+      } catch {
+        // fall through to metadata/cache
       }
 
-      // PRIORITY 1: Check user metadata from Supabase Auth (most reliable source)
-      // This is set during registration and persists even if profiles table isn't ready
       if (userMetadata?.user_role) {
         const metadataRole = userMetadata.user_role as "owner" | "client";
         setCachedRole(userId, metadataRole);
         return metadataRole;
       }
 
-      // PRIORITY 2: Query profiles table as fallback
-      try {
-        // Add timeout to prevent hanging
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Role fetch timeout")), 2000);
-        });
+      const cachedRole = getCachedRole(userId);
+      if (cachedRole) return cachedRole;
 
-        const queryPromise = supabase
-          .from("profiles")
-          .select("user_role")
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
-
-        if (error) {
-          console.error("Error fetching role from profiles:", error);
-          const defaultRole = "client" as const;
-          setCachedRole(userId, defaultRole);
-          return defaultRole;
-        }
-
-        if (data?.user_role) {
-          const userRole = data.user_role as "owner" | "client";
-          setCachedRole(userId, userRole);
-          return userRole;
-        }
-
-        // If no data found in profiles, default to client
-        const defaultRole = "client" as const;
-        setCachedRole(userId, defaultRole);
-        return defaultRole;
-      } catch (error: any) {
-        console.error("Exception in fetchRole:", error);
-        // If timeout or any other error, default to client
-        const defaultRole = "client" as const;
-        setCachedRole(userId, defaultRole);
-        return defaultRole;
-      }
+      return "client";
     };
 
-    const fetchBusinessStatus = async (userId: string) => {
-      // Helper function to fetch business status with timeout
-      const fetchWithTimeout = async () => {
-        // First get the profile id
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', userId)
-          .maybeSingle();
+    const fetchBusinessStatus = async (userId: string): Promise<boolean> => {
+      const MAX_ATTEMPTS = 5;
+      const RETRY_DELAY_MS = 1500;
+      const QUERY_TIMEOUT_MS = 8000;
 
-        if (profileError || !profile) {
-          console.error('Error fetching profile for business status:', profileError);
-          return null;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          const profilePromise = supabase
+            .from("profiles")
+            .select("id")
+            .eq("user_id", userId)
+            .maybeSingle();
+
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`TIMEOUT profiles intento ${attempt}`)), QUERY_TIMEOUT_MS)
+          );
+
+          const { data: profile, error: profileError } = await Promise.race([profilePromise, timeoutPromise]) as Awaited<typeof profilePromise>;
+
+          if (profileError) {
+            if (attempt < MAX_ATTEMPTS) {
+              await new Promise(res => setTimeout(res, RETRY_DELAY_MS));
+              continue;
+            }
+            return false;
+          }
+
+          if (!profile) {
+            if (attempt < MAX_ATTEMPTS) {
+              await new Promise(res => setTimeout(res, RETRY_DELAY_MS));
+              continue;
+            }
+            return false;
+          }
+
+          const businessPromise = supabase
+            .from("businesses")
+            .select("active")
+            .eq("owner_id", profile.id)
+            .maybeSingle();
+
+          const businessTimeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`TIMEOUT businesses intento ${attempt}`)), QUERY_TIMEOUT_MS)
+          );
+
+          const { data: business, error: businessError } = await Promise.race([businessPromise, businessTimeoutPromise]) as Awaited<typeof businessPromise>;
+
+          if (businessError) {
+            if (attempt < MAX_ATTEMPTS) {
+              await new Promise(res => setTimeout(res, RETRY_DELAY_MS));
+              continue;
+            }
+            return false;
+          }
+
+          if (!business) {
+            if (attempt < MAX_ATTEMPTS) {
+              await new Promise(res => setTimeout(res, RETRY_DELAY_MS));
+              continue;
+            }
+            return false;
+          }
+
+          return business.active ?? false;
+        } catch {
+          if (attempt < MAX_ATTEMPTS) {
+            await new Promise(res => setTimeout(res, RETRY_DELAY_MS));
+          }
         }
-
-        // Get business active status using profile.id
-        const { data: business, error: businessError } = await supabase
-          .from('businesses')
-          .select('active')
-          .eq('owner_id', profile.id)
-          .maybeSingle();
-
-        if (businessError) {
-          console.error('Error fetching business status:', businessError);
-          return null;
-        }
-
-        return business?.active ?? null;
-      };
-
-      // Add 10 second timeout to prevent hanging
-      const timeoutPromise = new Promise<null>((_, reject) => {
-        setTimeout(() => reject(new Error("Business status fetch timeout")), 10000);
-      });
-
-      try {
-        const result = await Promise.race([fetchWithTimeout(), timeoutPromise]);
-        return result;
-      } catch (error) {
-        console.warn('Business status fetch timeout or error:', error);
-        return null;
       }
+
+      return false;
     };
 
-    // Track if we've completed initial auth setup
-    let initialAuthComplete = false;
-    
-    const handleAuthState = async (session: Session | null) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        const userRole = await fetchRole(session.user.id, session.user.user_metadata);
+    const applySession = async (event: string, currentSession: Session | null) => {
+      if (cancelled) return;
+
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+
+      if (currentSession?.user) {
+        const userRole = await fetchRole(currentSession.user.id, currentSession.user.user_metadata);
+        if (cancelled) return;
         setRole(userRole);
-        
-        if (userRole === 'owner') {
-          const active = await fetchBusinessStatus(session.user.id);
+
+        if (userRole === "owner") {
+          const active = await fetchBusinessStatus(currentSession.user.id);
+          if (cancelled) return;
           setBusinessActive(active);
         } else {
           setBusinessActive(null);
@@ -199,54 +202,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRole(null);
         setBusinessActive(null);
       }
-      
-      // Only update loading/isAuthReady on initial auth
-      if (!initialAuthComplete) {
-        setLoading(false);
-        setIsAuthReady(true);
-        initialAuthComplete = true;
-      }
+
+      setLoading(false);
+      setIsAuthReady(true);
     };
 
-    // Set up onAuthStateChange listener first
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        await handleAuthState(session);
-      }
-    );
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      if (cancelled) return;
+      applySession("INITIAL_SESSION", initialSession ?? null);
+    });
 
-    // Cleanup function
+    // Queries are deferred with setTimeout(0) to avoid the Supabase JS v2 deadlock
+    // that occurs when making DB calls directly inside onAuthStateChange
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      setTimeout(() => {
+        applySession(event, currentSession);
+      }, 0);
+    });
+
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
     };
-
   }, []);
-
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
-      // ℹ️ NOTA: Los triggers de Supabase ya manejan la asignación de roles en la tabla 'profiles'.
-      // Sin embargo, también establecemos user_role en los metadatos para:
-      // 1. Tener acceso inmediato al rol sin consultar la BD
-      // 2. Mantener consistencia entre metadatos y tabla profiles
-      // 
-      // ⚠️ CONSIDERACIÓN DE SEGURIDAD: 
-      // Aunque los metadatos pueden ser establecidos desde el cliente, la fuente de verdad
-      // es la tabla 'profiles' manejada por triggers del servidor. Los metadatos son solo
-      // para conveniencia y velocidad de acceso.
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
-            user_role: 'client', // Metadatos para acceso rápido (triggers manejan la tabla profiles)
+            user_role: "client",
           },
         },
       });
-
       if (error) return { error };
-
       return { error: null };
     } catch (error) {
       return { error: error as AuthError };
@@ -255,13 +247,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) return { error };
-
       return { error: null };
     } catch (error) {
       return { error: error as AuthError };
@@ -277,24 +264,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     phoneNumber: string
   ) => {
     try {
-      // ℹ️ NOTA: Los triggers de Supabase ya manejan la asignación de roles en la tabla 'profiles'
-      // y la creación del registro en la tabla 'businesses'.
-      // Los metadatos (user_role, business_name, etc.) se establecen aquí para:
-      // 1. Que los triggers tengan acceso a esta información
-      // 2. Proporcionar acceso inmediato sin consultar la BD
-      //
-      // ⚠️ CONSIDERACIÓN DE SEGURIDAD:
-      // La fuente de verdad es la tabla 'profiles' manejada por triggers del servidor.
-      // Los metadatos son solo para conveniencia y para que los triggers los procesen.
-      const { data: _data, error } = await supabase.auth.signUp({
-
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
             phone_number: phoneNumber,
-            user_role: 'owner', // Metadatos para triggers y acceso rápido
+            user_role: "owner",
             business_name: businessName,
             business_address: businessAddress,
             business_phone: phoneNumber,
@@ -303,15 +280,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.error('SignUpOwner: Auth signup error:', error);
+        console.error("SignUpOwner: Auth signup error:", error);
         return { error };
       }
 
-      // Profile and business will be created by Supabase triggers
-
-      return { error: null };
+      return { error: null, userId: data.user?.id };
     } catch (error) {
-      console.error('SignUpOwner: Unexpected error:', error);
+      console.error("SignUpOwner: Unexpected error:", error);
       return { error: error as AuthError };
     }
   };
@@ -335,7 +310,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signOut,
   };
-
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

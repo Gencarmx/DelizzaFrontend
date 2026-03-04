@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "@core/context/AuthContext";
-import { Eye, EyeOff, Upload } from "lucide-react";
-import { uploadBusinessLogo } from "@core/services/businessService";
-import { getBusinessByOwner } from "@core/services/businessService";
+import { Eye, EyeOff, Upload, Image as ImageIcon, X } from "lucide-react";
+import { getBusinessByOwner, uploadBusinessLogo, updateBusiness } from "@core/services/businessService";
 
 export default function RegisterOwner() {
   const [fullName, setFullName] = useState("");
@@ -14,6 +13,8 @@ export default function RegisterOwner() {
   const [businessAddress, setBusinessAddress] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [restaurantPhoto, setRestaurantPhoto] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
@@ -42,7 +43,7 @@ export default function RegisterOwner() {
 
     setLoading(true);
 
-    const { error: signUpError } = await signUpOwner(
+    const { error: signUpError, userId: newUserId } = await signUpOwner(
       email,
       password,
       fullName,
@@ -55,20 +56,20 @@ export default function RegisterOwner() {
       let errorMessage = signUpError.message;
       const originalError = errorMessage.toLowerCase();
 
-      if (originalError.includes("user already registered") || 
-          (originalError.includes("email") && originalError.includes("already"))) {
+      if (originalError.includes("user already registered") ||
+        (originalError.includes("email") && originalError.includes("already"))) {
         errorMessage = `❌ El correo electrónico "${email}" ya está registrado. Por favor usa otro correo o inicia sesión.`;
       }
-      else if (originalError.includes("users_phone_number_key") || 
-               (originalError.includes("phone") && originalError.includes("duplicate"))) {
+      else if (originalError.includes("users_phone_number_key") ||
+        (originalError.includes("phone") && originalError.includes("duplicate"))) {
         errorMessage = `❌ El número de teléfono "${phoneNumber}" ya está registrado. Por favor usa otro número.`;
       }
-      else if (originalError.includes("duplicate") && 
-               (originalError.includes("email") || originalError.includes("phone"))) {
+      else if (originalError.includes("duplicate") &&
+        (originalError.includes("email") || originalError.includes("phone"))) {
         const duplicatedFields = [];
         if (originalError.includes("email")) duplicatedFields.push(`correo "${email}"`);
         if (originalError.includes("phone")) duplicatedFields.push(`teléfono "${phoneNumber}"`);
-        
+
         if (duplicatedFields.length > 0) {
           errorMessage = `❌ Los siguientes datos ya están registrados: ${duplicatedFields.join(" y ")}. Por favor usa otros datos.`;
         } else {
@@ -89,23 +90,52 @@ export default function RegisterOwner() {
       setLoading(false);
     } else {
       try {
-        if (user?.id && restaurantPhoto) {
-          const business = await getBusinessByOwner(user.id);
+        const ownerUserId = newUserId || user?.id;
+        if (ownerUserId && restaurantPhoto) {
+          const business = await getBusinessByOwner(ownerUserId);
           if (business) {
-            await uploadBusinessLogo(business.id, restaurantPhoto);
+            const logoUrl = await uploadBusinessLogo(business.id, restaurantPhoto);
+            await updateBusiness(business.id, { logo_url: logoUrl });
           }
         }
       } catch (uploadError) {
         console.error('Error subiendo logo del restaurante:', uploadError);
       }
-      
+
       navigate("/pending-approval");
     }
   };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Por favor selecciona un archivo de imagen válido');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('La imagen del restaurante no debe superar los 5MB');
+      return;
+    }
+
+    setError("");
     setRestaurantPhoto(file);
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setRestaurantPhoto(null);
+    setImagePreview("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   return (
@@ -263,27 +293,58 @@ export default function RegisterOwner() {
 
           {/* Restaurant Photo Upload */}
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-gray-700 mb-1">
               Foto del restaurante
             </label>
-            <div className="relative">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoChange}
-                className="hidden"
-                id="restaurantPhoto"
-                required
-              />
-              <label
-                htmlFor="restaurantPhoto"
-                className="flex items-center gap-3 w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-all"
-              >
-                <Upload className="w-5 h-5 text-gray-400" />
-                <span className="text-gray-600">
-                  {restaurantPhoto ? restaurantPhoto.name : "Seleccionar archivo"}
-                </span>
-              </label>
+
+            <div className="space-y-4">
+              {imagePreview ? (
+                <div className="relative inline-block">
+                  <img
+                    src={imagePreview}
+                    alt="Preview del logo"
+                    className="w-32 h-32 object-cover rounded-xl border-2 border-gray-200 shadow-sm"
+                  />
+                  <button
+                    onClick={handleRemoveImage}
+                    className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-sm"
+                    type="button"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center w-32 h-32 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50">
+                  <div className="text-center">
+                    <ImageIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-xs text-gray-500">Sin foto</p>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  className="hidden"
+                  id="restaurantPhoto"
+                  required={!restaurantPhoto}
+                />
+                <label
+                  htmlFor="restaurantPhoto"
+                  className="inline-flex items-center gap-3 px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-all text-gray-600 font-medium w-full"
+                >
+                  <Upload className="w-5 h-5 text-gray-400" />
+                  <span>
+                    {imagePreview ? 'Cambiar foto' : 'Seleccionar archivo'}
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 mt-2">
+                  Formatos permitidos: JPG, PNG, GIF. Tamaño máximo: 5MB
+                </p>
+              </div>
             </div>
           </div>
 

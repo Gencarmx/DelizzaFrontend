@@ -51,7 +51,6 @@ export function useRealtimeNotifications(businessId?: string) {
     isReconnecting: false,
   });
 
-
   // Obtener estado de autenticación
   const { isAuthReady } = useAuth();
 
@@ -62,253 +61,207 @@ export function useRealtimeNotifications(businessId?: string) {
   const reconnectAttemptRef = useRef(0);
   const MAX_RECONNECT_ATTEMPTS = 5;
 
+  // Use a ref to hold the setup function to avoid circular useCallback dependencies
+  const setupSubscriptionRef = useRef<(() => void) | null>(null);
 
-  // Función para establecer la suscripción
-  const setupSubscription = useCallback(() => {
-    // Esperar a que la autenticación esté lista
-    if (!isAuthReady) {
-      return;
+  const cleanupSubscription = useCallback(() => {
+    isSubscribedRef.current = false;
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
     }
-
-    if (!businessId) {
-      return;
-    }
-
-    // Evitar suscripciones duplicadas
-    if (isSubscribedRef.current) {
-      return;
-    }
-
-    // Limpiar suscripción anterior si existe
     if (subscriptionRef.current) {
       try {
-        subscriptionRef.current.unsubscribe();
+        supabase.removeChannel(subscriptionRef.current);
       } catch (e) {
         // Ignore cleanup errors
       }
+      subscriptionRef.current = null;
+    }
+  }, []);
+
+  const scheduleReconnect = useCallback(() => {
+    if (reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
+      setNotificationState(prev => ({
+        ...prev,
+        maxReconnectReached: true,
+        connectionError: `Máximo de intentos de reconexión alcanzado (${MAX_RECONNECT_ATTEMPTS}). Por favor, reconecta manualmente.`,
+        isReconnecting: false,
+      }));
+      return;
     }
 
-    isSubscribedRef.current = true;
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
+    reconnectAttemptRef.current += 1;
 
-    // Suscribirse a cambios en la tabla orders
-    const subscription = supabase
-      .channel(`restaurant_orders_${businessId}`, {
-        config: {
-          broadcast: { self: true },
-        },
-      })
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'orders',
-          filter: `business_id=eq.${businessId}`,
-        },
-        async (payload) => {
-          try {
-            // Esperar un momento para asegurar que los order_items estén commitados
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Obtener detalles completos del pedido incluyendo items
-            let orderDetails = null;
-            let retryCount = 0;
-            const maxRetries = 3;
-            
-            while (retryCount < maxRetries) {
-              const { data, error } = await supabase
-                .from('orders')
-                .select(`
-                  *,
-                  order_items (
-                    product_name,
-                    quantity,
-                    price
-                  )
-                `)
-                .eq('id', payload.new.id)
-                .single();
+    setNotificationState(prev => ({
+      ...prev,
+      reconnectAttempt: reconnectAttemptRef.current,
+      isReconnecting: true,
+    }));
 
-              if (error) {
-                console.error(`Error obteniendo detalles del pedido (intento ${retryCount + 1}):`, error);
-                retryCount++;
-                if (retryCount < maxRetries) {
-                  await new Promise(resolve => setTimeout(resolve, 300));
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+    reconnectTimeoutRef.current = setTimeout(() => {
+      setupSubscriptionRef.current?.();
+    }, delay);
+  }, []);
+
+  useEffect(() => {
+    setupSubscriptionRef.current = () => {
+      if (!isAuthReady || !businessId) return;
+      if (isSubscribedRef.current) return;
+
+      if (subscriptionRef.current) {
+        try {
+          supabase.removeChannel(subscriptionRef.current);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        subscriptionRef.current = null;
+      }
+
+      const subscription = supabase
+        .channel(`restaurant_orders_${businessId}`, {
+          config: {
+            broadcast: { self: true },
+          },
+        })
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'orders',
+            filter: `business_id=eq.${businessId}`,
+          },
+          async (payload) => {
+            try {
+              // Esperar un momento para asegurar que los order_items estén commitados
+              await new Promise(resolve => setTimeout(resolve, 500));
+
+              // Obtener detalles completos del pedido incluyendo items
+              let orderDetails = null;
+              let retryCount = 0;
+              const maxRetries = 3;
+
+              while (retryCount < maxRetries) {
+                const { data, error } = await supabase
+                  .from('orders')
+                  .select(`
+                    *,
+                    order_items (
+                      product_name,
+                      quantity,
+                      price
+                    )
+                  `)
+                  .eq('id', payload.new.id)
+                  .single();
+
+                if (error) {
+                  console.error(`Error obteniendo detalles del pedido (intento ${retryCount + 1}):`, error);
+                  retryCount++;
+                  if (retryCount < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                  }
+                  continue;
                 }
-                continue;
-              }
 
-              // Verificar si tenemos order_items
-              if (!data.order_items || data.order_items.length === 0) {
-                console.warn(`Pedido ${payload.new.id} sin order_items, reintentando...`);
-                retryCount++;
-                if (retryCount < maxRetries) {
-                  await new Promise(resolve => setTimeout(resolve, 300));
+                // Verificar si tenemos order_items
+                if (!data.order_items || data.order_items.length === 0) {
+                  console.warn(`Pedido ${payload.new.id} sin order_items, reintentando...`);
+                  retryCount++;
+                  if (retryCount < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                  } else {
+                    // Usar datos del payload como fallback
+                    orderDetails = { ...data, order_items: [] };
+                  }
                 } else {
-                  // Usar datos del payload como fallback
-                  orderDetails = {
-                    ...data,
-                    order_items: []
-                  };
+                  orderDetails = data;
+                  break;
                 }
-              } else {
-                orderDetails = data;
-                break;
               }
+
+              if (!orderDetails) {
+                console.error('No se pudieron obtener los detalles del pedido después de varios intentos');
+                return;
+              }
+
+              console.log('✅ Notificación recibida - Order items:', orderDetails.order_items);
+
+              // Actualizar estado de notificaciones
+              setNotificationState(prev => ({
+                ...prev,
+                hasNewOrder: true,
+                latestOrder: orderDetails as OrderNotification,
+                orderCount: prev.orderCount + 1,
+              }));
+
+              // Reproducir sonido de notificación (si está disponible)
+              playNotificationSound();
+
+              // Mostrar notificación en el navegador
+              showBrowserNotification(orderDetails);
+
+            } catch (error) {
+              console.error('Error procesando notificación:', error);
             }
-
-            if (!orderDetails) {
-              console.error('No se pudieron obtener los detalles del pedido después de varios intentos');
-              return;
-            }
-
-            console.log('✅ Notificación recibida - Order items:', orderDetails.order_items);
-
-            // Actualizar estado de notificaciones
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'orders',
+            filter: `business_id=eq.${businessId}`,
+          },
+          (_payload) => {
+            // Pedido actualizado - payload no se usa actualmente
+            // pero se mantiene para compatibilidad futura
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            // Marcar como suscrito solo cuando la conexión es confirmada
+            isSubscribedRef.current = true;
+            // Reset reconnect attempts on successful connection
+            reconnectAttemptRef.current = 0;
             setNotificationState(prev => ({
               ...prev,
-              hasNewOrder: true,
-              latestOrder: orderDetails as OrderNotification,
-              orderCount: prev.orderCount + 1,
+              isConnected: true,
+              connectionError: null,
+              reconnectAttempt: 0,
+              maxReconnectReached: false,
+              isReconnecting: false,
             }));
-
-            // Reproducir sonido de notificación (si está disponible)
-            playNotificationSound();
-
-            // Mostrar notificación en el navegador
-            showBrowserNotification(orderDetails);
-
-          } catch (error) {
-            console.error('Error procesando notificación:', error);
-          }
-        }
-
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'orders',
-          filter: `business_id=eq.${businessId}`,
-        },
-        (_payload) => {
-          // Pedido actualizado - payload no se usa actualmente
-          // pero se mantiene para compatibilidad futura
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          // Reset reconnect attempts on successful connection
-          reconnectAttemptRef.current = 0;
-          setNotificationState(prev => ({
-            ...prev,
-            isConnected: true,
-            connectionError: null,
-            reconnectAttempt: 0,
-            maxReconnectReached: false,
-            isReconnecting: false,
-          }));
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          setNotificationState(prev => ({
-            ...prev,
-            isConnected: false,
-            isReconnecting: false,
-          }));
-          isSubscribedRef.current = false;
-          
-          // Check if max reconnect attempts reached
-          if (reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            isSubscribedRef.current = false;
             setNotificationState(prev => ({
               ...prev,
-              maxReconnectReached: true,
-              connectionError: `Máximo de intentos de reconexión alcanzado (${MAX_RECONNECT_ATTEMPTS}). Por favor, reconecta manualmente.`,
+              isConnected: false,
+              isReconnecting: false,
+              connectionError: status === 'TIMED_OUT' ? 'Connection timed out' : null,
             }));
-            return;
+            scheduleReconnect();
           }
-          
-          // Calculate exponential backoff delay: 1s, 2s, 4s, 8s, 16s
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
-          reconnectAttemptRef.current += 1;
-          
-          setNotificationState(prev => ({
-            ...prev,
-            reconnectAttempt: reconnectAttemptRef.current,
-            isReconnecting: true,
-          }));
-          
-          // Intentar reconexión con backoff exponencial
-          if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
-          }
-          reconnectTimeoutRef.current = setTimeout(() => {
-            setupSubscription();
-          }, delay);
-        } else if (status === 'TIMED_OUT') {
-          setNotificationState(prev => ({
-            ...prev,
-            isConnected: false,
-            connectionError: 'Connection timed out',
-            isReconnecting: false,
-          }));
-          isSubscribedRef.current = false;
-          
-          // Check if max reconnect attempts reached
-          if (reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
-            setNotificationState(prev => ({
-              ...prev,
-              maxReconnectReached: true,
-              connectionError: `Máximo de intentos de reconexión alcanzado (${MAX_RECONNECT_ATTEMPTS}). Por favor, reconecta manualmente.`,
-            }));
-            return;
-          }
-          
-          // Calculate exponential backoff delay
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
-          reconnectAttemptRef.current += 1;
-          
-          setNotificationState(prev => ({
-            ...prev,
-            reconnectAttempt: reconnectAttemptRef.current,
-            isReconnecting: true,
-          }));
-          
-          // Intentar reconexión con backoff exponencial
-          if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
-          }
-          reconnectTimeoutRef.current = setTimeout(() => {
-            setupSubscription();
-          }, delay);
-        }
+        });
 
-      });
-
-    subscriptionRef.current = subscription;
-
-    // Cleanup function
-    return () => {
-      isSubscribedRef.current = false;
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-      try {
-        subscription.unsubscribe();
-      } catch (e) {
-        // Ignore unsubscribe errors
-      }
+      subscriptionRef.current = subscription;
     };
-  }, [businessId]);
+  }, [businessId, isAuthReady, scheduleReconnect]);
 
   // Efecto para establecer la suscripción
   useEffect(() => {
-    const cleanup = setupSubscription();
+    setupSubscriptionRef.current?.();
 
     return () => {
-      if (cleanup) cleanup();
+      cleanupSubscription();
     };
-  }, [setupSubscription, isAuthReady, businessId]);
+  }, [businessId, isAuthReady, cleanupSubscription]);
 
   // Función para marcar notificación como leída
   const markAsRead = () => {
@@ -327,17 +280,21 @@ export function useRealtimeNotifications(businessId?: string) {
   };
 
   // Función para reconectar manualmente
-  const reconnect = () => {
+  const reconnect = useCallback(() => {
+    cleanupSubscription();
     reconnectAttemptRef.current = 0;
-    isSubscribedRef.current = false;
     setNotificationState(prev => ({
       ...prev,
       reconnectAttempt: 0,
       maxReconnectReached: false,
       isReconnecting: true,
+      connectionError: null,
     }));
-    setupSubscription();
-  };
+    // Defer to next tick so cleanup completes before re-subscribing
+    setTimeout(() => {
+      setupSubscriptionRef.current?.();
+    }, 0);
+  }, [cleanupSubscription]);
 
 
   return {

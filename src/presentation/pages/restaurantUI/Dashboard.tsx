@@ -39,23 +39,24 @@ function mapOrderStatus(orderStatus: string): Order['status'] {
 }
 
 export default function Dashboard() {
-  const { 
-    hasNewOrder, 
-    latestOrder, 
-    isConnected, 
+  const {
+    hasNewOrder,
+    latestOrder,
+    isConnected,
     connectionError,
     reconnect,
     businessId,
     reconnectAttempt,
     maxReconnectReached,
-    isReconnecting
+    isReconnecting,
+    markAsRead
   } = useRestaurantNotifications();
 
-  
+
   const [loading, setLoading] = useState(true);
   const isMounted = useRef(true);
   const [metrics, setMetrics] = useState<any[]>([]);
-  
+
   // Safety timeout to prevent infinite loading
   useEffect(() => {
     const safetyTimeout = setTimeout(() => {
@@ -63,7 +64,7 @@ export default function Dashboard() {
         setLoading(false);
       }
     }, 10000); // 10 seconds max loading time
-    
+
     return () => {
       clearTimeout(safetyTimeout);
     };
@@ -234,6 +235,7 @@ export default function Dashboard() {
             }) : 'Sin fecha'
           }));
           setRecentOrders(formattedOrders);
+          markAsRead();
 
         } catch (error) {
           // Error silently handled
@@ -242,7 +244,7 @@ export default function Dashboard() {
 
       reloadOrders();
     }
-  }, [hasNewOrder, latestOrder, businessId]);
+  }, [hasNewOrder, latestOrder, businessId, markAsRead]);
 
 
 
@@ -335,7 +337,7 @@ export default function Dashboard() {
             Resumen de tu restaurante en tiempo real
           </p>
         </div>
-        
+
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-red-100 dark:bg-red-800 rounded-full flex items-center justify-center">
@@ -370,7 +372,7 @@ export default function Dashboard() {
             Resumen de tu restaurante en tiempo real
           </p>
         </div>
-        
+
         {/* Indicador de estado de conexión mejorado */}
         <div className="flex flex-col items-end gap-2">
           {isConnected ? (
@@ -407,7 +409,7 @@ export default function Dashboard() {
                   </div>
                 ) : null}
               </div>
-              
+
               {/* Mensaje de estado de conexión más visible */}
               <div className="mt-2 text-right">
                 {maxReconnectReached ? (
@@ -439,7 +441,7 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
-              
+
               {connectionError && !maxReconnectReached && (
                 <span className="text-xs text-red-500 dark:text-red-400 mt-1 max-w-[200px] text-right">
                   {connectionError}
@@ -484,7 +486,7 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Orders */}
-      <div className="pb-24 sm:pb-8">
+      <div className="pb-24 md:pb-28">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
           Pedidos recientes
         </h2>

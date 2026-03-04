@@ -338,7 +338,11 @@ export async function getRecentOrders(
       .select(
         `
         *,
-        order_items (*)
+        order_items (*),
+        profiles:customer_id (
+          full_name,
+          phone_number
+        )
       `,
       )
       .eq("business_id", businessId)
@@ -347,11 +351,18 @@ export async function getRecentOrders(
 
     if (error) throw error;
 
-    // Ensure customer_name is properly extracted and attached
-    const processedData = (data || []).map((order) => ({
-      ...order,
-      customer_name: extractCustomerName(order) || order.customer_name,
-    }));
+    const processedData = (data || []).map((order) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = order as any;
+      const profile = raw.profiles;
+      return {
+        ...order,
+        customer_name: profile?.full_name || extractCustomerName(order) || order.customer_name,
+        customer: profile
+          ? { full_name: profile.full_name, phone_number: profile.phone_number }
+          : undefined,
+      };
+    });
 
     return processedData as OrderWithItems[];
   } catch (error) {

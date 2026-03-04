@@ -16,9 +16,12 @@ export default function Login() {
   useEffect(() => {
     console.log('🔐 [Login] Redirect check - user:', user?.id, 'role:', role, 'businessActive:', businessActive);
     if (user && role) {
-      console.log('🔐 [Login] User and role present, redirecting...');
       if (role === "owner") {
-        // Check if business is active
+        // Wait until businessActive is resolved (not null)
+        if (businessActive === null) {
+          console.log('🔐 [Login] Owner detected, waiting for businessActive to resolve...');
+          return;
+        }
         if (businessActive === false) {
           console.log('🔐 [Login] Redirecting to pending-approval');
           navigate("/pending-approval", { replace: true });

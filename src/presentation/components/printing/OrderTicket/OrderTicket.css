@@ -1,235 +1,253 @@
-/* Estilos para visualización en pantalla */
+/* Estilos generales (visualización y base) */
 .order-ticket {
-  font-family: 'Courier New', Courier, monospace;
-  max-width: 300px;
+  font-family: 'Roboto', 'Inter', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* El "Ancho Mágico" para impresoras POS 58mm en Windows/Chrome es 190px - 200px netos.
+     Usarlo previene que Chrome aplique zooms extraños internamente intentando conciliar milímetros */
+  width: 195px;
+  max-width: 195px;
+  min-width: 195px;
+
   margin: 0 auto;
-  padding: 20px;
+  padding: 8px 4px;
+  /* Un poco de respiro visual */
   background: white;
   color: black;
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  box-sizing: border-box;
 }
 
 .ticket-header {
   text-align: center;
-  margin-bottom: 15px;
+  margin-bottom: 6px;
 }
 
 .business-name {
-  font-size: 18px;
-  font-weight: bold;
-  margin: 0 0 8px 0;
+  font-size: 15px;
+  font-weight: 900;
+  margin: 0 0 3px 0;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
+  word-break: break-word;
+  white-space: normal;
+  line-height: 1.2;
 }
 
 .business-info {
-  font-size: 11px;
-  margin: 2px 0;
+  font-size: 10px;
+  font-weight: 600;
+  margin: 1px 0;
+  word-break: break-word;
 }
 
 .divider {
-  margin: 8px 0;
-  font-size: 10px;
-  overflow: hidden;
+  border: none;
+  border-top: 1.5px dashed black;
+  margin: 5px 0;
 }
 
 .divider-thin {
-  margin: 5px 0;
-  font-size: 10px;
-  overflow: hidden;
+  border: none;
+  border-top: 1px solid black;
+  margin: 4px 0;
 }
 
-.ticket-order-info {
-  margin-bottom: 15px;
+.ticket-section {
+  margin-bottom: 4px;
+  text-align: left;
+  width: 100%;
 }
 
 .info-row {
   display: flex;
   justify-content: space-between;
-  margin: 4px 0;
-  font-size: 11px;
+  align-items: flex-start;
+  margin: 2px 0;
+  font-size: 10px;
+  font-weight: 700;
+  width: 100%;
 }
 
 .label {
-  font-weight: bold;
+  font-weight: 900;
+  flex-shrink: 0;
+  margin-right: 4px;
 }
 
 .value {
+  font-weight: 600;
   text-align: right;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
-.ticket-items {
-  margin-bottom: 15px;
+.section-title {
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  margin: 0 0 4px 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.address-line {
+  font-size: 10px;
+  font-weight: 600;
+  margin: 2px 0;
+  word-break: break-word;
 }
 
 .items-header {
   display: flex;
   justify-content: space-between;
-  font-weight: bold;
-  font-size: 11px;
-  margin-bottom: 5px;
+  font-weight: 900;
+  font-size: 10px;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+  border-bottom: 1px solid black;
+  padding-bottom: 2px;
 }
 
 .col-qty {
-  width: 15%;
+  width: 13%;
   text-align: left;
+  flex-shrink: 0;
 }
 
 .col-item {
-  width: 60%;
+  flex: 1;
   text-align: left;
+  padding: 0 4px;
+  word-break: break-word;
+  line-height: 1.25;
 }
 
 .col-price {
   width: 25%;
   text-align: right;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .item-row {
   display: flex;
   justify-content: space-between;
-  margin: 6px 0;
-  font-size: 11px;
-}
-
-.ticket-total {
-  margin-bottom: 15px;
+  align-items: flex-start;
+  margin: 4px 0;
+  font-size: 10px;
+  font-weight: 600;
 }
 
 .total-row {
   display: flex;
   justify-content: space-between;
-  font-size: 16px;
-  font-weight: bold;
-  margin: 10px 0;
+  align-items: baseline;
+  font-size: 13px;
+  font-weight: 900;
+  margin: 6px 0;
 }
 
 .total-label {
-  font-size: 16px;
+  font-size: 13px;
+  font-weight: 900;
 }
 
 .total-value {
-  font-size: 18px;
+  font-size: 14px;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .ticket-footer {
   text-align: center;
-  margin-top: 15px;
+  margin-top: 6px;
 }
 
 .footer-text {
-  margin: 5px 0;
-  font-size: 12px;
-  font-weight: bold;
+  margin: 2px 0;
+  font-size: 11px;
+  font-weight: 900;
 }
 
 .footer-small {
-  margin: 5px 0;
-  font-size: 10px;
-  color: #666;
+  margin: 2px 0;
+  font-size: 9px;
+  font-weight: 600;
 }
 
-/* Estilos específicos para impresión */
+
+/* -----------------------------------------------------------------
+   Estilos de Impresión ULTRA Rígidos para SUZWIP / POS-58
+----------------------------------------------------------------- */
 @media print {
+  @page {
+    /* El margen a 0 explícito quita bordes que añade Chrome por defecto */
+    margin: 0 !important;
+  }
+
+  /* Reset radical desde el documento raíz para matar el margen central de Windows */
+  html,
   body {
-    margin: 0;
-    padding: 0;
+    margin: 0 0 0 -13px !important;
+    /* TRUCO CRÍTICO: Tiramos del papel a la izquierda para comer el margen forzoso del Hardware */
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: unset !important;
+    background: transparent !important;
+    overflow: hidden !important;
   }
 
-  .order-ticket {
-    width: 80mm; /* Ancho estándar de impresora térmica */
-    max-width: 80mm;
-    margin: 0;
-    padding: 5mm;
-    font-size: 11px;
-    page-break-after: always;
-  }
-
-  /* Ocultar todo excepto el ticket */
+  /* Ocultamos cualquier cosa en el árbol de React/HTML que no sea el recibo */
   body * {
     visibility: hidden;
   }
 
+  /* Exponemos nuestro ticket */
   .order-ticket,
   .order-ticket * {
     visibility: visible;
   }
 
   .order-ticket {
-    position: absolute;
-    left: 0;
-    top: 0;
-  }
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
 
-  /* Ajustes de tamaño para impresión */
-  .business-name {
-    font-size: 16px;
-  }
+    /* Al usar calc, demandamos el 100% del ancho del papel pero dejamos unos
+       milímetros de gracia a la derecha para la guillotina del hardware */
+    width: calc(100% - 4mm) !important;
+    max-width: none !important;
+    min-width: unset !important;
 
-  .business-info {
-    font-size: 10px;
-  }
-
-  .info-row,
-  .items-header,
-  .item-row {
-    font-size: 10px;
-  }
-
-  .total-row {
-    font-size: 14px;
-  }
-
-  .total-value {
-    font-size: 16px;
-  }
-
-  .footer-text {
-    font-size: 11px;
-  }
-
-  .footer-small {
-    font-size: 9px;
-  }
-
-  /* Eliminar márgenes y padding innecesarios */
-  @page {
-    margin: 0;
-    size: 80mm auto; /* Ancho fijo, alto automático */
-  }
-}
-
-/* Estilos para impresoras de 58mm (más pequeñas) */
-@media print and (max-width: 58mm) {
-  .order-ticket {
-    width: 58mm;
-    max-width: 58mm;
-    font-size: 10px;
+    margin: 0 !important;
+    padding: 0 4mm 0 0 !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: black !important;
+    line-height: 1.35 !important;
+    box-sizing: border-box !important;
+    text-align: left !important;
   }
 
   .business-name {
-    font-size: 14px;
+    font-size: 15px !important;
+    text-align: center !important;
   }
 
   .business-info {
-    font-size: 9px;
+    text-align: center !important;
   }
 
-  .info-row,
-  .items-header,
-  .item-row {
-    font-size: 9px;
-  }
-
-  .total-row {
-    font-size: 12px;
-  }
-
+  .col-price,
   .total-value {
-    font-size: 14px;
-  }
-
-  @page {
-    size: 58mm auto;
+    white-space: nowrap !important;
+    word-break: keep-all !important;
   }
 }

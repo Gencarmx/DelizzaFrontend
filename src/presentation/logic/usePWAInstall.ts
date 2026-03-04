@@ -5,14 +5,20 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
-const STORAGE_KEY = "pwa-android-install-dismissed";
+export function isInStandaloneMode(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    ("standalone" in navigator &&
+      (navigator as Navigator & { standalone: boolean }).standalone ===
+      true) ||
+    window.matchMedia("(display-mode: standalone)").matches
+  );
+}
 
 export function usePWAInstall() {
   const [promptEvent, setPromptEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
-  const [isDismissed, setIsDismissed] = useState(
-    () => !!sessionStorage.getItem(STORAGE_KEY)
-  );
+  const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
     if (isDismissed) return;
@@ -46,13 +52,12 @@ export function usePWAInstall() {
   }
 
   function dismiss() {
-    sessionStorage.setItem(STORAGE_KEY, "1");
     setIsDismissed(true);
     setPromptEvent(null);
     window.__pwaInstallPrompt = null;
   }
 
-  const canInstall = !!promptEvent && !isDismissed;
+  const canInstall = !!promptEvent && !isDismissed && !isInStandaloneMode();
 
   return { canInstall, triggerInstall, dismiss };
 }

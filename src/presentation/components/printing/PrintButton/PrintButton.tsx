@@ -24,18 +24,15 @@ export default function PrintButton({
   const printRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
-    // Crear una ventana de impresión
     const printWindow = window.open('', '_blank');
-    
+
     if (!printWindow) {
       alert('Por favor, permite las ventanas emergentes para imprimir');
       return;
     }
 
-    // Obtener el contenido del ticket
     const ticketContent = printRef.current?.innerHTML || '';
 
-    // Crear el HTML completo para la impresión
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -51,7 +48,7 @@ export default function PrintButton({
             }
 
             body {
-              font-family: 'Courier New', Courier, monospace;
+              font-family: 'Courier New', Courier, 'Lucida Console', monospace;
               margin: 0;
               padding: 0;
               background: white;
@@ -60,127 +57,167 @@ export default function PrintButton({
             .order-ticket {
               width: 80mm;
               margin: 0 auto;
-              padding: 5mm;
+              padding: 4mm 4mm;
               font-size: 11px;
-              line-height: 1.4;
-              color: black;
+              font-weight: 700;
+              line-height: 1.5;
+              color: #000;
             }
 
             .ticket-header {
               text-align: center;
-              margin-bottom: 10px;
+              margin-bottom: 8px;
             }
 
             .business-name {
-              font-size: 16px;
-              font-weight: bold;
-              margin: 0 0 5px 0;
+              font-size: 15px;
+              font-weight: 900;
+              margin: 0 0 4px 0;
               text-transform: uppercase;
+              letter-spacing: 0.5px;
+              word-break: break-word;
+              white-space: normal;
             }
 
             .business-info {
               font-size: 10px;
+              font-weight: 700;
               margin: 2px 0;
+              word-break: break-word;
             }
 
             .divider {
+              border: none;
+              border-top: 2px dashed #000;
               margin: 5px 0;
-              font-size: 10px;
             }
 
             .divider-thin {
+              border: none;
+              border-top: 1px solid #000;
               margin: 3px 0;
-              font-size: 10px;
             }
 
-            .ticket-order-info {
-              margin-bottom: 10px;
+            .ticket-section {
+              margin-bottom: 2px;
+              text-align: left;
             }
 
             .info-row {
-              display: flex;
-              justify-content: space-between;
+              display: block;
               margin: 3px 0;
               font-size: 10px;
+              font-weight: 700;
+              word-break: break-word;
+              overflow-wrap: break-word;
             }
 
             .label {
-              font-weight: bold;
+              font-weight: 900;
+              display: inline;
+            }
+
+            .label::after {
+              content: ' ';
             }
 
             .value {
-              text-align: right;
+              font-weight: 700;
+              display: inline;
+              word-break: break-word;
+              overflow-wrap: break-word;
             }
 
-            .ticket-items {
-              margin-bottom: 10px;
+            .section-title {
+              font-size: 10px;
+              font-weight: 900;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              margin: 0 0 3px 0;
+              text-decoration: underline;
+            }
+
+            .address-line {
+              font-size: 10px;
+              font-weight: 700;
+              margin: 2px 0;
+              word-break: break-word;
+              overflow-wrap: break-word;
             }
 
             .items-header {
               display: flex;
               justify-content: space-between;
-              font-weight: bold;
+              font-weight: 900;
               font-size: 10px;
-              margin-bottom: 3px;
+              margin-bottom: 2px;
+              text-transform: uppercase;
             }
 
             .col-qty {
-              width: 15%;
+              width: 12%;
               text-align: left;
+              flex-shrink: 0;
             }
 
             .col-item {
-              width: 60%;
+              flex: 1;
               text-align: left;
+              padding: 0 4px;
+              word-break: break-word;
+              overflow-wrap: break-word;
             }
 
             .col-price {
-              width: 25%;
+              width: 26%;
               text-align: right;
+              flex-shrink: 0;
             }
 
             .item-row {
               display: flex;
               justify-content: space-between;
-              margin: 4px 0;
+              align-items: flex-start;
+              margin: 3px 0;
               font-size: 10px;
-            }
-
-            .ticket-total {
-              margin-bottom: 10px;
+              font-weight: 700;
             }
 
             .total-row {
               display: flex;
               justify-content: space-between;
-              font-size: 14px;
-              font-weight: bold;
-              margin: 8px 0;
+              align-items: baseline;
+              font-size: 13px;
+              font-weight: 900;
+              margin: 6px 0;
             }
 
             .total-label {
-              font-size: 14px;
+              font-size: 13px;
+              font-weight: 900;
             }
 
             .total-value {
-              font-size: 16px;
+              font-size: 15px;
+              font-weight: 900;
             }
 
             .ticket-footer {
               text-align: center;
-              margin-top: 10px;
+              margin-top: 6px;
             }
 
             .footer-text {
-              margin: 4px 0;
-              font-size: 11px;
-              font-weight: bold;
+              margin: 3px 0;
+              font-size: 10px;
+              font-weight: 900;
             }
 
             .footer-small {
-              margin: 4px 0;
+              margin: 3px 0;
               font-size: 9px;
-              color: #666;
+              font-weight: 700;
+              color: #000;
             }
 
             @media print {
@@ -204,7 +241,6 @@ export default function PrintButton({
 
     printWindow.document.close();
 
-    // Esperar a que se cargue el contenido y luego imprimir
     printWindow.onload = () => {
       setTimeout(() => {
         printWindow.print();
@@ -215,7 +251,6 @@ export default function PrintButton({
 
   return (
     <>
-      {/* Botón visible */}
       {variant === "icon" ? (
         <button
           onClick={handlePrint}

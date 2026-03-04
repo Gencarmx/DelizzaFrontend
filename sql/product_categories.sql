@@ -31,14 +31,16 @@ ALTER TABLE product_categories ENABLE ROW LEVEL SECURITY;
 -- Paso 5: Eliminar políticas existentes si existen y recrearlas
 DROP POLICY IF EXISTS "Allow read access to authenticated users" ON product_categories;
 DROP POLICY IF EXISTS "Allow full access to owners" ON product_categories;
+DROP POLICY IF EXISTS "Allow public read access" ON product_categories;
 
--- Política para permitir lectura a todos los usuarios autenticados
-CREATE POLICY "Allow read access to authenticated users" ON product_categories
-  FOR SELECT USING (auth.role() = 'authenticated');
+-- Política para permitir lectura pública (sin autenticación requerida)
+CREATE POLICY "Allow public read access" ON product_categories
+  FOR SELECT USING (true);
 
 -- Política para permitir todas las operaciones a usuarios con rol 'owner'
 CREATE POLICY "Allow full access to owners" ON product_categories
   FOR ALL USING (
+    auth.uid() IS NOT NULL AND
     EXISTS (
       SELECT 1 FROM profiles p
       JOIN collaborators c ON c.user_id = p.id

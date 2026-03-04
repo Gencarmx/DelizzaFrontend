@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, Eye, Loader2, Wifi, WifiOff, ChefHat, Package, X } from "lucide-react";
+import { Search, Filter, Eye, Loader2, Wifi, WifiOff, ChefHat, Package, X, CheckCircle, Phone, MapPin, User, ShoppingBag } from "lucide-react";
 import DataTable from "@components/restaurant-ui/tables/DataTable";
 import StatusBadge from "@components/restaurant-ui/badges/StatusBadge";
 import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
@@ -7,18 +7,49 @@ import { getRecentOrders, updateOrderStatus } from "@core/services/orderService"
 import { getBusinessById } from "@core/services/businessService";
 import { PrintButton } from "@presentation/components/printing";
 import type { Column } from "@components/restaurant-ui/tables/DataTable";
+import { supabase } from "@core/supabase/client";
 
 
 interface Order {
   id: string;
-  fullId: string; // ID completo para operaciones de base de datos
+  fullId: string;
   customer: string;
+  customerPhone?: string;
   items: string;
   total: number;
   status: "pending" | "completed" | "cancelled" | "in_progress" | "ready" | "preparing";
   date: string;
   paymentMethod: string;
   originalStatus?: string;
+  deliveryType?: string;
+  customerId?: string;
+  deliveryAddress?: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
+    recipientName?: string;
+    recipientPhone?: string;
+  } | null;
+}
+
+interface OrderDetailData {
+  order: Order;
+  customerName: string;
+  customerPhone: string;
+  deliveryAddress: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
+    recipientName?: string;
+    recipientPhone?: string;
+  } | null;
+  items: { quantity: number; productName: string; price: number }[];
 }
 
 export default function Orders() {
@@ -32,6 +63,9 @@ export default function Orders() {
     address: string;
     phone: string;
   } | null>(null);
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState<OrderDetailData | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [confirmCompleteOrder, setConfirmCompleteOrder] = useState<Order | null>(null);
   
   // Obtener notificaciones en tiempo real y estado de conexión
   const { 
@@ -58,7 +92,7 @@ export default function Orders() {
           setBusinessInfo({
             name: business.name || "Mi Restaurante",
             address: business.address || "Dirección del restaurante",
-            phone: businessData.phone_number || business.profile?.phone_number || "Teléfono",
+            phone: businessData.phone || businessData.profile?.phone_number || "Teléfono",
           });
         }
       } catch (error) {
@@ -98,6 +132,34 @@ export default function Orders() {
     }
   };
 
+  // Función compartida para formatear órdenes
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const formatOrders = (ordersData: any[]): Order[] =>
+    ordersData.map(order => ({
+      id: order.id.slice(-8).toUpperCase(),
+      fullId: order.id,
+      customer: order.customer_name || 'Cliente',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      items: order.order_items?.map((item: any) =>
+        `${item.quantity}x ${item.product_name || 'Producto'}`
+      ).join(', ') || 'Sin items',
+      total: order.total,
+      status: mapOrderStatus(order.status || 'pending'),
+      originalStatus: order.status || undefined,
+      date: order.created_at
+        ? new Date(order.created_at).toLocaleString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        : 'Sin fecha',
+      paymentMethod: order.payment_method || 'No especificado',
+      deliveryType: order.delivery_type || undefined,
+      customerId: order.customer_id || undefined,
+    }));
+
   // Cargar pedidos iniciales
   useEffect(() => {
     const loadOrders = async () => {
@@ -105,45 +167,16 @@ export default function Orders() {
         setLoading(false);
         return;
       }
-
       try {
         setLoading(true);
         const ordersData = await getRecentOrders(businessId, 50);
-        
-        const formattedOrders: Order[] = ordersData.map(order => {
-          const formattedOrder = {
-            id: order.id.slice(-8).toUpperCase(),
-            fullId: order.id, // Guardar el ID completo
-            customer: order.customer_name || 'Cliente',
-            items: order.order_items?.map(item => 
-              `${item.quantity}x ${item.product_name || 'Producto'}`
-            ).join(', ') || 'Sin items',
-            total: order.total,
-            status: mapOrderStatus(order.status || 'pending'),
-            originalStatus: order.status || undefined,
-            date: order.created_at 
-              ? new Date(order.created_at).toLocaleString('es-ES', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })
-              : 'Sin fecha',
-            paymentMethod: order.payment_method || 'No especificado',
-          };
-
-          return formattedOrder;
-        });
-        
-        setOrders(formattedOrders);
+        setOrders(formatOrders(ordersData));
       } catch (error) {
         console.error('Error cargando pedidos:', error);
       } finally {
         setLoading(false);
       }
     };
-
     loadOrders();
   }, [businessId]);
 
@@ -153,40 +186,12 @@ export default function Orders() {
       const reloadOrders = async () => {
         try {
           const ordersData = await getRecentOrders(businessId, 50);
-          
-          const formattedOrders: Order[] = ordersData.map(order => {
-            const formattedOrder = {
-              id: order.id.slice(-8).toUpperCase(),
-              fullId: order.id, // Guardar el ID completo
-              customer: order.customer_name || 'Cliente',
-              items: order.order_items?.map(item => 
-                `${item.quantity}x ${item.product_name || 'Producto'}`
-              ).join(', ') || 'Sin items',
-              total: order.total,
-              status: mapOrderStatus(order.status || 'pending'),
-              originalStatus: order.status || undefined,
-              date: order.created_at 
-                ? new Date(order.created_at).toLocaleString('es-ES', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })
-                : 'Sin fecha',
-              paymentMethod: order.payment_method || 'No especificado',
-            };
-            
-            return formattedOrder;
-          });
-          
-          setOrders(formattedOrders);
+          setOrders(formatOrders(ordersData));
           markAsRead();
         } catch (error) {
           console.error('Error recargando pedidos:', error);
         }
       };
-      
       reloadOrders();
     }
   }, [hasNewOrder, latestOrder, businessId, markAsRead]);
@@ -209,6 +214,97 @@ export default function Orders() {
         return 'pending';
     }
   }
+
+  const openOrderDetail = async (order: Order) => {
+    setLoadingDetail(true);
+    setSelectedOrderDetail(null);
+    try {
+      const { data: rawOrder, error: orderError } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items(*)
+        `)
+        .eq('id', order.fullId)
+        .single();
+
+      if (orderError) throw orderError;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const customerId = (rawOrder as any)?.customer_id;
+
+      let customerName = order.customer;
+      let customerPhone = '';
+      let deliveryAddress: OrderDetailData['deliveryAddress'] = null;
+
+      if (customerId) {
+        const [profileResult, addressResult] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('full_name, phone_number')
+            .eq('id', customerId)
+            .single(),
+          supabase
+            .from('addresses')
+            .select('*')
+            .eq('profile_id', customerId)
+            .order('is_default', { ascending: false })
+            .limit(1),
+        ]);
+
+        if (profileResult.data) {
+          customerName = profileResult.data.full_name || order.customer;
+          customerPhone = profileResult.data.phone_number || addressResult.data?.[0]?.phone || '';
+        }
+
+        const address = addressResult.data?.[0];
+        if (address) {
+          deliveryAddress = {
+            line1: address.line1 || '',
+            line2: address.line2 || undefined,
+            city: address.city || '',
+            state: address.state || undefined,
+            postalCode: address.postal_code || undefined,
+            country: address.country || undefined,
+            recipientName: address.recipient_name || undefined,
+            recipientPhone: address.phone || undefined,
+          };
+        }
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rawItems = (rawOrder as any)?.order_items || [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const items = rawItems.map((item: any) => ({
+        quantity: item.quantity || 1,
+        productName: item.product_name || 'Producto',
+        price: item.price || 0,
+      }));
+
+      const enrichedOrder: Order = {
+        ...order,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        deliveryType: (rawOrder as any)?.delivery_type || order.deliveryType,
+        customer: customerName,
+        customerPhone: customerPhone || undefined,
+        deliveryAddress: deliveryAddress,
+      };
+
+      setOrders(prev => prev.map(o => o.fullId === order.fullId ? enrichedOrder : o));
+
+      setSelectedOrderDetail({
+        order: enrichedOrder,
+        customerName,
+        customerPhone,
+        deliveryAddress,
+        items,
+      });
+    } catch (error) {
+      console.error('Error cargando detalle del pedido:', error);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
 
   // Determina qué acciones mostrar según el estado
   const getActionsForStatus = (order: Order) => {
@@ -235,6 +331,7 @@ export default function Orders() {
           
           {/* Botón: Ver detalles - siempre visible */}
           <button
+            onClick={(e) => { e.stopPropagation(); openOrderDetail(order); }}
             className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             title="Ver detalles"
           >
@@ -270,6 +367,18 @@ export default function Orders() {
           </button>
         )}
 
+        {/* Botón: Completado (CheckCircle) - visible cuando está listo para entrega o en preparación */}
+        {(status === 'ready' || status === 'preparing') && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setConfirmCompleteOrder(order); }}
+            disabled={isUpdating}
+            className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-full text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors disabled:opacity-50"
+            title="Marcar como completado"
+          >
+            <CheckCircle className="w-4 h-4" />
+          </button>
+        )}
+
         {/* Botón: Cancelar (X) - siempre visible para pedidos activos */}
         <button
           onClick={() => handleStatusChange(order.fullId, order.id, 'cancelled')}
@@ -291,6 +400,7 @@ export default function Orders() {
 
         {/* Botón: Ver detalles - siempre visible */}
         <button
+          onClick={(e) => { e.stopPropagation(); openOrderDetail(order); }}
           className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           title="Ver detalles"
         >
@@ -462,9 +572,248 @@ export default function Orders() {
             data={filteredOrders}
             keyExtractor={(order) => order.fullId || order.id}
             emptyMessage="No se encontraron pedidos"
+            onRowClick={(order) => openOrderDetail(order)}
           />
         )}
       </div>
+
+      {/* Order Detail Modal */}
+      {(selectedOrderDetail || loadingDetail) && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 dark:bg-black/70"
+          onClick={() => { setSelectedOrderDetail(null); }}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {loadingDetail ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
+                <span className="ml-3 text-gray-600 dark:text-gray-400">Cargando detalles...</span>
+              </div>
+            ) : selectedOrderDetail && (
+              <>
+                {/* Modal Header */}
+                <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                      Pedido #{selectedOrderDetail.order.id}
+                    </h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                      {selectedOrderDetail.order.date}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <StatusBadge status={selectedOrderDetail.order.status} />
+                    <button
+                      onClick={() => setSelectedOrderDetail(null)}
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-6 flex flex-col gap-5">
+                  {/* Customer Info */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 flex flex-col gap-3">
+                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                      Datos del cliente
+                    </h3>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+                        <User className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <span className="text-gray-900 dark:text-white font-medium">
+                        {selectedOrderDetail.customerName}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+                          <Phone className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          {selectedOrderDetail.customerPhone || 'Número no disponible'}
+                        </span>
+                      </div>
+                  </div>
+
+                  {/* Delivery Address */}
+                  {selectedOrderDetail.deliveryAddress && (
+                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 flex flex-col gap-3">
+                      <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                        Dirección de entrega
+                      </h3>
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full mt-0.5">
+                          <MapPin className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          {selectedOrderDetail.deliveryAddress.recipientName && (
+                            <span className="text-gray-900 dark:text-white font-medium">
+                              {selectedOrderDetail.deliveryAddress.recipientName}
+                            </span>
+                          )}
+                          <span className="text-gray-700 dark:text-gray-300">
+                            {selectedOrderDetail.deliveryAddress.line1}
+                          </span>
+                          {selectedOrderDetail.deliveryAddress.line2 && (
+                            <span className="text-gray-700 dark:text-gray-300">
+                              {selectedOrderDetail.deliveryAddress.line2}
+                            </span>
+                          )}
+                          <span className="text-gray-700 dark:text-gray-300">
+                            {[
+                              selectedOrderDetail.deliveryAddress.city,
+                              selectedOrderDetail.deliveryAddress.state,
+                              selectedOrderDetail.deliveryAddress.postalCode,
+                            ].filter(Boolean).join(', ')}
+                          </span>
+                          {selectedOrderDetail.deliveryAddress.country && (
+                            <span className="text-gray-500 dark:text-gray-400 text-sm">
+                              {selectedOrderDetail.deliveryAddress.country}
+                            </span>
+                          )}
+                          {selectedOrderDetail.deliveryAddress.recipientPhone && (
+                            <span className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                              Tel: {selectedOrderDetail.deliveryAddress.recipientPhone}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Order Items */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 flex flex-col gap-3">
+                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide flex items-center gap-2">
+                      <ShoppingBag className="w-4 h-4" />
+                      Productos
+                    </h3>
+                    <div className="flex flex-col gap-2">
+                      {selectedOrderDetail.items.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full text-xs font-semibold">
+                              {item.quantity}x
+                            </span>
+                            <span className="text-gray-700 dark:text-gray-300 text-sm">
+                              {item.productName}
+                            </span>
+                          </div>
+                          {item.price > 0 && (
+                            <span className="text-gray-600 dark:text-gray-400 text-sm font-medium">
+                              ${(item.price * item.quantity).toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Order Summary */}
+                  <div className="flex flex-col gap-2 pt-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-400">Método de pago</span>
+                      <span className="text-gray-700 dark:text-gray-300 font-medium capitalize">
+                        {selectedOrderDetail.order.paymentMethod}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-400">Tipo de entrega</span>
+                      <span className="text-gray-700 dark:text-gray-300 font-medium capitalize">
+                        {selectedOrderDetail.order.deliveryType === 'delivery' ? 'Domicilio' : selectedOrderDetail.order.deliveryType === 'pickup' ? 'Recoger en tienda' : selectedOrderDetail.order.deliveryType || 'No especificado'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-gray-100 dark:border-gray-700 pt-2 mt-1">
+                      <span className="font-bold text-gray-900 dark:text-white">Total</span>
+                      <span className="font-bold text-xl text-gray-900 dark:text-white">
+                        ${selectedOrderDetail.order.total}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Complete Modal */}
+      {confirmCompleteOrder && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 dark:bg-black/70"
+          onClick={() => setConfirmCompleteOrder(null)}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                  <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                  Completar pedido
+                </h2>
+              </div>
+              <button
+                onClick={() => setConfirmCompleteOrder(null)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 flex flex-col gap-4">
+              <p className="text-gray-600 dark:text-gray-400 text-sm">
+                ¿Estás seguro de que deseas marcar el pedido{' '}
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  #{confirmCompleteOrder.id}
+                </span>{' '}
+                de{' '}
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {confirmCompleteOrder.customer}
+                </span>{' '}
+                como completado?
+              </p>
+
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 flex items-center justify-between">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Total del pedido</span>
+                <span className="font-bold text-gray-900 dark:text-white">
+                  ${confirmCompleteOrder.total}
+                </span>
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setConfirmCompleteOrder(null)}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    handleStatusChange(confirmCompleteOrder.fullId, confirmCompleteOrder.id, 'completed');
+                    setConfirmCompleteOrder(null);
+                  }}
+                  disabled={updatingOrders.has(confirmCompleteOrder.id)}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {updatingOrders.has(confirmCompleteOrder.id) ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4" />
+                  )}
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -133,7 +133,8 @@ export function useCustomerNotifications(
     if (isSubscribedRef.current) return;
 
     if (subscriptionRef.current) {
-      try { subscriptionRef.current.unsubscribe(); } catch { /* ignore */ }
+      try { supabase.removeChannel(subscriptionRef.current); } catch { /* ignore */ }
+      subscriptionRef.current = null;
     }
 
     isSubscribedRef.current = true;
@@ -212,7 +213,8 @@ export function useCustomerNotifications(
       cancelled = true;
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (subscriptionRef.current) {
-        try { subscriptionRef.current.unsubscribe(); } catch { /* ignore */ }
+        try { supabase.removeChannel(subscriptionRef.current); } catch { /* ignore */ }
+        subscriptionRef.current = null;
       }
       isSubscribedRef.current = false;
       profileIdRef.current = null;

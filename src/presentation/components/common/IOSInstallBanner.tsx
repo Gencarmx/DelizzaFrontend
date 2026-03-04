@@ -9,12 +9,10 @@ function isInStandaloneMode(): boolean {
   return (
     ("standalone" in navigator &&
       (navigator as Navigator & { standalone: boolean }).standalone ===
-        true) ||
+      true) ||
     window.matchMedia("(display-mode: standalone)").matches
   );
 }
-
-const STORAGE_KEY = "pwa-ios-install-dismissed";
 
 export function IOSInstallBanner() {
   const [visible, setVisible] = useState(false);
@@ -23,12 +21,10 @@ export function IOSInstallBanner() {
   useEffect(() => {
     if (!isIOS()) return;
     if (isInStandaloneMode()) return;
-    if (sessionStorage.getItem(STORAGE_KEY)) return;
     setVisible(true);
   }, []);
 
   function dismiss() {
-    sessionStorage.setItem(STORAGE_KEY, "1");
     setVisible(false);
   }
 
@@ -119,9 +115,8 @@ export function IOSInstallBanner() {
           {steps.map((_, i) => (
             <div
               key={i}
-              className={`h-1 flex-1 rounded-full transition-colors ${
-                i <= step ? "bg-amber-400" : "bg-gray-200 dark:bg-gray-700"
-              }`}
+              className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? "bg-amber-400" : "bg-gray-200 dark:bg-gray-700"
+                }`}
             />
           ))}
         </div>
