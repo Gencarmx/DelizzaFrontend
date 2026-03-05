@@ -121,6 +121,7 @@ async function createRestaurantOrder(
       .insert({
         business_id: order.restaurant.id,
         customer_id: customerProfile.id,
+        customer_name: customerProfile.full_name || 'Cliente',
         status: 'pending',
         total: order.total,
         delivery_type: checkoutData.deliveryOption.type,
@@ -147,13 +148,13 @@ async function createRestaurantOrder(
     // 4. Si falla la creación de items, cancelar la orden (rollback manual)
     if (itemsError) {
       console.error('Error creando items del pedido, cancelando orden:', itemsError);
-      
+
       // Cancelar la orden creada
       await supabase
         .from('orders')
         .update({ status: 'cancelled', cancelled_reason: 'Error al crear items del pedido' })
         .eq('id', orderData.id);
-      
+
       throw new Error(`Error al crear los items del pedido: ${itemsError.message}`);
     }
 
@@ -161,8 +162,19 @@ async function createRestaurantOrder(
     // 3. Aquí iría la integración con MercadoPago
     // await processPayment(orderData.id, order.total, checkoutData.paymentMethod);
 
-    // 4. Notificar al restaurante sobre el nuevo pedido
-    await notifyRestaurant(orderData.id);
+    // 4. Notificar al restaurante sobre el nuevo pedido vía Broadcast
+    await notifyRestaurant(orderData.id, {
+      business_id: order.restaurant.id,
+      customer_name: customerProfile.full_name || 'Cliente',
+      total: order.total,
+      delivery_type: checkoutData.deliveryOption.type,
+      created_at: orderData.created_at,
+      order_items: order.items.map(item => ({
+        product_name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+    });
 
     return {
       success: true,
@@ -197,18 +209,44 @@ export async function processPayment(
 }
 
 /**
- * Envía notificación al restaurante usando Supabase Realtime
- * Los restaurantes suscritos recibirán la notificación automáticamente
- * a través de postgres_changes en la tabla orders
+ * Notifica al restaurante de un nuevo pedido usando Supabase Broadcast.
+ * Broadcast no requiere RLS, por lo que siempre se entrega al canal destino.
  */
-export async function notifyRestaurant(_orderId: string): Promise<void> {
-  // Con Supabase Realtime postgres_changes, las notificaciones se envían
-  // automáticamente cuando se inserta un registro en la tabla 'orders'.
-  // Los clientes suscritos recibirán la notificación sin necesidad de
-  // enviar broadcasts manuales.
-  
-  // El parámetro _orderId está prefijado con _ para indicar que no se usa actualmente
-  // pero se mantiene para compatibilidad futura cuando se implemente la notificación
+export async function notifyRestaurant(orderId: string, orderData?: {
+  business_id: string;
+  customer_name: string;
+  total: number;
+  delivery_type: string;
+  order_items: Array<{ product_name: string; quantity: number; price: number }>;
+  created_at?: string;
+}): Promise<void> {
+  if (!orderData) return;
+
+  try {
+    // Usar el mismo nombre de canal que escucha useRealtimeNotifications
+    const channel = supabase.channel(`restaurant_orders_${orderData.business_id}`);
+
+    await channel.send({
+      type: 'broadcast',
+      event: 'new_order',
+      payload: {
+        id: orderId,
+        business_id: orderData.business_id,
+        customer_name: orderData.customer_name,
+        total: orderData.total,
+        delivery_type: orderData.delivery_type,
+        status: 'pending',
+        created_at: orderData.created_at || new Date().toISOString(),
+        order_items: orderData.order_items,
+      },
+    });
+
+    // Limpiar el canal temporal (el del restaurante tiene su propio canal persistente)
+    await supabase.removeChannel(channel);
+  } catch (err) {
+    // No interrumpir el flujo del pedido si falla la notificación
+    console.warn('[notifyRestaurant] Error enviando broadcast:', err);
+  }
 }
 
 /**

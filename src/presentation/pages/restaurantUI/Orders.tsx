@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Search, Filter, Eye, Loader2, Wifi, WifiOff, ChefHat, Package, X, CheckCircle, Phone, MapPin, User, ShoppingBag } from "lucide-react";
 import DataTable from "@components/restaurant-ui/tables/DataTable";
 import StatusBadge from "@components/restaurant-ui/badges/StatusBadge";
@@ -66,14 +66,14 @@ export default function Orders() {
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<OrderDetailData | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [confirmCompleteOrder, setConfirmCompleteOrder] = useState<Order | null>(null);
-  
+
   // Obtener notificaciones en tiempo real y estado de conexión
-  const { 
-    hasNewOrder, 
-    latestOrder, 
-    isConnected, 
+  const {
+    hasNewOrder,
+    latestOrder,
+    isConnected,
     businessId,
-    markAsRead 
+    markAsRead
   } = useRestaurantNotifications();
 
   // Cargar información del negocio cuando cambia el businessId
@@ -110,14 +110,14 @@ export default function Orders() {
       console.error('❌ Error: fullId es undefined o inválido');
       return;
     }
-    
+
     try {
       setUpdatingOrders(prev => new Set(prev).add(displayId));
       await updateOrderStatus(fullId, newStatus as any);
-      
+
       // Actualizar el estado local
-      setOrders(prev => prev.map(order => 
-        order.fullId === fullId 
+      setOrders(prev => prev.map(order =>
+        order.fullId === fullId
           ? { ...order, status: mapOrderStatus(newStatus) }
           : order
       ));
@@ -148,12 +148,12 @@ export default function Orders() {
       originalStatus: order.status || undefined,
       date: order.created_at
         ? new Date(order.created_at).toLocaleString('es-ES', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          })
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
         : 'Sin fecha',
       paymentMethod: order.payment_method || 'No especificado',
       deliveryType: order.delivery_type || undefined,
@@ -180,21 +180,52 @@ export default function Orders() {
     loadOrders();
   }, [businessId]);
 
-  // Escuchar nuevos pedidos en tiempo real
+  // Track which order IDs we've already added to avoid duplicates
+  const processedOrderIds = useRef<Set<string>>(new Set());
+
+  // React immediately to a new order from Realtime – prepend it without a full refetch
   useEffect(() => {
-    if (hasNewOrder && latestOrder && businessId) {
-      const reloadOrders = async () => {
-        try {
-          const ordersData = await getRecentOrders(businessId, 50);
-          setOrders(formatOrders(ordersData));
-          markAsRead();
-        } catch (error) {
-          console.error('Error recargando pedidos:', error);
-        }
-      };
-      reloadOrders();
-    }
+    if (!hasNewOrder || !latestOrder || !businessId) return;
+    if (processedOrderIds.current.has(latestOrder.id)) return;
+
+    processedOrderIds.current.add(latestOrder.id);
+
+    // Build a formatted Order directly from the latestOrder payload
+    const newOrder: Order = {
+      id: latestOrder.id.slice(-8).toUpperCase(),
+      fullId: latestOrder.id,
+      customer: latestOrder.customer_name || 'Cliente',
+      items: latestOrder.order_items?.map(
+        (item: { quantity: number; product_name: string }) =>
+          `${item.quantity}x ${item.product_name || 'Producto'}`
+      ).join(', ') || 'Sin items',
+      total: latestOrder.total,
+      status: mapOrderStatus(latestOrder.status || 'pending'),
+      originalStatus: latestOrder.status || undefined,
+      date: latestOrder.created_at
+        ? new Date(latestOrder.created_at).toLocaleString('es-ES', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+        : 'Ahora',
+      paymentMethod: latestOrder.delivery_type || 'No especificado',
+      deliveryType: latestOrder.delivery_type || undefined,
+      customerId: latestOrder.customer_id || undefined,
+    };
+
+    // Prepend: most recent order should appear first
+    setOrders(prev => {
+      // Guard against duplicates already in the list
+      if (prev.some(o => o.fullId === latestOrder.id)) return prev;
+      return [newOrder, ...prev];
+    });
+
+    markAsRead();
   }, [hasNewOrder, latestOrder, businessId, markAsRead]);
+
 
   // Función para mapear estados de orden
   function mapOrderStatus(status: string): Order['status'] {
@@ -310,26 +341,17 @@ export default function Orders() {
   const getActionsForStatus = (order: Order) => {
     const { status } = order;
     const isUpdating = updatingOrders.has(order.id);
-    
+
     // Debug: verificar que fullId existe
     if (!order.fullId) {
       console.error('❌ Error: order.fullId es undefined para el pedido:', order);
     }
-    
+
     // No mostrar acciones si está completado o cancelado
     if (status === 'completed' || status === 'cancelled') {
       return (
         <div className="flex items-center gap-1">
-        {/* Botón: Imprimir ticket */}
-        <PrintButton 
-          order={order} 
-          variant="icon"
-          businessName={businessInfo?.name || "Mi Restaurante"}
-          businessAddress={businessInfo?.address || "Dirección del restaurante"}
-          businessPhone={businessInfo?.phone || "Teléfono"}
-        />
-          
-          {/* Botón: Ver detalles - siempre visible */}
+          {/* Botón: Ver detalles - primero */}
           <button
             onClick={(e) => { e.stopPropagation(); openOrderDetail(order); }}
             className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -337,12 +359,29 @@ export default function Orders() {
           >
             <Eye className="w-4 h-4" />
           </button>
+          {/* Botón: Imprimir ticket */}
+          <PrintButton
+            order={order}
+            variant="icon"
+            businessName={businessInfo?.name || "Mi Restaurante"}
+            businessAddress={businessInfo?.address || "Dirección del restaurante"}
+            businessPhone={businessInfo?.phone || "Teléfono"}
+          />
         </div>
       );
     }
 
     return (
       <div className="flex items-center gap-1">
+        {/* Botón: Ver detalles - primero */}
+        <button
+          onClick={(e) => { e.stopPropagation(); openOrderDetail(order); }}
+          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          title="Ver detalles"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+
         {/* Botón: En preparación (ChefHat) - visible cuando está pendiente */}
         {status === 'pending' && (
           <button
@@ -389,23 +428,14 @@ export default function Orders() {
           <X className="w-4 h-4" />
         </button>
 
-          {/* Botón: Imprimir ticket */}
-          <PrintButton 
-            order={order} 
-            variant="icon"
-            businessName={businessInfo?.name || "Mi Restaurante"}
-            businessAddress={businessInfo?.address || "Dirección del restaurante"}
-            businessPhone={businessInfo?.phone || "Teléfono"}
-          />
-
-        {/* Botón: Ver detalles - siempre visible */}
-        <button
-          onClick={(e) => { e.stopPropagation(); openOrderDetail(order); }}
-          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-          title="Ver detalles"
-        >
-          <Eye className="w-4 h-4" />
-        </button>
+        {/* Botón: Imprimir ticket */}
+        <PrintButton
+          order={order}
+          variant="icon"
+          businessName={businessInfo?.name || "Mi Restaurante"}
+          businessAddress={businessInfo?.address || "Dirección del restaurante"}
+          businessPhone={businessInfo?.phone || "Teléfono"}
+        />
       </div>
     );
   };
@@ -512,7 +542,7 @@ export default function Orders() {
             Administra los pedidos de tu restaurante
           </p>
         </div>
-        
+
         {/* Indicador de conexión Realtime */}
         <div className="flex items-center gap-2">
           {isConnected ? (
@@ -572,8 +602,8 @@ export default function Orders() {
             data={filteredOrders}
             keyExtractor={(order) => order.fullId || order.id}
             emptyMessage="No se encontraron pedidos"
-            onRowClick={(order) => openOrderDetail(order)}
           />
+
         )}
       </div>
 
@@ -630,13 +660,13 @@ export default function Orders() {
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full">
-                          <Phone className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                        </div>
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {selectedOrderDetail.customerPhone || 'Número no disponible'}
-                        </span>
+                      <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+                        <Phone className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                       </div>
+                      <span className="text-gray-700 dark:text-gray-300">
+                        {selectedOrderDetail.customerPhone || 'Número no disponible'}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Delivery Address */}

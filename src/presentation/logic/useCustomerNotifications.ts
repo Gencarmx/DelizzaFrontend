@@ -139,8 +139,25 @@ export function useCustomerNotifications(
 
     isSubscribedRef.current = true;
 
+    // Handler compartido para actualización de estado
+    const handleOrderUpdate = (orderPayload: { id: string; status: string;[key: string]: unknown }) => {
+      onOrderUpdateRef.current?.();
+      playNotificationSound();
+      showBrowserNotification(orderPayload);
+    };
+
     const subscription = supabase
       .channel(`customer_orders_${profileId}`)
+      // ── BROADCAST (canal principal, sin RLS) ─────────────────────────────
+      .on(
+        "broadcast",
+        { event: "order_status_update" },
+        ({ payload }) => {
+          console.log("[Customer] ✅ Actualización de pedido recibida:", payload);
+          handleOrderUpdate(payload as { id: string; status: string });
+        },
+      )
+      // ── POSTGRES_CHANGES (backup, puede fallar si RLS bloquea el evento) ─
       .on(
         "postgres_changes",
         {
@@ -192,6 +209,7 @@ export function useCustomerNotifications(
 
     subscriptionRef.current = subscription;
   }, [playNotificationSound, showBrowserNotification]);
+
 
   useEffect(() => {
     if (!user) return;

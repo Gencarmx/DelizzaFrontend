@@ -122,12 +122,34 @@ export function useRealtimeNotifications(businessId?: string) {
         subscriptionRef.current = null;
       }
 
+      // Helper compartido para procesar un nuevo pedido (viene de broadcast o de postgres_changes)
+      const handleNewOrder = (orderPayload: OrderNotification) => {
+        console.log('[Realtime] ✅ Nuevo pedido recibido:', orderPayload.id);
+        setNotificationState(prev => ({
+          ...prev,
+          hasNewOrder: true,
+          latestOrder: orderPayload,
+          orderCount: prev.orderCount + 1,
+        }));
+        playNotificationSound();
+        showBrowserNotification(orderPayload);
+      };
+
       const subscription = supabase
         .channel(`restaurant_orders_${businessId}`, {
           config: {
             broadcast: { self: true },
           },
         })
+        // ── BROADCAST (canal principal, sin RLS) ──────────────────────────────
+        .on(
+          'broadcast',
+          { event: 'new_order' },
+          ({ payload }) => {
+            handleNewOrder(payload as OrderNotification);
+          }
+        )
+        // ── POSTGRES_CHANGES (backup, puede fallar si RLS bloquea el evento) ──
         .on(
           'postgres_changes',
           {
@@ -138,76 +160,33 @@ export function useRealtimeNotifications(businessId?: string) {
           },
           async (payload) => {
             try {
-              // Esperar un momento para asegurar que los order_items estén commitados
-              await new Promise(resolve => setTimeout(resolve, 500));
+              // Fetch order details with items
+              const { data: orderDetails, error } = await supabase
+                .from('orders')
+                .select(`
+                  *,
+                  order_items (
+                    product_name,
+                    quantity,
+                    price
+                  )
+                `)
+                .eq('id', payload.new.id)
+                .single();
 
-              // Obtener detalles completos del pedido incluyendo items
-              let orderDetails = null;
-              let retryCount = 0;
-              const maxRetries = 3;
-
-              while (retryCount < maxRetries) {
-                const { data, error } = await supabase
-                  .from('orders')
-                  .select(`
-                    *,
-                    order_items (
-                      product_name,
-                      quantity,
-                      price
-                    )
-                  `)
-                  .eq('id', payload.new.id)
-                  .single();
-
-                if (error) {
-                  console.error(`Error obteniendo detalles del pedido (intento ${retryCount + 1}):`, error);
-                  retryCount++;
-                  if (retryCount < maxRetries) {
-                    await new Promise(resolve => setTimeout(resolve, 300));
-                  }
-                  continue;
-                }
-
-                // Verificar si tenemos order_items
-                if (!data.order_items || data.order_items.length === 0) {
-                  console.warn(`Pedido ${payload.new.id} sin order_items, reintentando...`);
-                  retryCount++;
-                  if (retryCount < maxRetries) {
-                    await new Promise(resolve => setTimeout(resolve, 300));
-                  } else {
-                    // Usar datos del payload como fallback
-                    orderDetails = { ...data, order_items: [] };
-                  }
-                } else {
-                  orderDetails = data;
-                  break;
-                }
-              }
-
-              if (!orderDetails) {
-                console.error('No se pudieron obtener los detalles del pedido después de varios intentos');
+              if (error || !orderDetails) {
+                console.warn('[Realtime][pg_changes] No se pudo obtener detalle del pedido, usando payload base');
+                const fallbackOrder = {
+                  ...payload.new as Record<string, unknown>,
+                  order_items: [],
+                } as unknown as OrderNotification;
+                handleNewOrder(fallbackOrder);
                 return;
               }
 
-              console.log('✅ Notificación recibida - Order items:', orderDetails.order_items);
-
-              // Actualizar estado de notificaciones
-              setNotificationState(prev => ({
-                ...prev,
-                hasNewOrder: true,
-                latestOrder: orderDetails as OrderNotification,
-                orderCount: prev.orderCount + 1,
-              }));
-
-              // Reproducir sonido de notificación (si está disponible)
-              playNotificationSound();
-
-              // Mostrar notificación en el navegador
-              showBrowserNotification(orderDetails);
-
+              handleNewOrder(orderDetails as unknown as OrderNotification);
             } catch (error) {
-              console.error('Error procesando notificación:', error);
+              console.error('[Realtime][pg_changes] Error procesando notificación:', error);
             }
           }
         )
@@ -220,15 +199,12 @@ export function useRealtimeNotifications(businessId?: string) {
             filter: `business_id=eq.${businessId}`,
           },
           (_payload) => {
-            // Pedido actualizado - payload no se usa actualmente
-            // pero se mantiene para compatibilidad futura
+            // Pedido actualizado - reservado para uso futuro
           }
         )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
-            // Marcar como suscrito solo cuando la conexión es confirmada
             isSubscribedRef.current = true;
-            // Reset reconnect attempts on successful connection
             reconnectAttemptRef.current = 0;
             setNotificationState(prev => ({
               ...prev,
@@ -251,6 +227,7 @@ export function useRealtimeNotifications(businessId?: string) {
         });
 
       subscriptionRef.current = subscription;
+
     };
   }, [businessId, isAuthReady, scheduleReconnect]);
 

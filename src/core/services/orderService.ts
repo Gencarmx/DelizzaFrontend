@@ -21,7 +21,7 @@ export type OrderStatus =
 
 export interface OrderWithItems extends Order {
   order_items: OrderItem[];
-  customer_name?: string;
+  customer_name: string | null;
   business_name?: string;
   customer?: {
     full_name: string;
@@ -148,7 +148,7 @@ export async function getOrderDetails(
 }
 
 /**
- * Actualiza el estado de un pedido
+ * Actualiza el estado de un pedido y notifica al cliente vía Broadcast
  */
 export async function updateOrderStatus(
   orderId: string,
@@ -156,7 +156,6 @@ export async function updateOrderStatus(
   notes?: string,
 ): Promise<Order> {
   try {
-    // Validar estado
     const validStatuses: OrderStatus[] = [
       "pending",
       "confirmed",
@@ -174,10 +173,7 @@ export async function updateOrderStatus(
       updated_at: new Date().toISOString(),
     };
 
-    // Si se cancela el pedido, podríamos agregar notas
     if (status === "cancelled" && notes) {
-      // Nota: La tabla orders no tiene campo para notas de cancelación
-      // Podríamos agregarlo o usar un sistema de logs separado
       console.log(`Pedido ${orderId} cancelado. Notas: ${notes}`);
     }
 
@@ -195,7 +191,32 @@ export async function updateOrderStatus(
       );
     }
 
-    return data[0];
+    const updatedOrder = data[0];
+
+    // Notificar al cliente vía Broadcast (sin RLS, entrega instantánea)
+    if (updatedOrder.customer_id) {
+      try {
+        const channel = supabase.channel(`customer_orders_${updatedOrder.customer_id}`);
+        await channel.send({
+          type: "broadcast",
+          event: "order_status_update",
+          payload: {
+            id: updatedOrder.id,
+            status: updatedOrder.status,
+            updated_at: updatedOrder.updated_at,
+            customer_id: updatedOrder.customer_id,
+            business_id: updatedOrder.business_id,
+            total: updatedOrder.total,
+          },
+        });
+        await supabase.removeChannel(channel);
+      } catch (broadcastErr) {
+        // No interrumpir si falla el broadcast
+        console.warn("[updateOrderStatus] Error enviando broadcast al cliente:", broadcastErr);
+      }
+    }
+
+    return updatedOrder;
   } catch (error) {
     console.error("Error actualizando estado del pedido:", error);
     throw error instanceof Error
@@ -203,6 +224,7 @@ export async function updateOrderStatus(
       : new Error("Error desconocido al actualizar pedido");
   }
 }
+
 
 /**
  * Marca un pedido como pagado en efectivo

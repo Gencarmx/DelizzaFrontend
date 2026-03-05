@@ -214,37 +214,42 @@ export default function Dashboard() {
     loadDashboardData();
   }, [businessId]);
 
-  // Efecto para recargar pedidos cuando llega uno nuevo
+  // Track processed order IDs to avoid duplicates
+  const processedOrderIds = useRef<Set<string>>(new Set());
+
+  // React immediately to new order – prepend to list without a full refetch
   useEffect(() => {
-    if (hasNewOrder && latestOrder && businessId) {
-      // Recargar la lista de pedidos automáticamente
-      const reloadOrders = async () => {
-        try {
-          const orders = await getRecentOrders(businessId, 5);
+    if (!hasNewOrder || !latestOrder || !businessId) return;
+    if (processedOrderIds.current.has(latestOrder.id)) return;
 
-          const formattedOrders: Order[] = orders.map(order => ({
-            id: order.id,
-            customer: order.customer_name || 'Cliente',
+    processedOrderIds.current.add(latestOrder.id);
 
-            items: order.order_items?.map(item => `${item.quantity}x ${item.product_name || 'Producto'}`).join(', ') || 'Productos varios',
-            total: order.total,
-            status: mapOrderStatus(order.status || 'pending'),
-            date: order.created_at ? new Date(order.created_at).toLocaleTimeString('es-ES', {
-              hour: '2-digit',
-              minute: '2-digit'
-            }) : 'Sin fecha'
-          }));
-          setRecentOrders(formattedOrders);
-          markAsRead();
+    const newOrder: Order = {
+      id: latestOrder.id,
+      customer: latestOrder.customer_name || 'Cliente',
+      items: latestOrder.order_items?.map(
+        (item: { quantity: number; product_name: string }) =>
+          `${item.quantity}x ${item.product_name || 'Producto'}`
+      ).join(', ') || 'Productos varios',
+      total: latestOrder.total,
+      status: mapOrderStatus(latestOrder.status || 'pending'),
+      date: latestOrder.created_at
+        ? new Date(latestOrder.created_at).toLocaleTimeString('es-ES', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+        : 'Ahora',
+    };
 
-        } catch (error) {
-          // Error silently handled
-        }
-      };
+    setRecentOrders(prev => {
+      if (prev.some(o => o.id === latestOrder.id)) return prev;
+      // Keep only last 5 entries
+      return [newOrder, ...prev].slice(0, 5);
+    });
 
-      reloadOrders();
-    }
+    markAsRead();
   }, [hasNewOrder, latestOrder, businessId, markAsRead]);
+
 
 
 
