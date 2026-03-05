@@ -6,15 +6,15 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* El "Ancho Mágico" para impresoras POS 58mm en Windows/Chrome es 190px - 200px netos.
-     Usarlo previene que Chrome aplique zooms extraños internamente intentando conciliar milímetros */
-  width: 195px;
-  max-width: 195px;
-  min-width: 195px;
+  /* El "Ancho Seguro" para impresoras térmicas de 58mm es de 48mm.
+     Esto asegura que el contenido no se corte en los laterales físicos. */
+  width: 48mm;
+  max-width: 48mm;
+  min-width: 48mm;
 
   margin: 0 auto;
-  padding: 8px 4px;
-  /* Un poco de respiro visual */
+  padding: 4mm 2mm;
+  /* 2mm de respiro lateral interior */
   background: white;
   color: black;
   font-size: 11px;
@@ -194,8 +194,7 @@
   /* Reset radical desde el documento raíz para matar el margen central de Windows */
   html,
   body {
-    margin: 0 0 0 -13px !important;
-    /* TRUCO CRÍTICO: Tiramos del papel a la izquierda para comer el margen forzoso del Hardware */
+    margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
     max-width: none !important;
@@ -216,18 +215,18 @@
   }
 
   .order-ticket {
-    position: absolute !important;
+    position: relative !important;
     left: 0 !important;
     top: 0 !important;
 
-    /* Al usar calc, demandamos el 100% del ancho del papel pero dejamos unos
-       milímetros de gracia a la derecha para la guillotina del hardware */
-    width: calc(100% - 4mm) !important;
-    max-width: none !important;
-    min-width: unset !important;
+    /* Forzamos el ancho físico de 48mm para la impresión real */
+    width: 48mm !important;
+    max-width: 48mm !important;
+    min-width: 48mm !important;
 
-    margin: 0 !important;
-    padding: 0 4mm 0 0 !important;
+    margin: 0 auto !important;
+    padding: 2mm 2mm !important;
+    /* Margen de seguridad izquierdo y derecho de 2mm */
     font-size: 11px !important;
     font-weight: 700 !important;
     color: black !important;
