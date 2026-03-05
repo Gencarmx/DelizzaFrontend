@@ -7,7 +7,7 @@ import About from "@presentation/pages/About";
 import Products from "@presentation/pages/Products";
 import { productsLoader } from "@core/router/loaders/productsLoader";
 import NotFound from "@presentation/pages/NotFound";
-import Favorites from "@presentation/pages/Favorites";
+// import Favorites from "@presentation/pages/Favorites";
 import Activity from "@presentation/pages/Activity";
 import { Login, Register, RegisterOwner, PendingApproval } from "@presentation/pages/auth";
 import { Account, UserProfile, EditProfile } from "@presentation/pages/profile";
@@ -66,10 +66,12 @@ export const routes: RouteObject[] = [
         path: "about",
         element: <About />,
       },
+      /*
       {
         path: "favorites",
         element: <Favorites />,
       },
+      */
       {
         path: "activity",
         element: <Activity />,

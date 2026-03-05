@@ -1,4 +1,4 @@
-import { Home, Heart, Activity, User } from "lucide-react";
+import { Home, /* Heart, */ Activity, User } from "lucide-react";
 import { Link, useLocation } from "react-router";
 
 export function BottomNav() {
@@ -8,7 +8,7 @@ export function BottomNav() {
 
   const navItems = [
     { icon: Home, label: "Inicio", path: "/" },
-    { icon: Heart, label: "Favoritos", path: "/favorites" },
+    // { icon: Heart, label: "Favoritos", path: "/favorites" },
     { icon: Activity, label: "Actividad", path: "/activity" },
     { icon: User, label: "Cuenta", path: "/account" },
   ];
@@ -19,11 +19,10 @@ export function BottomNav() {
         <Link
           key={item.path}
           to={item.path}
-          className={`flex flex-col items-center gap-1 transition-colors ${
-            isActive(item.path)
-              ? "text-amber-400"
-              : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
-          }`}
+          className={`flex flex-col items-center gap-1 transition-colors ${isActive(item.path)
+            ? "text-amber-400"
+            : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+            }`}
         >
           <item.icon
             className={`w-6 h-6 ${isActive(item.path) ? "fill-current" : ""}`}

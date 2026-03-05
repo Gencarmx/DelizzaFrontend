@@ -27,6 +27,7 @@ interface AuthContextType {
     password: string
   ) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
+  signInWithFacebook: () => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -282,6 +283,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInWithFacebook = async () => {
+    try {
+      console.log('🔄 [AuthContext] Initiating Facebook Auth, Redirect URL:', `${window.location.origin}/`);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'facebook',
+        options: {
+          redirectTo: `${window.location.origin}/`,
+        }
+      });
+      if (error) {
+        console.error('❌ [AuthContext] Facebook Auth Error:', error);
+        return { error };
+      }
+      return { error: null };
+    } catch (error) {
+      console.error('❌ [AuthContext] Facebook Auth Exception:', error);
+      return { error: error as AuthError };
+    }
+  };
+
   const signUpOwner = async (
     email: string,
     password: string,
@@ -336,6 +357,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUpOwner,
     signIn,
     signInWithGoogle,
+    signInWithFacebook,
     signOut,
   };
 

@@ -70,7 +70,7 @@ export default function ProductEdit() {
       try {
         setIsLoadingProduct(true);
         const product = await getProductById(productId);
-        
+
         if (!product) {
           throw new Error("Producto no encontrado");
         }
@@ -78,7 +78,7 @@ export default function ProductEdit() {
         // Cargar datos del producto en el formulario
         setFormData({
           name: product.name || "",
-          category: "", // La tabla products no tiene category_id aún
+          category: product.category_id || "",
           price: product.price?.toString() || "",
           stock: product.stock?.toString() || "0",
           description: product.description || "",
@@ -179,6 +179,7 @@ export default function ProductEdit() {
         price: number;
         active: boolean;
         stock: number;
+        category_id: string | null;
         image_url?: string;
       } = {
         name: formData.name.trim(),
@@ -186,6 +187,7 @@ export default function ProductEdit() {
         price: parseFloat(formData.price),
         active: formData.status === "active",
         stock: parseInt(formData.stock) || 0,
+        category_id: formData.category || null,
       };
 
       // Solo actualizar image_url si cambió

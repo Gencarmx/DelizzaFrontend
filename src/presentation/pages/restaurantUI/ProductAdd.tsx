@@ -148,6 +148,7 @@ export default function ProductAdd() {
         description: formData.description.trim(),
         price: parseFloat(formData.price),
         business_id: businessId,
+        category_id: formData.category, // Map selected category to category_id
         image_url: imageUrl,
         active: formData.status === "active",
         stock: parseInt(formData.stock) || 0,

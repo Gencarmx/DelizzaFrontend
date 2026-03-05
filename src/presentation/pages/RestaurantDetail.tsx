@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
-import { ChevronLeft, Star, Clock, Loader2 } from "lucide-react";
+import { ChevronLeft, /* Star, Clock, */ Loader2 } from "lucide-react";
 import { supabase } from "@core/supabase/client";
 import ProductModal from "@presentation/components/common/ProductModal";
 
@@ -118,11 +118,10 @@ export default function RestaurantDetail() {
             className="w-full h-full object-cover"
           />
           <span
-            className={`absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-full ${
-              restaurant.status === "Abierto"
-                ? "bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300"
-                : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-            }`}
+            className={`absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-full ${restaurant.status === "Abierto"
+              ? "bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300"
+              : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+              }`}
           >
             {restaurant.status}
           </span>
@@ -132,12 +131,14 @@ export default function RestaurantDetail() {
             {restaurant.name}
           </h2>
           <div className="flex items-center gap-3 mt-1">
+            {/* Rating and Time hidden for future release
             <span className="flex items-center gap-1 text-amber-500 text-sm font-medium">
               <Star className="w-4 h-4 fill-current" /> 4.5
             </span>
             <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400 text-sm">
               <Clock className="w-4 h-4" /> 30 min
             </span>
+            */}
           </div>
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
             {restaurant.address}

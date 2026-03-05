@@ -473,6 +473,7 @@ export type Database = {
         Row: {
           active: boolean | null
           business_id: string
+          category_id: string | null
           created_at: string | null
           description: string | null
           id: string
@@ -485,6 +486,7 @@ export type Database = {
         Insert: {
           active?: boolean | null
           business_id: string
+          category_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -497,6 +499,7 @@ export type Database = {
         Update: {
           active?: boolean | null
           business_id?: string
+          category_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -512,6 +515,13 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
             referencedColumns: ["id"]
           },
         ]

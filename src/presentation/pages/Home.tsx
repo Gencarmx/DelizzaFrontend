@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
-import { ChevronDown, Heart, Star, Clock, ChevronLeft, ChevronRight, Loader2, MapPin } from "lucide-react";
+import { ChevronDown, /* Heart, Star, Clock, */ ChevronLeft, ChevronRight, Loader2, MapPin } from "lucide-react";
 import ProductModal from "@presentation/components/common/ProductModal";
 import { SearchBar } from "@presentation/components/layout/SearchBar";
 import { supabase } from "@core/supabase/client";
@@ -19,13 +19,13 @@ export default function Home() {
     description?: string;
   } | null>(null);
 
-  const [favorites, setFavorites] = useState<any[]>([]);
+  // const [favorites, setFavorites] = useState<any[]>([]);
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [restaurants, setRestaurants] = useState<any[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState({
-    favorites: true,
+    // favorites: true,
     restaurants: true,
     categories: true,
     allProducts: true
@@ -74,6 +74,7 @@ export default function Home() {
         setCategories(categoriesData);
         setLoading(prev => ({ ...prev, categories: false }));
 
+        /* Favorites fetching hidden for future release
         setLoading(prev => ({ ...prev, favorites: true }));
         const { data: favoritesData, error: favoritesError } = await supabase
           .from('products')
@@ -104,11 +105,12 @@ export default function Home() {
           setFavorites(mappedFavorites);
         }
         setLoading(prev => ({ ...prev, favorites: false }));
+        */
 
         setLoading(prev => ({ ...prev, allProducts: true }));
         const { data: allProductsData, error: allProductsError } = await supabase
           .from('products')
-          .select('id, name, price, description, image_url, active, business_id')
+          .select('id, name, price, description, image_url, active, business_id, category_id')
           .eq('active', true);
         if (allProductsError) {
           console.error('Error fetching all products:', allProductsError);
@@ -129,7 +131,8 @@ export default function Home() {
             restaurant: allBusinessMap.get(p.business_id) || "Unknown",
             restaurantId: p.business_id,
             description: p.description || "",
-            image: p.image_url || "https://via.placeholder.com/200"
+            image: p.image_url || "https://via.placeholder.com/200",
+            category_id: p.category_id
           })) || [];
           setAllProducts(mappedAllProducts);
         }
@@ -157,7 +160,7 @@ export default function Home() {
       } catch (error) {
         console.error('Error general al cargar datos:', error);
         setError('Error al cargar los datos. Por favor, intenta de nuevo.');
-        setLoading({ favorites: false, restaurants: false, categories: false, allProducts: false });
+        setLoading({ /* favorites: false, */ restaurants: false, categories: false, allProducts: false });
       }
     };
 
@@ -248,18 +251,16 @@ export default function Home() {
                 onClick={() => handleCategoryClick(category.id)}
                 className="flex flex-col items-center gap-2 cursor-pointer group flex-shrink-0 snap-start min-w-[70px] max-w-[80px]"
               >
-                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-sm group-hover:shadow-md group-hover:scale-105 transition-all duration-200 border ${
-                  selectedCategory === category.id
-                    ? "bg-amber-400 dark:bg-amber-500 border-amber-500 dark:border-amber-400 scale-105 shadow-md"
-                    : "bg-gradient-to-br from-amber-50 to-amber-100 dark:from-gray-800 dark:to-gray-700 border-amber-200/50 dark:border-gray-600"
-                }`}>
+                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-sm group-hover:shadow-md group-hover:scale-105 transition-all duration-200 border ${selectedCategory === category.id
+                  ? "bg-amber-400 dark:bg-amber-500 border-amber-500 dark:border-amber-400 scale-105 shadow-md"
+                  : "bg-gradient-to-br from-amber-50 to-amber-100 dark:from-gray-800 dark:to-gray-700 border-amber-200/50 dark:border-gray-600"
+                  }`}>
                   {category.icon || "🍽️"}
                 </div>
-                <span className={`text-[10px] leading-tight font-medium text-center w-full line-clamp-2 px-1 ${
-                  selectedCategory === category.id
-                    ? "text-amber-600 dark:text-amber-400 font-semibold"
-                    : "text-gray-700 dark:text-gray-300"
-                }`}>
+                <span className={`text-[10px] leading-tight font-medium text-center w-full line-clamp-2 px-1 ${selectedCategory === category.id
+                  ? "text-amber-600 dark:text-amber-400 font-semibold"
+                  : "text-gray-700 dark:text-gray-300"
+                  }`}>
                   {category.name}
                 </span>
               </div>
@@ -268,7 +269,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* Favorites Section */}
+      {/* Favorites Section - Future Feature
       <section>
         <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-4">
           El favorito entre los locales
@@ -328,6 +329,7 @@ export default function Home() {
           </div>
         )}
       </section>
+      */}
 
       {/* All Products Section */}
       <section>
@@ -437,11 +439,13 @@ export default function Home() {
                     {item.name}
                   </h4>
                   <div className="flex items-center gap-1 mt-1">
+                    {/* Star rating and time hidden as future functions
                     <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                     <span className="text-xs font-medium text-amber-500">4.5</span>
                     <span className="text-xs text-gray-400 dark:text-gray-500 mx-1">·</span>
                     <Clock className="w-3 h-3 text-gray-400" />
                     <span className="text-xs text-gray-500 dark:text-gray-400">30 min</span>
+                    */}
                   </div>
                   <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 truncate">
                     {item.address}

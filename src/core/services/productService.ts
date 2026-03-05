@@ -15,6 +15,7 @@ export interface ProductData {
   description?: string;
   price: number;
   business_id: string;
+  category_id?: string | null;
   image_url?: string;
   active?: boolean;
   stock?: number;
@@ -106,6 +107,7 @@ export async function createProduct(productData: ProductData): Promise<Product> 
       description: productData.description?.trim(),
       price: productData.price,
       business_id: productData.business_id,
+      category_id: productData.category_id,
       image_url: productData.image_url,
       active: productData.active ?? true,
       stock: productData.stock ?? 0,

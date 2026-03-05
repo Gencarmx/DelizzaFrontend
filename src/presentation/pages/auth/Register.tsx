@@ -12,7 +12,7 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signUp, signInWithGoogle } = useAuth();
+  const { signUp, signInWithGoogle, signInWithFacebook } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -95,6 +95,16 @@ export default function Register() {
     const { error } = await signInWithGoogle();
     if (error) {
       setError(`❌ Error al registrarse con Google: ${error.message}`);
+      setLoading(false);
+    }
+  };
+
+  const handleFacebookLogin = async () => {
+    setError("");
+    setLoading(true);
+    const { error } = await signInWithFacebook();
+    if (error) {
+      setError(`❌ Error al registrarse con Facebook: ${error.message}`);
       setLoading(false);
     }
   };
@@ -277,12 +287,19 @@ export default function Register() {
             Continuar con Google
           </button>
 
-          <button className="w-full bg-white border border-gray-200 text-gray-700 font-medium py-3.5 rounded-xl shadow-sm hover:bg-gray-50 transition-all flex items-center justify-center gap-3">
+          {/* 
+          <button
+            type="button"
+            onClick={handleFacebookLogin}
+            disabled={loading}
+            className="w-full bg-white border border-gray-200 text-gray-700 font-medium py-3.5 rounded-xl shadow-sm hover:bg-gray-50 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
             </svg>
             Continuar con Facebook
           </button>
+          */}
         </div>
 
         {/* Sign In Link */}
