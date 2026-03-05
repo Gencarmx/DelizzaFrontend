@@ -9,7 +9,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signIn, user, role, businessActive } = useAuth();
+  const { signIn, signInWithGoogle, user, role, businessActive } = useAuth();
   const navigate = useNavigate();
 
   // Redirect if already logged in
@@ -81,6 +81,16 @@ export default function Login() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setError("");
+    setLoading(true);
+    const { error } = await signInWithGoogle();
+    if (error) {
+      setError(`❌ Error al iniciar sesión con Google: ${error.message}`);
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
@@ -108,6 +118,7 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="ejemplo@correo.com"
               required
+              autoComplete="email"
               className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
             />
           </div>
@@ -125,6 +136,7 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                autoComplete="current-password"
                 className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all pr-12"
               />
               <button
@@ -177,7 +189,12 @@ export default function Login() {
 
         {/* Social Login Buttons */}
         <div className="flex flex-col gap-3">
-          <button className="w-full bg-white border border-gray-200 text-gray-700 font-medium py-3.5 rounded-xl shadow-sm hover:bg-gray-50 transition-all flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            className="w-full bg-white border border-gray-200 text-gray-700 font-medium py-3.5 rounded-xl shadow-sm hover:bg-gray-50 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
                 fill="currentColor"

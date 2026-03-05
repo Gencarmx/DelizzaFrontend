@@ -26,6 +26,7 @@ interface AuthContextType {
     email: string,
     password: string
   ) => Promise<{ error: AuthError | null }>;
+  signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -180,11 +181,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return false;
     };
 
-    const applySession = async (event: string, currentSession: Session | null) => {
+    const applySession = async (_event: string, currentSession: Session | null) => {
       if (cancelled) return;
 
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+
+      console.log('🔄 [AuthContext] applySession - Event:', _event, 'User:', currentSession?.user?.id);
 
       if (currentSession?.user) {
         const userRole = await fetchRole(currentSession.user.id, currentSession.user.user_metadata);
@@ -255,6 +258,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInWithGoogle = async () => {
+    try {
+      console.log('🔄 [AuthContext] Initiating Google Auth, Redirect URL:', `${window.location.origin}/`);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        }
+      });
+      if (error) {
+        console.error('❌ [AuthContext] Google Auth Error:', error);
+        return { error };
+      }
+      return { error: null };
+    } catch (error) {
+      console.error('❌ [AuthContext] Google Auth Exception:', error);
+      return { error: error as AuthError };
+    }
+  };
+
   const signUpOwner = async (
     email: string,
     password: string,
@@ -308,6 +335,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signUpOwner,
     signIn,
+    signInWithGoogle,
     signOut,
   };
 

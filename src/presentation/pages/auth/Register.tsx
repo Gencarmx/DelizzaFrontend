@@ -12,7 +12,7 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signUp } = useAuth();
+  const { signUp, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,22 +39,22 @@ export default function Register() {
       const originalError = errorMessage.toLowerCase();
 
       // Check for duplicate email
-      if (originalError.includes("user already registered") || 
-          (originalError.includes("email") && originalError.includes("already"))) {
+      if (originalError.includes("user already registered") ||
+        (originalError.includes("email") && originalError.includes("already"))) {
         errorMessage = `❌ El correo electrónico "${email}" ya está registrado. Por favor usa otro correo o inicia sesión.`;
       }
       // Check for duplicate phone number (aunque clientes no tienen teléfono, por consistencia)
-      else if (originalError.includes("users_phone_number_key") || 
-               (originalError.includes("phone") && originalError.includes("duplicate"))) {
+      else if (originalError.includes("users_phone_number_key") ||
+        (originalError.includes("phone") && originalError.includes("duplicate"))) {
         errorMessage = `❌ Este número de teléfono ya está registrado. Por favor usa otro número.`;
       }
       // Check for both duplicates
-      else if (originalError.includes("duplicate") && 
-               (originalError.includes("email") || originalError.includes("phone"))) {
+      else if (originalError.includes("duplicate") &&
+        (originalError.includes("email") || originalError.includes("phone"))) {
         const duplicatedFields = [];
         if (originalError.includes("email")) duplicatedFields.push(`correo "${email}"`);
         if (originalError.includes("phone")) duplicatedFields.push("teléfono");
-        
+
         if (duplicatedFields.length > 0) {
           errorMessage = `❌ Los siguientes datos ya están registrados: ${duplicatedFields.join(" y ")}. Por favor usa otros datos.`;
         } else {
@@ -89,6 +89,16 @@ export default function Register() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setError("");
+    setLoading(true);
+    const { error } = await signInWithGoogle();
+    if (error) {
+      setError(`❌ Error al registrarse con Google: ${error.message}`);
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
@@ -116,6 +126,7 @@ export default function Register() {
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Juan Pérez"
               required
+              autoComplete="name"
               className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
             />
           </div>
@@ -132,6 +143,7 @@ export default function Register() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="ejemplo@correo.com"
               required
+              autoComplete="email"
               className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
             />
           </div>
@@ -149,6 +161,7 @@ export default function Register() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                autoComplete="new-password"
                 className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all pr-12"
               />
               <button
@@ -178,6 +191,7 @@ export default function Register() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                autoComplete="new-password"
                 className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all pr-12"
               />
               <button
@@ -236,7 +250,12 @@ export default function Register() {
 
         {/* Social Login Buttons */}
         <div className="flex flex-col gap-3">
-          <button className="w-full bg-white border border-gray-200 text-gray-700 font-medium py-3.5 rounded-xl shadow-sm hover:bg-gray-50 transition-all flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            className="w-full bg-white border border-gray-200 text-gray-700 font-medium py-3.5 rounded-xl shadow-sm hover:bg-gray-50 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
                 fill="currentColor"
