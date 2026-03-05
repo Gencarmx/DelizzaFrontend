@@ -15,34 +15,39 @@
   padding: 4mm;
   background: white;
   color: black;
-  font-size: 11px;
+  font-size: 13px;
+  /* Aumentado de 11 a 13px */
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.4;
+  /* Aumentado */
   box-sizing: border-box;
 }
 
 .ticket-header {
   text-align: center;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .business-name {
-  font-size: 16px;
+  font-size: 19px;
+  /* Aumentado de 16 a 19px */
   font-weight: 900;
-  margin: 0 0 4px 0;
+  margin: 0 0 6px 0;
   text-transform: uppercase;
   letter-spacing: 1px;
   word-break: break-word;
   white-space: normal;
   line-height: 1.1;
-  border-bottom: 1px dashed black;
-  padding-bottom: 4px;
+  border-bottom: 2px dashed black;
+  /* Borde más visible */
+  padding-bottom: 6px;
 }
 
 .business-info {
-  font-size: 10px;
+  font-size: 11px;
+  /* Aumentado */
   font-weight: 600;
-  margin: 2px 0;
+  margin: 3px 0;
   word-break: break-word;
   text-transform: uppercase;
 }
@@ -51,23 +56,25 @@
 .divider {
   border: none;
   border-top: 1px dashed black;
-  margin: 6px 0;
+  margin: 8px 0;
+  /* Más espacio */
 }
 
 .divider-thin {
   border: none;
   border-top: 1px dashed black;
-  margin: 5px 0;
+  margin: 6px 0;
 }
 
 .divider-thick {
   border: none;
   border-top: 2px solid black;
-  margin: 6px 0;
+  margin: 8px 0;
 }
 
 .ticket-section {
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+  /* Mayor separación vertical */
   text-align: left;
   width: 100%;
 }
@@ -75,8 +82,9 @@
 /* Bloque para el número de pedido sin fondo negro */
 .order-id-block {
   text-align: center;
-  padding: 4px 0;
-  margin: 8px 0;
+  padding: 6px 0;
+  margin: 10px 0;
+  /* Mayor espacio */
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -86,14 +94,16 @@
 }
 
 .order-id-label {
-  font-size: 11px;
+  font-size: 13px;
+  /* Aumentado */
   font-weight: 600;
   letter-spacing: 1px;
   text-transform: uppercase;
 }
 
 .order-id-value {
-  font-size: 16px;
+  font-size: 18px;
+  /* Aumentado de 16 a 18px */
   font-weight: 900;
   letter-spacing: 2px;
 }
@@ -102,8 +112,10 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  margin: 3px 0;
-  font-size: 11px;
+  margin: 4px 0;
+  /* Mayor espacio */
+  font-size: 12px;
+  /* Aumentado */
   font-weight: 700;
   width: 100%;
 }
@@ -125,29 +137,32 @@
 .value-badge {
   font-weight: 900;
   text-align: right;
-  font-size: 11px;
+  font-size: 12px;
+  /* Aumentado */
   text-transform: uppercase;
 }
 
 .section-title {
-  font-size: 11px;
+  font-size: 13px;
+  /* Aumentado */
   font-weight: 900;
   text-transform: uppercase;
-  margin: 4px 0;
+  margin: 6px 0;
   padding: 2px 0;
   text-align: left;
   text-decoration: underline;
 }
 
 .address-line {
-  font-size: 11px;
+  font-size: 13px;
+  /* Aumentado */
   font-weight: 600;
-  margin: 2px 0;
+  margin: 3px 0;
   word-break: break-word;
 }
 
 .items-section {
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 /* Cabecera de items sin fondo negro */
@@ -155,10 +170,11 @@
   display: flex;
   justify-content: space-between;
   font-weight: 900;
-  font-size: 11px;
-  margin-bottom: 4px;
+  font-size: 12px;
+  /* Aumentado */
+  margin-bottom: 6px;
   text-transform: uppercase;
-  padding: 4px 0;
+  padding: 5px 0;
   border-top: 1px dashed black;
   border-bottom: 1px dashed black;
 }
@@ -174,7 +190,7 @@
   text-align: left;
   padding: 0 4px;
   word-break: break-word;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 .col-price {
@@ -188,8 +204,10 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin: 6px 0;
-  font-size: 11px;
+  margin: 8px 0;
+  /* Filas más separadas */
+  font-size: 12px;
+  /* Aumentado de 11 a 12px */
   font-weight: 700;
 }
 
@@ -197,53 +215,61 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 14px;
+  font-size: 16px;
+  /* Aumentado de 14 a 16px */
   font-weight: 900;
-  margin: 8px 0;
-  padding: 6px 0;
-  border-top: 1px dashed black;
-  border-bottom: 1px dashed black;
+  margin: 10px 0;
+  padding: 8px 0;
+  border-top: 2px dashed black;
+  /* Bordes más visibles */
+  border-bottom: 2px dashed black;
 }
 
 .total-label {
-  font-size: 14px;
+  font-size: 16px;
+  /* Aumentado */
   font-weight: 900;
   letter-spacing: 1px;
 }
 
 .total-value {
-  font-size: 16px;
+  font-size: 19px;
+  /* Aumentado de 16 a 19px */
   font-weight: 900;
   white-space: nowrap;
 }
 
 .ticket-footer {
   text-align: center;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .footer-text {
-  margin: 3px 0;
-  font-size: 11px;
+  margin: 4px 0;
+  font-size: 12px;
+  /* Aumentado */
   font-weight: 700;
   text-transform: uppercase;
 }
 
 .footer-text.highlight {
   font-weight: 900;
-  font-size: 12px;
+  font-size: 14px;
+  /* Aumentado */
 }
 
 .footer-small {
-  margin: 4px 0 0 0;
-  font-size: 9px;
+  margin: 6px 0 0 0;
+  font-size: 11px;
+  /* Aumentado */
   font-weight: 600;
   color: black;
   text-transform: uppercase;
 }
 
 .footer-status {
-  font-size: 13px;
+  font-size: 15px;
+  /* Aumentado */
   font-weight: 900;
   padding: 2px 0;
   margin-top: 2px;
@@ -252,10 +278,11 @@
 
 .barcode-placeholder {
   font-family: 'Courier New', Courier, monospace;
-  font-size: 14px;
+  font-size: 16px;
+  /* Aumentado */
   font-weight: bold;
   letter-spacing: 2px;
-  margin-top: 8px;
+  margin-top: 10px;
   text-align: center;
   padding: 4px;
 }
@@ -297,23 +324,27 @@
 
     /* El margen de 0 aquí se compensa con un padding explícito de seguridad */
     margin: 0 !important;
-    padding: 2mm 4mm !important;
-    /* 4mm left y right margin de seguridad */
+    padding: 2mm 5mm !important;
+    /* Aumentado a 5mm left/right de respiro */
 
-    font-size: 11px !important;
+    font-size: 13px !important;
+    /* Forzar el tamaño mayor de fuente */
     font-weight: 700 !important;
     color: black !important;
-    line-height: 1.35 !important;
+    line-height: 1.4 !important;
+    /* Mayor line-height para legibilidad */
     box-sizing: border-box !important;
     text-align: left !important;
   }
 
   .business-name {
-    font-size: 16px !important;
+    font-size: 19px !important;
+    /* Más grande en print */
     text-align: center !important;
   }
 
   .business-info {
+    font-size: 11px !important;
     text-align: center !important;
   }
 
