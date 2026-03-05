@@ -31,6 +31,10 @@ export default function PrintButton({
       return;
     }
 
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map(tag => tag.outerHTML)
+      .join('\n');
+
     const ticketContent = printRef.current?.innerHTML || '';
 
     printWindow.document.write(`
@@ -40,10 +44,10 @@ export default function PrintButton({
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Ticket - Pedido ${order.id}</title>
+          ${styles}
           <style>
             @media print {
               @page {
-                margin: 0;
                 size: 58mm auto;
               }
               html, body {

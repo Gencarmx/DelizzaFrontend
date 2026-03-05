@@ -18,8 +18,8 @@ export default function OrderTicket({
     order.deliveryType === "delivery"
       ? "Domicilio"
       : order.deliveryType === "pickup"
-      ? "Recoger en tienda"
-      : order.deliveryType || null;
+        ? "Recoger en tienda"
+        : order.deliveryType || null;
 
   return (
     <div className="order-ticket">
@@ -33,35 +33,35 @@ export default function OrderTicket({
 
       {/* Información del Pedido */}
       <div className="ticket-section">
-        <div className="info-row">
-          <span className="label">PEDIDO #</span>
-          <span className="value">{order.id}</span>
+        <div className="order-id-block">
+          <span className="order-id-label">PEDIDO #</span>
+          <span className="order-id-value">{order.id}</span>
         </div>
         <div className="info-row">
-          <span className="label">FECHA</span>
+          <span className="label">Fecha:</span>
           <span className="value">{order.date}</span>
         </div>
         <div className="info-row">
-          <span className="label">CLIENTE</span>
+          <span className="label">Cliente:</span>
           <span className="value">{order.customer}</span>
         </div>
         {order.customerPhone && (
           <div className="info-row">
-            <span className="label">TELÉFONO</span>
+            <span className="label">Teléfono:</span>
             <span className="value">{order.customerPhone}</span>
           </div>
         )}
         <div className="info-row">
-          <span className="label">PAGO</span>
+          <span className="label">Pago:</span>
           <span className="value">{order.paymentMethod}</span>
         </div>
         {deliveryLabel && (
           <div className="info-row">
-            <span className="label">ENTREGA</span>
-            <span className="value">{deliveryLabel}</span>
+            <span className="label">Entrega:</span>
+            <span className="value-badge">{deliveryLabel}</span>
           </div>
         )}
-        <div className="divider" />
+        <div className="divider-thick" />
       </div>
 
       {/* Dirección de entrega - solo para domicilio */}
@@ -105,13 +105,12 @@ export default function OrderTicket({
       )}
 
       {/* Items del Pedido */}
-      <div className="ticket-section">
+      <div className="ticket-section items-section">
         <div className="items-header">
-          <span className="col-qty">CANT.</span>
+          <span className="col-qty">CANT</span>
           <span className="col-item">PRODUCTO</span>
           <span className="col-price">PRECIO</span>
         </div>
-        <div className="divider-thin" />
 
         {order.items.split(", ").map((item: string, index: number) => {
           const match = item.match(/(\d+)x\s(.+)/);
@@ -138,15 +137,19 @@ export default function OrderTicket({
           <span className="total-label">TOTAL</span>
           <span className="total-value">${order.total.toFixed(2)}</span>
         </div>
-        <div className="divider" />
       </div>
 
       {/* Footer */}
       <div className="ticket-footer">
-        <p className="footer-text">¡Gracias por su compra!</p>
-        <p className="footer-text">Vuelva pronto</p>
+        <div className="divider-thick" />
+        <p className="footer-text highlight">¡GRACIAS POR SU COMPRA!</p>
+        <p className="footer-text">Visítenos pronto</p>
         <div className="divider-thin" />
-        <p className="footer-small">Estado: {getStatusText(order.status)}</p>
+        <p className="footer-small">ESTADO DEL PEDIDO</p>
+        <p className="footer-status">{getStatusText(order.status).toUpperCase()}</p>
+        <div className="barcode-placeholder">
+          *{order.id.substring(0, 8)}*
+        </div>
       </div>
     </div>
   );

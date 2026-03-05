@@ -1,20 +1,18 @@
 /* Estilos generales (visualización y base) */
 .order-ticket {
-  font-family: 'Roboto', 'Inter', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-family: 'Courier New', Courier, 'Roboto', 'Inter', monospace, sans-serif;
   font-variant-numeric: tabular-nums;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* El "Ancho Seguro" para impresoras térmicas de 58mm es de 48mm.
-     Esto asegura que el contenido no se corte en los laterales físicos. */
-  width: 48mm;
-  max-width: 48mm;
-  min-width: 48mm;
+  /* El "Ancho Seguro" para impresoras térmicas de 58mm es de 48mm. */
+  width: 52mm;
+  max-width: 52mm;
+  min-width: 52mm;
 
   margin: 0 auto;
-  padding: 4mm 2mm;
-  /* 2mm de respiro lateral interior */
+  padding: 4mm;
   background: white;
   color: black;
   font-size: 11px;
@@ -25,98 +23,149 @@
 
 .ticket-header {
   text-align: center;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .business-name {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 900;
-  margin: 0 0 3px 0;
+  margin: 0 0 4px 0;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
   word-break: break-word;
   white-space: normal;
-  line-height: 1.2;
+  line-height: 1.1;
+  border-bottom: 1px dashed black;
+  padding-bottom: 4px;
 }
 
 .business-info {
   font-size: 10px;
   font-weight: 600;
-  margin: 1px 0;
+  margin: 2px 0;
   word-break: break-word;
+  text-transform: uppercase;
 }
 
+/* Modificamos los divisores para dar un toque más profesional */
 .divider {
   border: none;
-  border-top: 1.5px dashed black;
-  margin: 5px 0;
+  border-top: 1px dashed black;
+  margin: 6px 0;
 }
 
 .divider-thin {
   border: none;
-  border-top: 1px solid black;
-  margin: 4px 0;
+  border-top: 1px dashed black;
+  margin: 5px 0;
+}
+
+.divider-thick {
+  border: none;
+  border-top: 2px solid black;
+  margin: 6px 0;
 }
 
 .ticket-section {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   text-align: left;
   width: 100%;
+}
+
+/* Bloque para el número de pedido sin fondo negro */
+.order-id-block {
+  text-align: center;
+  padding: 4px 0;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-top: 1px dashed black;
+  border-bottom: 1px dashed black;
+}
+
+.order-id-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.order-id-value {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 2px;
 }
 
 .info-row {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin: 2px 0;
-  font-size: 10px;
+  align-items: flex-end;
+  margin: 3px 0;
+  font-size: 11px;
   font-weight: 700;
   width: 100%;
 }
 
 .label {
-  font-weight: 900;
+  font-weight: 600;
   flex-shrink: 0;
   margin-right: 4px;
+  text-transform: uppercase;
 }
 
 .value {
-  font-weight: 600;
+  font-weight: 900;
   text-align: right;
   word-break: break-word;
   overflow-wrap: break-word;
 }
 
+.value-badge {
+  font-weight: 900;
+  text-align: right;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
 .section-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
-  margin: 0 0 4px 0;
+  margin: 4px 0;
+  padding: 2px 0;
+  text-align: left;
   text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 .address-line {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   margin: 2px 0;
   word-break: break-word;
 }
 
+.items-section {
+  margin-top: 8px;
+}
+
+/* Cabecera de items sin fondo negro */
 .items-header {
   display: flex;
   justify-content: space-between;
   font-weight: 900;
-  font-size: 10px;
-  margin-bottom: 3px;
+  font-size: 11px;
+  margin-bottom: 4px;
   text-transform: uppercase;
-  border-bottom: 1px solid black;
-  padding-bottom: 2px;
+  padding: 4px 0;
+  border-top: 1px dashed black;
+  border-bottom: 1px dashed black;
 }
 
 .col-qty {
-  width: 13%;
-  text-align: left;
+  width: 15%;
+  text-align: center;
   flex-shrink: 0;
 }
 
@@ -125,7 +174,7 @@
   text-align: left;
   padding: 0 4px;
   word-break: break-word;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .col-price {
@@ -139,94 +188,118 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin: 4px 0;
-  font-size: 10px;
-  font-weight: 600;
+  margin: 6px 0;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .total-row {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  font-size: 13px;
+  align-items: center;
+  font-size: 14px;
   font-weight: 900;
-  margin: 6px 0;
+  margin: 8px 0;
+  padding: 6px 0;
+  border-top: 1px dashed black;
+  border-bottom: 1px dashed black;
 }
 
 .total-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 900;
+  letter-spacing: 1px;
 }
 
 .total-value {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 900;
   white-space: nowrap;
 }
 
 .ticket-footer {
   text-align: center;
-  margin-top: 6px;
+  margin-top: 10px;
 }
 
 .footer-text {
-  margin: 2px 0;
+  margin: 3px 0;
   font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.footer-text.highlight {
   font-weight: 900;
+  font-size: 12px;
 }
 
 .footer-small {
-  margin: 2px 0;
+  margin: 4px 0 0 0;
   font-size: 9px;
   font-weight: 600;
+  color: black;
+  text-transform: uppercase;
 }
 
+.footer-status {
+  font-size: 13px;
+  font-weight: 900;
+  padding: 2px 0;
+  margin-top: 2px;
+  text-transform: uppercase;
+}
+
+.barcode-placeholder {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  margin-top: 8px;
+  text-align: center;
+  padding: 4px;
+}
 
 /* -----------------------------------------------------------------
    Estilos de Impresión ULTRA Rígidos para SUZWIP / POS-58
 ----------------------------------------------------------------- */
 @media print {
   @page {
-    /* El margen a 0 explícito quita bordes que añade Chrome por defecto */
-    margin: 0 !important;
+    /* No forzamos margin 0 absoluto para permitir que el SO o la impresora gestione el margen mínimo (aprox 3mm) */
+    margin: 3mm;
   }
 
-  /* Reset radical desde el documento raíz para matar el margen central de Windows */
   html,
   body {
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    max-width: none !important;
-    min-width: unset !important;
     background: transparent !important;
-    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
   }
 
-  /* Ocultamos cualquier cosa en el árbol de React/HTML que no sea el recibo */
   body * {
     visibility: hidden;
   }
 
-  /* Exponemos nuestro ticket */
   .order-ticket,
   .order-ticket * {
     visibility: visible;
   }
 
   .order-ticket {
-    position: relative !important;
+    position: absolute !important;
+    /* Al centrar forzosamente a la izquierda, añadimos padding para evitar que se corte el texto */
     left: 0 !important;
     top: 0 !important;
+    width: 100% !important;
+    max-width: 58mm !important;
+    min-width: unset !important;
 
-    /* Forzamos el ancho físico de 48mm para la impresión real */
-    width: 48mm !important;
-    max-width: 48mm !important;
-    min-width: 48mm !important;
+    /* El margen de 0 aquí se compensa con un padding explícito de seguridad */
+    margin: 0 !important;
+    padding: 2mm 4mm !important;
+    /* 4mm left y right margin de seguridad */
 
-    margin: 0 auto !important;
-    padding: 2mm 2mm !important;
-    /* Margen de seguridad izquierdo y derecho de 2mm */
     font-size: 11px !important;
     font-weight: 700 !important;
     color: black !important;
@@ -236,7 +309,7 @@
   }
 
   .business-name {
-    font-size: 15px !important;
+    font-size: 16px !important;
     text-align: center !important;
   }
 
