@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { CheckCircle2, Clock, XCircle, Loader2, Bell, X } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, Loader2 } from "lucide-react";
 import {
   getOrdersByCustomer,
   type OrderWithItems,
@@ -8,19 +8,13 @@ import { supabase } from "@core/supabase/client";
 import { useCustomerNotificationsContext } from "@core/context/CustomerNotificationsContext";
 
 export default function Activity() {
-  const {
-    registerOrderUpdateCallback,
-    registerInAppNotificationCallback,
-  } = useCustomerNotificationsContext();
+  const { registerOrderUpdateCallback } = useCustomerNotificationsContext();
 
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
-  const [inAppNotification, setInAppNotification] = useState<{
-    title: string;
-    body: string;
-  } | null>(null);
+
 
   const reloadOrders = useCallback(
     async (pid: string) => {
@@ -93,16 +87,7 @@ export default function Activity() {
     };
   }, [profileId, registerOrderUpdateCallback, reloadOrders]);
 
-  useEffect(() => {
-    registerInAppNotificationCallback((title, body) => {
-      setInAppNotification({ title, body });
-      setTimeout(() => setInAppNotification(null), 5000);
-    });
 
-    return () => {
-      registerInAppNotificationCallback(null);
-    };
-  }, [registerInAppNotificationCallback]);
 
   // Función para formatear la fecha
   const formatDate = (dateString: string) => {
@@ -212,29 +197,7 @@ export default function Activity() {
 
 
 
-      {inAppNotification && (
-        <div className="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 flex items-start justify-between shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="bg-blue-100 dark:bg-blue-800/50 p-2 rounded-full shrink-0">
-              <Bell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="font-semibold text-gray-900 dark:text-white text-sm">
-                {inAppNotification.title}
-              </span>
-              <span className="text-xs text-gray-600 dark:text-gray-300">
-                {inAppNotification.body}
-              </span>
-            </div>
-          </div>
-          <button
-            onClick={() => setInAppNotification(null)}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 shrink-0 ml-2"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+
 
       <div className="flex flex-col gap-4">
         {orders.map((order) => {

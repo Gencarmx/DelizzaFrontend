@@ -224,28 +224,35 @@ export async function notifyRestaurant(orderId: string, orderData?: {
 
   try {
     // Usar el mismo nombre de canal que escucha useRealtimeNotifications
-    const channel = supabase.channel(`restaurant_orders_${orderData.business_id}`);
-
-    await channel.send({
-      type: 'broadcast',
-      event: 'new_order',
-      payload: {
-        id: orderId,
-        business_id: orderData.business_id,
-        customer_name: orderData.customer_name,
-        total: orderData.total,
-        delivery_type: orderData.delivery_type,
-        status: 'pending',
-        created_at: orderData.created_at || new Date().toISOString(),
-        order_items: orderData.order_items,
-      },
+    const channel = supabase.channel(`restaurant_orders_${orderData.business_id}`, {
+      config: { broadcast: { ack: true } },
     });
 
-    // Limpiar el canal temporal (el del restaurante tiene su propio canal persistente)
-    await supabase.removeChannel(channel);
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        const resp = await channel.send({
+          type: 'broadcast',
+          event: 'new_order',
+          payload: {
+            id: orderId,
+            business_id: orderData.business_id,
+            customer_name: orderData.customer_name,
+            total: orderData.total,
+            delivery_type: orderData.delivery_type,
+            status: 'pending',
+            created_at: orderData.created_at || new Date().toISOString(),
+            order_items: orderData.order_items,
+          },
+        });
+        console.log("[notifyRestaurant] Broadcast sent response:", resp);
+
+        // Limpiar el canal temporal (el del restaurante tiene su propio canal persistente)
+        await supabase.removeChannel(channel);
+      }
+    });
   } catch (err) {
     // No interrumpir el flujo del pedido si falla la notificación
-    console.warn('[notifyRestaurant] Error enviando broadcast:', err);
+    console.warn('[notifyRestaurant] Error en la suscripcion para broadcast:', err);
   }
 }
 

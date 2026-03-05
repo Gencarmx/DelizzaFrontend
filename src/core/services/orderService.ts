@@ -196,23 +196,30 @@ export async function updateOrderStatus(
     // Notificar al cliente vía Broadcast (sin RLS, entrega instantánea)
     if (updatedOrder.customer_id) {
       try {
-        const channel = supabase.channel(`customer_orders_${updatedOrder.customer_id}`);
-        await channel.send({
-          type: "broadcast",
-          event: "order_status_update",
-          payload: {
-            id: updatedOrder.id,
-            status: updatedOrder.status,
-            updated_at: updatedOrder.updated_at,
-            customer_id: updatedOrder.customer_id,
-            business_id: updatedOrder.business_id,
-            total: updatedOrder.total,
-          },
+        const channel = supabase.channel(`customer_orders_${updatedOrder.customer_id}`, {
+          config: { broadcast: { ack: true } },
         });
-        await supabase.removeChannel(channel);
+        channel.subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            const resp = await channel.send({
+              type: "broadcast",
+              event: "order_status_update",
+              payload: {
+                id: updatedOrder.id,
+                status: updatedOrder.status,
+                updated_at: updatedOrder.updated_at,
+                customer_id: updatedOrder.customer_id,
+                business_id: updatedOrder.business_id,
+                total: updatedOrder.total,
+              },
+            });
+            console.log("[updateOrderStatus] Broadcast sent response:", resp);
+            await supabase.removeChannel(channel);
+          }
+        });
       } catch (broadcastErr) {
         // No interrumpir si falla el broadcast
-        console.warn("[updateOrderStatus] Error enviando broadcast al cliente:", broadcastErr);
+        console.warn("[updateOrderStatus] Error devolviendo suscripción para broadcast al cliente:", broadcastErr);
       }
     }
 

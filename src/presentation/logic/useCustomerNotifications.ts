@@ -12,16 +12,22 @@ export function useCustomerNotifications(
 
   const subscriptionRef = useRef<any>(null);
   const isSubscribedRef = useRef(false);
+  const lastNotifiedStatusRef = useRef<Record<string, string>>({});
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptRef = useRef(0);
   const profileIdRef = useRef<string | null>(null);
   const onOrderUpdateRef = useRef(onOrderUpdate);
   const onInAppNotificationRef = useRef(onInAppNotification);
 
-  const [permissionStatus, setPermissionStatus] =
-    useState<NotificationPermission>(
-      "Notification" in window ? Notification.permission : "denied",
-    );
+  const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>("default");
+
+  useEffect(() => {
+    if ("Notification" in window) {
+      setPermissionStatus(Notification.permission);
+    } else {
+      setPermissionStatus("denied");
+    }
+  }, []);
 
   const [isConnected, setIsConnected] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
@@ -141,19 +147,27 @@ export function useCustomerNotifications(
 
     // Handler compartido para actualización de estado
     const handleOrderUpdate = (orderPayload: { id: string; status: string;[key: string]: unknown }) => {
+      const { id, status } = orderPayload;
+      if (lastNotifiedStatusRef.current[id] === status) {
+        return; // Esta actualización ya fue notificada, evitamos duplicados
+      }
+      lastNotifiedStatusRef.current[id] = status;
+
       onOrderUpdateRef.current?.();
       playNotificationSound();
       showBrowserNotification(orderPayload);
     };
 
     const subscription = supabase
-      .channel(`customer_orders_${profileId}`)
+      .channel(`customer_orders_${profileId}`, {
+        config: { broadcast: { ack: true } },
+      })
       // ── BROADCAST (canal principal, sin RLS) ─────────────────────────────
       .on(
         "broadcast",
         { event: "order_status_update" },
         ({ payload }) => {
-          console.log("[Customer] ✅ Actualización de pedido recibida:", payload);
+          console.log("[Customer] ✅ Actualización de pedido recibida (Broadcast):", payload);
           handleOrderUpdate(payload as { id: string; status: string });
         },
       )
@@ -161,20 +175,15 @@ export function useCustomerNotifications(
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "UPDATE",
           schema: "public",
           table: "orders",
           filter: `customer_id=eq.${profileId}`,
         },
         async (payload) => {
-          onOrderUpdateRef.current?.();
-
-          if (
-            payload.eventType === "UPDATE" &&
-            payload.old.status !== payload.new.status
-          ) {
-            playNotificationSound();
-            showBrowserNotification(payload.new);
+          console.log("[Customer] 📡 postgres_changes UPDATE recibido:", payload);
+          if (payload.new && payload.new.status) {
+            handleOrderUpdate(payload.new as { id: string; status: string });
           }
         },
       )
