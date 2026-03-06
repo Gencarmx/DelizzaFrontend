@@ -1,15 +1,34 @@
 import { useState, useEffect, useRef } from "react";
-import { ChevronLeft, Save, Loader2, Store, MapPin, Image as ImageIcon, Phone, Upload, X } from "lucide-react";
+import {
+  ChevronLeft,
+  Save,
+  Loader2,
+  Store,
+  MapPin,
+  Image as ImageIcon,
+  Phone,
+  Upload,
+  X,
+} from "lucide-react";
 import { useNavigate } from "react-router";
 import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
-import { getBusinessById, updateBusiness, uploadBusinessLogo, deleteBusinessLogo } from "@core/services/businessService";
+import {
+  getBusinessById,
+  updateBusiness,
+  uploadBusinessLogo,
+  deleteBusinessLogo,
+} from "@core/services/businessService";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-interface BusinessFormData {
-  name: string;
-  address: string;
-  logo_url: string;
-  phone_number: string;
-}
+const businessInfoSchema = z.object({
+  name: z.string().min(1, "El nombre del restaurante es obligatorio"),
+  address: z.string().optional(),
+  phone_number: z.string().optional(),
+});
+
+type BusinessInfoFormValues = z.infer<typeof businessInfoSchema>;
 
 export default function BusinessInfo() {
   const navigate = useNavigate();
@@ -18,29 +37,32 @@ export default function BusinessInfo() {
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [businessData, setBusinessData] = useState<BusinessFormData>({
-    name: "",
-    address: "",
-    logo_url: "",
-    phone_number: "",
-  });
-  const [originalData, setOriginalData] = useState<BusinessFormData>({
-    name: "",
-    address: "",
-    logo_url: "",
-    phone_number: "",
-  });
+
+  const [originalLogoUrl, setOriginalLogoUrl] = useState<string>("");
   const [imagePreview, setImagePreview] = useState<string>("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors: formErrors, isDirty },
+  } = useForm<BusinessInfoFormValues>({
+    resolver: zodResolver(businessInfoSchema),
+    defaultValues: {
+      name: "",
+      address: "",
+      phone_number: "",
+    },
+  });
+
+  const formValues = watch();
+
   useEffect(() => {
     loadBusinessInfo();
   }, [businessId]);
-
-  useEffect(() => {
-    setImagePreview(businessData.logo_url);
-  }, [businessData.logo_url]);
 
   const loadBusinessInfo = async () => {
     if (!businessId) {
@@ -52,14 +74,13 @@ export default function BusinessInfo() {
       const business = await getBusinessById(businessId);
 
       if (business) {
-        const formData: BusinessFormData = {
+        reset({
           name: business.name || "",
           address: business.address || "",
-          logo_url: business.logo_url || "",
           phone_number: business.phone || "",
-        };
-        setBusinessData(formData);
-        setOriginalData(formData);
+        });
+        setOriginalLogoUrl(business.logo_url || "");
+        setImagePreview(business.logo_url || "");
       }
     } catch (error) {
       console.error("Error loading business info:", error);
@@ -69,24 +90,17 @@ export default function BusinessInfo() {
     }
   };
 
-  const handleInputChange = (field: keyof BusinessFormData, value: string | boolean) => {
-    setBusinessData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      alert('Por favor selecciona un archivo de imagen válido');
+    if (!file.type.startsWith("image/")) {
+      alert("Por favor selecciona un archivo de imagen válido");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('La imagen no debe superar los 5MB');
+      alert("La imagen no debe superar los 5MB");
       return;
     }
 
@@ -101,42 +115,36 @@ export default function BusinessInfo() {
   const handleRemoveImage = () => {
     setSelectedFile(null);
     setImagePreview("");
-    handleInputChange('logo_url', "");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
   const handleCancel = () => {
-    setBusinessData(originalData);
+    reset(); // reset to default values (original data load)
     setSelectedFile(null);
-    setImagePreview(originalData.logo_url);
+    setImagePreview(originalLogoUrl);
     setIsEditing(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
-  const handleSave = async () => {
+  const onSubmit = async (data: BusinessInfoFormValues) => {
     if (!businessId) {
       alert("No se pudo identificar el negocio");
       return;
     }
 
-    if (!businessData.name.trim()) {
-      alert("El nombre del restaurante es obligatorio");
-      return;
-    }
-
     setSaving(true);
     try {
-      let logoUrl = businessData.logo_url;
+      let logoUrl = imagePreview;
 
       if (selectedFile) {
         setUploadingImage(true);
         try {
-          if (originalData.logo_url) {
-            await deleteBusinessLogo(originalData.logo_url);
+          if (originalLogoUrl) {
+            await deleteBusinessLogo(originalLogoUrl);
           }
 
           logoUrl = await uploadBusinessLogo(businessId, selectedFile);
@@ -149,6 +157,10 @@ export default function BusinessInfo() {
         } finally {
           setUploadingImage(false);
         }
+      } else if (imagePreview === "" && originalLogoUrl !== "") {
+        logoUrl = "";
+        // Optional: delete original logo if user explicitly removed it and didn't select a new one
+        // await deleteBusinessLogo(originalLogoUrl);
       }
 
       const updates: Partial<{
@@ -157,26 +169,34 @@ export default function BusinessInfo() {
         logo_url: string;
         phone: string;
       }> = {
-        name: businessData.name.trim(),
+        name: data.name.trim(),
       };
 
-      if (businessData.address.trim()) {
-        updates.address = businessData.address.trim();
+      if (data.address && data.address.trim()) {
+        updates.address = data.address.trim();
+      } else {
+        updates.address = "";
       }
 
-      if (logoUrl.trim()) {
-        updates.logo_url = logoUrl.trim();
-      }
+      updates.logo_url = logoUrl.trim();
 
-      if (businessData.phone_number.trim()) {
-        updates.phone = businessData.phone_number.trim();
+      if (data.phone_number && data.phone_number.trim()) {
+        updates.phone = data.phone_number.trim();
+      } else {
+        updates.phone = "";
       }
 
       await updateBusiness(businessId, updates);
 
-      const updatedData = { ...businessData, logo_url: logoUrl };
-      setBusinessData(updatedData);
-      setOriginalData(updatedData);
+      // Reset form to update isDirty state
+      reset({
+        name: updates.name,
+        address: updates.address,
+        phone_number: updates.phone,
+      });
+
+      setOriginalLogoUrl(logoUrl);
+      setImagePreview(logoUrl);
       setSelectedFile(null);
       setIsEditing(false);
       alert("Información actualizada correctamente");
@@ -190,11 +210,9 @@ export default function BusinessInfo() {
 
   const hasChanges = () => {
     return (
-      businessData.name !== originalData.name ||
-      businessData.address !== originalData.address ||
-      businessData.phone_number !== originalData.phone_number ||
+      isDirty ||
       selectedFile !== null ||
-      (businessData.logo_url !== originalData.logo_url && !selectedFile)
+      (imagePreview === "" && originalLogoUrl !== "")
     );
   };
 
@@ -226,7 +244,7 @@ export default function BusinessInfo() {
 
       <div className="p-4 max-w-2xl mx-auto pb-24 sm:pb-8">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="p-6 space-y-6">
+          <form className="p-6 space-y-6" onSubmit={handleSubmit(onSubmit)}>
             <div className="space-y-4">
               <div className="flex items-start gap-3">
                 <Store className="w-5 h-5 text-gray-500 dark:text-gray-400 mt-1" />
@@ -235,16 +253,26 @@ export default function BusinessInfo() {
                     Nombre del restaurante
                   </label>
                   {isEditing ? (
-                    <input
-                      type="text"
-                      value={businessData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                      placeholder="Nombre del restaurante"
-                    />
+                    <>
+                      <input
+                        type="text"
+                        {...register("name")}
+                        className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                          formErrors.name
+                            ? "border-red-300"
+                            : "border-gray-300 dark:border-gray-600"
+                        }`}
+                        placeholder="Nombre del restaurante"
+                      />
+                      {formErrors.name && (
+                        <span className="text-sm text-red-500 mt-1 block">
+                          {formErrors.name.message}
+                        </span>
+                      )}
+                    </>
                   ) : (
                     <p className="text-gray-900 dark:text-white text-lg">
-                      {businessData.name || "Sin nombre"}
+                      {formValues.name || "Sin nombre"}
                     </p>
                   )}
                 </div>
@@ -258,15 +286,14 @@ export default function BusinessInfo() {
                   </label>
                   {isEditing ? (
                     <textarea
-                      value={businessData.address}
-                      onChange={(e) => handleInputChange('address', e.target.value)}
+                      {...register("address")}
                       rows={3}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
                       placeholder="Dirección del restaurante"
                     />
                   ) : (
                     <p className="text-gray-900 dark:text-white">
-                      {businessData.address || "Sin dirección"}
+                      {formValues.address || "Sin dirección"}
                     </p>
                   )}
                 </div>
@@ -281,14 +308,13 @@ export default function BusinessInfo() {
                   {isEditing ? (
                     <input
                       type="tel"
-                      value={businessData.phone_number}
-                      onChange={(e) => handleInputChange('phone_number', e.target.value)}
+                      {...register("phone_number")}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                       placeholder="+52 999 999 9999"
                     />
                   ) : (
                     <p className="text-gray-900 dark:text-white">
-                      {businessData.phone_number || "Sin teléfono"}
+                      {formValues.phone_number || "Sin teléfono"}
                     </p>
                   )}
                 </div>
@@ -338,7 +364,9 @@ export default function BusinessInfo() {
                           className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                         >
                           <Upload className="w-4 h-4" />
-                          <span>{imagePreview ? 'Cambiar imagen' : 'Subir imagen'}</span>
+                          <span>
+                            {imagePreview ? "Cambiar imagen" : "Subir imagen"}
+                          </span>
                         </label>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                           Formatos: JPG, PNG, GIF. Tamaño máximo: 5MB
@@ -347,20 +375,22 @@ export default function BusinessInfo() {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {businessData.logo_url ? (
+                      {imagePreview ? (
                         <img
-                          src={businessData.logo_url}
+                          src={imagePreview}
                           alt="Logo del restaurante"
                           className="w-32 h-32 object-cover rounded-lg border-2 border-gray-200 dark:border-gray-600"
                           onError={(e) => {
-                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.style.display = "none";
                           }}
                         />
                       ) : (
                         <div className="flex items-center justify-center w-32 h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
                           <div className="text-center">
                             <ImageIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Sin logo</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Sin logo
+                            </p>
                           </div>
                         </div>
                       )}
@@ -374,6 +404,7 @@ export default function BusinessInfo() {
               {isEditing ? (
                 <div className="flex gap-3">
                   <button
+                    type="button"
                     onClick={handleCancel}
                     disabled={saving}
                     className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
@@ -381,14 +412,18 @@ export default function BusinessInfo() {
                     Cancelar
                   </button>
                   <button
-                    onClick={handleSave}
+                    type="submit"
                     disabled={saving || !hasChanges()}
                     className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {saving ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>{uploadingImage ? 'Subiendo imagen...' : 'Guardando...'}</span>
+                        <span>
+                          {uploadingImage
+                            ? "Subiendo imagen..."
+                            : "Guardando..."}
+                        </span>
                       </>
                     ) : (
                       <>
@@ -400,6 +435,7 @@ export default function BusinessInfo() {
                 </div>
               ) : (
                 <button
+                  type="button"
                   onClick={() => setIsEditing(true)}
                   className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-colors"
                 >
@@ -407,12 +443,13 @@ export default function BusinessInfo() {
                 </button>
               )}
             </div>
-          </div>
+          </form>
         </div>
 
         <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <p className="text-sm text-blue-800 dark:text-blue-300">
-            <strong>Nota:</strong> Los cambios en la información del negocio se reflejarán inmediatamente en la aplicación.
+            <strong>Nota:</strong> Los cambios en la información del negocio se
+            reflejarán inmediatamente en la aplicación.
           </p>
         </div>
       </div>

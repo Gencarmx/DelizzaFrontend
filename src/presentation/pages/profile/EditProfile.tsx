@@ -6,14 +6,17 @@ import { useEditProfileLogic } from "@presentation/logic";
 export default function EditProfile() {
   const navigate = useNavigate();
   const {
-    formData,
+    form: {
+      register,
+      handleSubmit,
+      formState: { errors: formErrors },
+    },
     isModalOpen,
     isSaving,
     saveMessage,
     imagePreview,
     fileInputRef,
     hasChanges,
-    handleChange,
     handleImageSelect,
     handleSave,
     confirmSave,
@@ -31,10 +34,12 @@ export default function EditProfile() {
           >
             <ChevronLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
           </button>
-          <h2 className="font-bold text-lg text-gray-900 dark:text-white">Editar perfil</h2>
+          <h2 className="font-bold text-lg text-gray-900 dark:text-white">
+            Editar perfil
+          </h2>
         </div>
         <button
-          onClick={handleSave}
+          onClick={handleSubmit(handleSave)}
           className="text-amber-400 font-semibold text-sm hover:text-amber-500 transition-colors"
         >
           Guardar
@@ -43,11 +48,13 @@ export default function EditProfile() {
 
       {/* Save Message */}
       {saveMessage && (
-        <div className={`mt-4 p-3 rounded-lg text-center text-sm font-medium ${
-          saveMessage.type === 'success'
-            ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800'
-            : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800'
-        }`}>
+        <div
+          className={`mt-4 p-3 rounded-lg text-center text-sm font-medium mx-4 ${
+            saveMessage.type === "success"
+              ? "bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800"
+              : "bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800"
+          }`}
+        >
           {saveMessage.text}
         </div>
       )}
@@ -73,86 +80,134 @@ export default function EditProfile() {
             <Camera className="w-4 h-4 text-white" strokeWidth={2} />
           </button>
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">Toca para cambiar foto</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+          Toca para cambiar foto
+        </p>
       </div>
 
       {/* Form Fields */}
-      <div className="flex flex-col gap-4">
+      <form
+        className="flex flex-col gap-4 px-4"
+        onSubmit={handleSubmit(handleSave)}
+      >
         {/* Name Field */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700">
+        <div
+          className={`bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border ${
+            formErrors.name
+              ? "border-red-300"
+              : "border-gray-100 dark:border-gray-700"
+          }`}
+        >
           <label className="flex items-center gap-3">
             <User className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
-            <div className="flex-1">
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Nombre completo</div>
+            <div className="flex-1 w-full">
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                Nombre completo
+              </div>
               <input
                 type="text"
-                value={formData.name}
-                onChange={(e) => handleChange("name", e.target.value)}
-                className="w-full text-sm font-medium text-gray-900 dark:text-white bg-transparent border-none outline-none"
+                {...register("name")}
+                className="w-full text-sm font-medium text-gray-900 dark:text-white bg-transparent border-none outline-none focus:ring-0 p-0"
                 placeholder="Ingresa tu nombre"
               />
             </div>
           </label>
         </div>
+        {formErrors.name && (
+          <p className="text-sm text-red-500 ml-4">{formErrors.name.message}</p>
+        )}
 
         {/* Email Field */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700">
+        <div
+          className={`bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border ${
+            formErrors.email
+              ? "border-red-300"
+              : "border-gray-100 dark:border-gray-700"
+          }`}
+        >
           <label className="flex items-center gap-3">
             <Mail className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
-            <div className="flex-1">
+            <div className="flex-1 w-full">
               <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                 Correo electrónico
               </div>
               <input
                 type="email"
-                value={formData.email}
-                onChange={(e) => handleChange("email", e.target.value)}
-                className="w-full text-sm font-medium text-gray-900 dark:text-white bg-transparent border-none outline-none"
+                {...register("email")}
+                className="w-full text-sm font-medium text-gray-900 dark:text-white bg-transparent border-none outline-none focus:ring-0 p-0 disabled:opacity-50"
                 placeholder="correo@ejemplo.com"
+                disabled // typically users can't edit email easily, but keeping it disabled as it was before or let hook handle it
               />
             </div>
           </label>
         </div>
+        {formErrors.email && (
+          <p className="text-sm text-red-500 ml-4">
+            {formErrors.email.message}
+          </p>
+        )}
 
         {/* Phone Field */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700">
+        <div
+          className={`bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border ${
+            formErrors.phone
+              ? "border-red-300"
+              : "border-gray-100 dark:border-gray-700"
+          }`}
+        >
           <label className="flex items-center gap-3">
             <Phone className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
-            <div className="flex-1">
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Teléfono</div>
+            <div className="flex-1 w-full">
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                Teléfono
+              </div>
               <input
                 type="tel"
-                value={formData.phone}
-                onChange={(e) => handleChange("phone", e.target.value)}
-                className="w-full text-sm font-medium text-gray-900 dark:text-white bg-transparent border-none outline-none"
+                {...register("phone")}
+                className="w-full text-sm font-medium text-gray-900 dark:text-white bg-transparent border-none outline-none focus:ring-0 p-0"
                 placeholder="+** 999 999 9999"
               />
             </div>
           </label>
         </div>
+        {formErrors.phone && (
+          <p className="text-sm text-red-500 ml-4">
+            {formErrors.phone.message}
+          </p>
+        )}
 
         {/* Birthdate Field */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700">
+        <div
+          className={`bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border ${
+            formErrors.birthdate
+              ? "border-red-300"
+              : "border-gray-100 dark:border-gray-700"
+          }`}
+        >
           <label className="flex items-center gap-3">
             <Calendar className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
-            <div className="flex-1">
+            <div className="flex-1 w-full">
               <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                 Fecha de nacimiento
               </div>
               <input
                 type="date"
-                value={formData.birthdate}
-                onChange={(e) => handleChange("birthdate", e.target.value)}
-                className="w-full text-sm font-medium text-gray-900 dark:text-white bg-transparent border-none outline-none"
+                {...register("birthdate")}
+                className="w-full text-sm font-medium text-gray-900 dark:text-white bg-transparent border-none outline-none focus:ring-0 p-0"
               />
             </div>
           </label>
         </div>
-      </div>
+        {formErrors.birthdate && (
+          <p className="text-sm text-red-500 ml-4">
+            {formErrors.birthdate.message}
+          </p>
+        )}
+      </form>
 
       {/* Change Warning */}
       {hasChanges && (
-        <div className="mt-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+        <div className="mt-4 mx-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
           <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
             <span className="font-semibold">Has realizado cambios.</span>{" "}
             Asegúrate de guardar tus modificaciones antes de salir.
@@ -161,7 +216,7 @@ export default function EditProfile() {
       )}
 
       {/* Info Message */}
-      <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4">
+      <div className="mt-6 mx-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4">
         <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
           <span className="font-semibold text-gray-800 dark:text-gray-200">
             Mantén tu información actualizada.

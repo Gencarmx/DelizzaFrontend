@@ -8,25 +8,30 @@ import {
   Check,
   Trash2,
   Edit2,
-X,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import { useAuth } from "@core/context";
 import { addressService, type Address } from "@core/services/addressService";
 import { supabase } from "@core/supabase/client";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-interface AddressFormData {
-  label: string;
-  line1: string;
-  line2: string;
-  city: string;
-  state: string;
-  postal_code: string;
-  country: string;
-  recipient_name: string;
-  phone: string;
-}
+const addressSchema = z.object({
+  label: z.string().min(1, "La etiqueta es requerida"),
+  line1: z.string().min(1, "La dirección es requerida"),
+  line2: z.string().optional(),
+  city: z.string().min(1, "La ciudad es requerida"),
+  state: z.string().min(1, "El estado es requerido"),
+  postal_code: z.string().optional(),
+  country: z.string().min(1, "El país es requerido"),
+  recipient_name: z.string().optional(),
+  phone: z.string().optional(),
+});
+
+type AddressFormValues = z.infer<typeof addressSchema>;
 
 const getIconForType = (type: string) => {
   switch (type.toLowerCase()) {
@@ -50,18 +55,27 @@ export default function SavedAddresses() {
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
-  const [formData, setFormData] = useState<AddressFormData>({
-    label: "",
-    line1: "",
-    line2: "",
-    city: "",
-    state: "",
-    postal_code: "",
-    country: "México",
-    recipient_name: "",
-    phone: "",
-  });
   const [saving, setSaving] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors: formErrors },
+  } = useForm<AddressFormValues>({
+    resolver: zodResolver(addressSchema),
+    defaultValues: {
+      label: "",
+      line1: "",
+      line2: "",
+      city: "",
+      state: "",
+      postal_code: "",
+      country: "México",
+      recipient_name: "",
+      phone: "",
+    },
+  });
 
   useEffect(() => {
     loadAddresses();
@@ -129,7 +143,7 @@ export default function SavedAddresses() {
           addresses.map((addr) => ({
             ...addr,
             is_default: addr.id === id,
-          }))
+          })),
         );
         setSelectedAddress(id);
       }
@@ -142,7 +156,7 @@ export default function SavedAddresses() {
   const handleOpenForm = (address?: Address) => {
     if (address) {
       setEditingAddress(address);
-      setFormData({
+      reset({
         label: address.label,
         line1: address.line1,
         line2: address.line2 || "",
@@ -155,7 +169,7 @@ export default function SavedAddresses() {
       });
     } else {
       setEditingAddress(null);
-      setFormData({
+      reset({
         label: "",
         line1: "",
         line2: "",
@@ -174,7 +188,7 @@ export default function SavedAddresses() {
   const handleCloseForm = () => {
     setShowForm(false);
     setEditingAddress(null);
-    setFormData({
+    reset({
       label: "",
       line1: "",
       line2: "",
@@ -187,8 +201,7 @@ export default function SavedAddresses() {
     });
   };
 
-  const handleSaveAddress = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: AddressFormValues) => {
     if (!user) return;
 
     setSaving(true);
@@ -206,31 +219,31 @@ export default function SavedAddresses() {
 
       if (editingAddress) {
         const updated = await addressService.updateAddress(editingAddress.id, {
-          label: formData.label,
-          line1: formData.line1,
-          line2: formData.line2 || null,
-          city: formData.city,
-          state: formData.state,
-          postal_code: formData.postal_code || null,
-          country: formData.country,
-          recipient_name: formData.recipient_name || null,
-          phone: formData.phone || null,
+          label: data.label,
+          line1: data.line1,
+          line2: data.line2 || null,
+          city: data.city,
+          state: data.state,
+          postal_code: data.postal_code || null,
+          country: data.country,
+          recipient_name: data.recipient_name || null,
+          phone: data.phone || null,
         });
         setAddresses(
-          addresses.map((addr) => (addr.id === updated.id ? updated : addr))
+          addresses.map((addr) => (addr.id === updated.id ? updated : addr)),
         );
       } else {
         const newAddress = await addressService.createAddress({
           profile_id: profile.id,
-          label: formData.label,
-          line1: formData.line1,
-          line2: formData.line2 || null,
-          city: formData.city,
-          state: formData.state,
-          postal_code: formData.postal_code || null,
-          country: formData.country,
-          recipient_name: formData.recipient_name || null,
-          phone: formData.phone || null,
+          label: data.label,
+          line1: data.line1,
+          line2: data.line2 || null,
+          city: data.city,
+          state: data.state,
+          postal_code: data.postal_code || null,
+          country: data.country,
+          recipient_name: data.recipient_name || null,
+          phone: data.phone || null,
           is_default: addresses.length === 0,
         });
         setAddresses([newAddress, ...addresses]);
@@ -328,7 +341,7 @@ export default function SavedAddresses() {
                         <button
                           onClick={() =>
                             setShowMenu(
-                              showMenu === address.id ? null : address.id
+                              showMenu === address.id ? null : address.id,
                             )
                           }
                           className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
@@ -431,21 +444,29 @@ export default function SavedAddresses() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveAddress} className="p-6 pb-24 space-y-4">
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              className="p-6 pb-24 space-y-4"
+            >
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Etiqueta
                 </label>
                 <input
                   type="text"
-                  value={formData.label}
-                  onChange={(e) =>
-                    setFormData({ ...formData, label: e.target.value })
-                  }
+                  {...register("label")}
                   placeholder="Ej: Casa, Trabajo, Casa de mamá"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 ${
+                    formErrors.label
+                      ? "border-red-300"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
                 />
+                {formErrors.label && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {formErrors.label.message}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -454,14 +475,19 @@ export default function SavedAddresses() {
                 </label>
                 <input
                   type="text"
-                  value={formData.line1}
-                  onChange={(e) =>
-                    setFormData({ ...formData, line1: e.target.value })
-                  }
+                  {...register("line1")}
                   placeholder="Ej: Av. Insurgentes 123"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 ${
+                    formErrors.line1
+                      ? "border-red-300"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
                 />
+                {formErrors.line1 && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {formErrors.line1.message}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -470,13 +496,19 @@ export default function SavedAddresses() {
                 </label>
                 <input
                   type="text"
-                  value={formData.line2}
-                  onChange={(e) =>
-                    setFormData({ ...formData, line2: e.target.value })
-                  }
+                  {...register("line2")}
                   placeholder="Ej: Col. Roma Norte, entre calles..."
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 ${
+                    formErrors.line2
+                      ? "border-red-300"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
                 />
+                {formErrors.line2 && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {formErrors.line2.message}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -486,14 +518,19 @@ export default function SavedAddresses() {
                   </label>
                   <input
                     type="text"
-                    value={formData.city}
-                    onChange={(e) =>
-                      setFormData({ ...formData, city: e.target.value })
-                    }
+                    {...register("city")}
                     placeholder="Ej: CDMX"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 ${
+                      formErrors.city
+                        ? "border-red-300"
+                        : "border-gray-300 dark:border-gray-600"
+                    }`}
                   />
+                  {formErrors.city && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {formErrors.city.message}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -502,14 +539,19 @@ export default function SavedAddresses() {
                   </label>
                   <input
                     type="text"
-                    value={formData.state}
-                    onChange={(e) =>
-                      setFormData({ ...formData, state: e.target.value })
-                    }
+                    {...register("state")}
                     placeholder="Ej: CDMX"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 ${
+                      formErrors.state
+                        ? "border-red-300"
+                        : "border-gray-300 dark:border-gray-600"
+                    }`}
                   />
+                  {formErrors.state && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {formErrors.state.message}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -519,13 +561,19 @@ export default function SavedAddresses() {
                 </label>
                 <input
                   type="text"
-                  value={formData.postal_code}
-                  onChange={(e) =>
-                    setFormData({ ...formData, postal_code: e.target.value })
-                  }
+                  {...register("postal_code")}
                   placeholder="Ej: 06700"
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 ${
+                    formErrors.postal_code
+                      ? "border-red-300"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
                 />
+                {formErrors.postal_code && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {formErrors.postal_code.message}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -534,13 +582,19 @@ export default function SavedAddresses() {
                 </label>
                 <input
                   type="text"
-                  value={formData.recipient_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, recipient_name: e.target.value })
-                  }
+                  {...register("recipient_name")}
                   placeholder="Ej: Juan Pérez"
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 ${
+                    formErrors.recipient_name
+                      ? "border-red-300"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
                 />
+                {formErrors.recipient_name && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {formErrors.recipient_name.message}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -549,13 +603,19 @@ export default function SavedAddresses() {
                 </label>
                 <input
                   type="tel"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
+                  {...register("phone")}
                   placeholder="Ej: 5512345678"
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 ${
+                    formErrors.phone
+                      ? "border-red-300"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
                 />
+                {formErrors.phone && (
+                  <p className="text-sm text-red-500 mt-1">
+                    {formErrors.phone.message}
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-3 pt-4">

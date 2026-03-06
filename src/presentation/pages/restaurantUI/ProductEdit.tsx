@@ -9,10 +9,23 @@ import type { SelectOption } from "@components/restaurant-ui/forms/Select";
 import {
   getProductById,
   updateProduct,
-  uploadProductImage
+  uploadProductImage,
 } from "@core/services/productService";
 import { getActiveProductCategories } from "@core/services/productCategoryService";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
+const productSchema = z.object({
+  name: z.string().min(1, "El nombre es requerido"),
+  category: z.string().min(1, "La categoría es requerida"),
+  price: z.number().positive("El precio debe ser mayor a 0"),
+  stock: z.number().min(0, "El stock debe ser mayor o igual a 0"),
+  description: z.string().min(1, "La descripción es requerida"),
+  status: z.enum(["active", "inactive"]),
+});
+
+type ProductFormValues = z.infer<typeof productSchema>;
 
 export default function ProductEdit() {
   const navigate = useNavigate();
@@ -24,19 +37,24 @@ export default function ProductEdit() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [businessId, setBusinessId] = useState<string>("");
   const [categories, setCategories] = useState<SelectOption[]>([
-    { value: "", label: "Selecciona una categoría" }
+    { value: "", label: "Selecciona una categoría" },
   ]);
+  const [generalError, setGeneralError] = useState("");
 
-  const [formData, setFormData] = useState({
-    name: "",
-    category: "",
-    price: "",
-    stock: "",
-    description: "",
-    status: "active",
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors: formErrors },
+  } = useForm<ProductFormValues>({
+    resolver: zodResolver(productSchema),
+    defaultValues: {
+      name: "",
+      category: "",
+      description: "",
+      status: "active",
+    },
   });
-
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Cargar categorías dinámicas
   useEffect(() => {
@@ -45,10 +63,10 @@ export default function ProductEdit() {
         const categoriesData = await getActiveProductCategories();
         const categoryOptions: SelectOption[] = [
           { value: "", label: "Selecciona una categoría" },
-          ...categoriesData.map(cat => ({
+          ...categoriesData.map((cat) => ({
             value: cat.id,
-            label: cat.name
-          }))
+            label: cat.name,
+          })),
         ];
         setCategories(categoryOptions);
       } catch (err) {
@@ -76,11 +94,11 @@ export default function ProductEdit() {
         }
 
         // Cargar datos del producto en el formulario
-        setFormData({
+        reset({
           name: product.name || "",
           category: product.category_id || "",
-          price: product.price?.toString() || "",
-          stock: product.stock?.toString() || "0",
+          price: product.price || ("" as unknown as number),
+          stock: product.stock ?? 0,
           description: product.description || "",
           status: product.active ? "active" : "inactive",
         });
@@ -97,19 +115,12 @@ export default function ProductEdit() {
     }
 
     loadProduct();
-  }, [productId, navigate]);
+  }, [productId, navigate, reset]);
 
   const statusOptions: SelectOption[] = [
     { value: "active", label: "Activo" },
     { value: "inactive", label: "Inactivo" },
   ];
-
-  const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: "" }));
-    }
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -128,42 +139,14 @@ export default function ProductEdit() {
     setImageFile(null);
   };
 
-  const validate = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = "El nombre es requerido";
-    }
-
-    if (!formData.category) {
-      newErrors.category = "La categoría es requerida";
-    }
-
-    if (!formData.price || parseFloat(formData.price) <= 0) {
-      newErrors.price = "El precio debe ser mayor a 0";
-    }
-
-    if (!formData.stock || parseInt(formData.stock) < 0) {
-      newErrors.stock = "El stock debe ser mayor o igual a 0";
-    }
-
-    if (!formData.description.trim()) {
-      newErrors.description = "La descripción es requerida";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validate() || !productId) {
+  const onSubmit = async (data: ProductFormValues) => {
+    if (!productId) {
       return;
     }
 
     try {
       setIsLoading(true);
+      setGeneralError("");
 
       let imageUrl = imagePreview;
 
@@ -182,12 +165,12 @@ export default function ProductEdit() {
         category_id: string | null;
         image_url?: string;
       } = {
-        name: formData.name.trim(),
-        description: formData.description.trim(),
-        price: parseFloat(formData.price),
-        active: formData.status === "active",
-        stock: parseInt(formData.stock) || 0,
-        category_id: formData.category || null,
+        name: data.name.trim(),
+        description: data.description.trim(),
+        price: data.price,
+        active: data.status === "active",
+        stock: data.stock || 0,
+        category_id: data.category || null,
       };
 
       // Solo actualizar image_url si cambió
@@ -202,10 +185,10 @@ export default function ProductEdit() {
       navigate("/restaurant/products");
     } catch (error) {
       console.error("Error actualizando producto:", error);
-      alert(
+      setGeneralError(
         error instanceof Error
           ? error.message
-          : "Error al actualizar el producto"
+          : "Error al actualizar el producto",
       );
     } finally {
       setIsLoading(false);
@@ -218,7 +201,9 @@ export default function ProductEdit() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Cargando producto...</p>
+          <p className="text-gray-600 dark:text-gray-400">
+            Cargando producto...
+          </p>
         </div>
       </div>
     );
@@ -244,8 +229,29 @@ export default function ProductEdit() {
         </div>
       </div>
 
+      {/* Error Message */}
+      {generalError && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 text-red-600 dark:text-red-400">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+                />
+              </svg>
+            </div>
+            <p className="text-red-800 dark:text-red-200 text-sm font-medium">
+              {generalError}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Form */}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
         {/* Image Upload */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700">
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">
@@ -294,28 +300,23 @@ export default function ProductEdit() {
           <Input
             label="Nombre del producto"
             placeholder="Ej: Hamburguesa Clásica"
-            value={formData.name}
-            onChange={(e) => handleChange("name", e.target.value)}
-            error={errors.name}
-            required
+            {...register("name")}
+            error={formErrors.name?.message}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Select
               label="Categoría"
               options={categories}
-              value={formData.category}
-              onChange={(e) => handleChange("category", e.target.value)}
-              error={errors.category}
-              required
+              {...register("category")}
+              error={formErrors.category?.message}
             />
 
             <Select
               label="Estado"
               options={statusOptions}
-              value={formData.status}
-              onChange={(e) => handleChange("status", e.target.value)}
-              required
+              {...register("status")}
+              error={formErrors.status?.message}
             />
           </div>
 
@@ -323,34 +324,29 @@ export default function ProductEdit() {
             <Input
               label="Precio"
               type="number"
+              step="any"
               placeholder="0.00"
-              value={formData.price}
-              onChange={(e) => handleChange("price", e.target.value)}
-              error={errors.price}
+              {...register("price", {valueAsNumber: true})}
+              error={formErrors.price?.message}
               helperText="Precio en pesos mexicanos"
-              required
             />
 
             <Input
               label="Stock disponible"
               type="number"
               placeholder="0"
-              value={formData.stock}
-              onChange={(e) => handleChange("stock", e.target.value)}
-              error={errors.stock}
+              {...register("stock", {valueAsNumber: true})}
+              error={formErrors.stock?.message}
               helperText="Cantidad disponible en inventario"
-              required
             />
           </div>
 
           <Textarea
             label="Descripción"
             placeholder="Describe el producto, ingredientes, características especiales..."
-            value={formData.description}
-            onChange={(e) => handleChange("description", e.target.value)}
-            error={errors.description}
+            {...register("description")}
+            error={formErrors.description?.message}
             rows={4}
-            required
           />
         </div>
 

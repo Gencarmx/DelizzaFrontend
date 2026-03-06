@@ -2,49 +2,79 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "@core/context/AuthContext";
 import { Eye, EyeOff } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+const loginSchema = z.object({
+  email: z
+    .string()
+    .min(1, "El correo es requerido")
+    .email("Formato de correo inválido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { signIn, signInWithGoogle, user, role, businessActive } = useAuth();
   const navigate = useNavigate();
 
+  const {
+    register,
+    handleSubmit,
+    formState: { errors: formErrors },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
   // Redirect if already logged in
   useEffect(() => {
-    console.log('🔐 [Login] Redirect check - user:', user?.id, 'role:', role, 'businessActive:', businessActive);
+    console.log(
+      "🔐 [Login] Redirect check - user:",
+      user?.id,
+      "role:",
+      role,
+      "businessActive:",
+      businessActive,
+    );
     if (user && role) {
       if (role === "owner") {
         // Wait until businessActive is resolved (not null)
         if (businessActive === null) {
-          console.log('🔐 [Login] Owner detected, waiting for businessActive to resolve...');
+          console.log(
+            "🔐 [Login] Owner detected, waiting for businessActive to resolve...",
+          );
           return;
         }
         if (businessActive === false) {
-          console.log('🔐 [Login] Redirecting to pending-approval');
+          console.log("🔐 [Login] Redirecting to pending-approval");
           navigate("/pending-approval", { replace: true });
         } else {
-          console.log('🔐 [Login] Redirecting to restaurant dashboard');
+          console.log("🔐 [Login] Redirecting to restaurant dashboard");
           navigate("/restaurant/dashboard", { replace: true });
         }
       } else if (role === "client") {
-        console.log('🔐 [Login] Redirecting to home');
+        console.log("🔐 [Login] Redirecting to home");
         navigate("/", { replace: true });
       }
     } else {
-      console.log('🔐 [Login] Missing user or role, staying on login page');
+      console.log("🔐 [Login] Missing user or role, staying on login page");
     }
   }, [user, role, businessActive, navigate]);
 
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: LoginFormValues) => {
     setError("");
     setLoading(true);
 
-    const { error } = await signIn(email, password);
+    const { error } = await signIn(data.email, data.password);
 
     if (error) {
       // Parse error message to provide user-friendly feedback
@@ -52,20 +82,36 @@ export default function Login() {
       const originalError = errorMessage.toLowerCase();
 
       // Check for invalid credentials
-      if (originalError.includes("invalid") && (originalError.includes("credentials") || originalError.includes("login"))) {
-        errorMessage = "❌ Correo electrónico o contraseña incorrectos. Por favor verifica tus datos.";
+      if (
+        originalError.includes("invalid") &&
+        (originalError.includes("credentials") ||
+          originalError.includes("login"))
+      ) {
+        errorMessage =
+          "❌ Correo electrónico o contraseña incorrectos. Por favor verifica tus datos.";
       }
       // Check for email not confirmed
-      else if (originalError.includes("email") && originalError.includes("confirm")) {
-        errorMessage = "❌ Por favor confirma tu correo electrónico antes de iniciar sesión.";
+      else if (
+        originalError.includes("email") &&
+        originalError.includes("confirm")
+      ) {
+        errorMessage =
+          "❌ Por favor confirma tu correo electrónico antes de iniciar sesión.";
       }
       // Check for user not found
-      else if (originalError.includes("user") && originalError.includes("not found")) {
-        errorMessage = `❌ No existe una cuenta con el correo "${email}". Por favor regístrate primero.`;
+      else if (
+        originalError.includes("user") &&
+        originalError.includes("not found")
+      ) {
+        errorMessage = `❌ No existe una cuenta con el correo "${data.email}". Por favor regístrate primero.`;
       }
       // Generic network error
-      else if (originalError.includes("failed to fetch") || originalError.includes("network")) {
-        errorMessage = "❌ Error de conexión. Por favor verifica tu conexión a internet e intenta nuevamente.";
+      else if (
+        originalError.includes("failed to fetch") ||
+        originalError.includes("network")
+      ) {
+        errorMessage =
+          "❌ Error de conexión. Por favor verifica tu conexión a internet e intenta nuevamente.";
       }
       // Keep original error if we can't parse it, but add emoji
       else if (!errorMessage.startsWith("❌")) {
@@ -91,65 +137,60 @@ export default function Login() {
     }
   };
 
-  /*
-    const handleFacebookLogin = async () => {
-      setError("");
-      setLoading(true);
-      const { error } = await signInWithFacebook();
-      if (error) {
-        setError(`❌ Error al iniciar sesión con Facebook: ${error.message}`);
-        setLoading(false);
-      }
-    };
-  */
-
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
       <div className="pt-16 pb-8 px-6">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">
-          Hola de nuevo
-        </h1>
-        <p className="text-gray-500 text-base">
-          Inicia sesión para continuar
-        </p>
+        <h1 className="text-4xl font-bold text-gray-900 mb-2">Hola de nuevo</h1>
+        <p className="text-gray-500 text-base">Inicia sesión para continuar</p>
       </div>
 
       {/* Form */}
       <div className="flex-1 px-6">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
           {/* Email Input */}
           <div className="flex flex-col gap-2">
-            <label htmlFor="email" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="email"
+              className="text-sm font-medium text-gray-700"
+            >
               Correo electrónico
             </label>
             <input
               id="email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              {...register("email")}
               placeholder="ejemplo@correo.com"
-              required
               autoComplete="email"
-              className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+              className={`w-full px-4 py-3.5 bg-gray-50 border rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all ${
+                formErrors.email ? "border-red-300" : "border-gray-200"
+              }`}
             />
+            {formErrors.email && (
+              <span className="text-sm text-red-500">
+                {formErrors.email.message}
+              </span>
+            )}
           </div>
 
           {/* Password Input */}
           <div className="flex flex-col gap-2">
-            <label htmlFor="password" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="password"
+              className="text-sm font-medium text-gray-700"
+            >
               Contraseña
             </label>
             <div className="relative">
               <input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                {...register("password")}
                 placeholder="••••••••"
-                required
                 autoComplete="current-password"
-                className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all pr-12"
+                className={`w-full px-4 py-3.5 bg-gray-50 border rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all pr-12 ${
+                  formErrors.password ? "border-red-300" : "border-gray-200"
+                }`}
               />
               <button
                 type="button"
@@ -163,6 +204,11 @@ export default function Login() {
                 )}
               </button>
             </div>
+            {formErrors.password && (
+              <span className="text-sm text-red-500">
+                {formErrors.password.message}
+              </span>
+            )}
           </div>
 
           {/* Forgot Password */}
@@ -227,20 +273,6 @@ export default function Login() {
             </svg>
             Continuar con Google
           </button>
-
-          {/* 
-          <button
-            type="button"
-            onClick={handleFacebookLogin}
-            disabled={loading}
-            className="w-full bg-white border border-gray-200 text-gray-700 font-medium py-3.5 rounded-xl shadow-sm hover:bg-gray-50 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-            </svg>
-            Continuar con Facebook
-          </button>
-          */}
         </div>
 
         {/* Sign Up Link */}

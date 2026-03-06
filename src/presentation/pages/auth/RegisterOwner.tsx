@@ -2,16 +2,39 @@ import { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "@core/context/AuthContext";
 import { Eye, EyeOff, Upload, Image as ImageIcon, X } from "lucide-react";
-import { getBusinessByOwner, uploadBusinessLogo, updateBusiness } from "@core/services/businessService";
+import {
+  getBusinessByOwner,
+  uploadBusinessLogo,
+  updateBusiness,
+} from "@core/services/businessService";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+const registerOwnerSchema = z
+  .object({
+    fullName: z.string().min(2, "El nombre completo es requerido"),
+    email: z.email("Formato de correo inválido"),
+    password: z
+      .string()
+      .min(6, "La contraseña debe tener al menos 6 caracteres"),
+    confirmPassword: z.string(),
+    businessName: z.string().min(2, "El nombre del restaurante es requerido"),
+    businessAddress: z
+      .string()
+      .min(5, "La dirección del restaurante es requerida"),
+    phoneNumber: z
+      .string()
+      .min(10, "El número de teléfono debe tener al menos 10 dígitos"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Las contraseñas no coinciden",
+    path: ["confirmPassword"],
+  });
+
+type RegisterOwnerFormValues = z.infer<typeof registerOwnerSchema>;
 
 export default function RegisterOwner() {
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [businessName, setBusinessName] = useState("");
-  const [businessAddress, setBusinessAddress] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
   const [restaurantPhoto, setRestaurantPhoto] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -22,19 +45,25 @@ export default function RegisterOwner() {
   const { signUpOwner, user } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors: formErrors },
+  } = useForm<RegisterOwnerFormValues>({
+    resolver: zodResolver(registerOwnerSchema),
+    defaultValues: {
+      fullName: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      businessName: "",
+      businessAddress: "",
+      phoneNumber: "",
+    },
+  });
+
+  const onSubmit = async (data: RegisterOwnerFormValues) => {
     setError("");
-
-    if (password !== confirmPassword) {
-      setError("Las contraseñas no coinciden");
-      return;
-    }
-
-    if (password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres");
-      return;
-    }
 
     if (!restaurantPhoto) {
       setError("Debe subir una foto del restaurante");
@@ -44,45 +73,54 @@ export default function RegisterOwner() {
     setLoading(true);
 
     const { error: signUpError, userId: newUserId } = await signUpOwner(
-      email,
-      password,
-      fullName,
-      businessName,
-      businessAddress,
-      phoneNumber
+      data.email,
+      data.password,
+      data.fullName,
+      data.businessName,
+      data.businessAddress,
+      data.phoneNumber,
     );
 
     if (signUpError) {
       let errorMessage = signUpError.message;
       const originalError = errorMessage.toLowerCase();
 
-      if (originalError.includes("user already registered") ||
-        (originalError.includes("email") && originalError.includes("already"))) {
-        errorMessage = `❌ El correo electrónico "${email}" ya está registrado. Por favor usa otro correo o inicia sesión.`;
-      }
-      else if (originalError.includes("users_phone_number_key") ||
-        (originalError.includes("phone") && originalError.includes("duplicate"))) {
-        errorMessage = `❌ El número de teléfono "${phoneNumber}" ya está registrado. Por favor usa otro número.`;
-      }
-      else if (originalError.includes("duplicate") &&
-        (originalError.includes("email") || originalError.includes("phone"))) {
+      if (
+        originalError.includes("user already registered") ||
+        (originalError.includes("email") && originalError.includes("already"))
+      ) {
+        errorMessage = `❌ El correo electrónico "${data.email}" ya está registrado. Por favor usa otro correo o inicia sesión.`;
+      } else if (
+        originalError.includes("users_phone_number_key") ||
+        (originalError.includes("phone") && originalError.includes("duplicate"))
+      ) {
+        errorMessage = `❌ El número de teléfono "${data.phoneNumber}" ya está registrado. Por favor usa otro número.`;
+      } else if (
+        originalError.includes("duplicate") &&
+        (originalError.includes("email") || originalError.includes("phone"))
+      ) {
         const duplicatedFields = [];
-        if (originalError.includes("email")) duplicatedFields.push(`correo "${email}"`);
-        if (originalError.includes("phone")) duplicatedFields.push(`teléfono "${phoneNumber}"`);
+        if (originalError.includes("email"))
+          duplicatedFields.push(`correo "${data.email}"`);
+        if (originalError.includes("phone"))
+          duplicatedFields.push(`teléfono "${data.phoneNumber}"`);
 
         if (duplicatedFields.length > 0) {
           errorMessage = `❌ Los siguientes datos ya están registrados: ${duplicatedFields.join(" y ")}. Por favor usa otros datos.`;
         } else {
-          errorMessage = "❌ Algunos datos ya están registrados. Por favor verifica el correo y número de teléfono.";
+          errorMessage =
+            "❌ Algunos datos ya están registrados. Por favor verifica el correo y número de teléfono.";
         }
-      }
-      else if (originalError.includes("database error")) {
-        errorMessage = "❌ Error al crear la cuenta. Por favor verifica que el correo y número de teléfono no estén ya registrados.";
-      }
-      else if (originalError.includes("failed to fetch") || originalError.includes("network")) {
-        errorMessage = "❌ Error de conexión. Por favor verifica tu conexión a internet e intenta nuevamente.";
-      }
-      else if (!errorMessage.startsWith("❌")) {
+      } else if (originalError.includes("database error")) {
+        errorMessage =
+          "❌ Error al crear la cuenta. Por favor verifica que el correo y número de teléfono no estén ya registrados.";
+      } else if (
+        originalError.includes("failed to fetch") ||
+        originalError.includes("network")
+      ) {
+        errorMessage =
+          "❌ Error de conexión. Por favor verifica tu conexión a internet e intenta nuevamente.";
+      } else if (!errorMessage.startsWith("❌")) {
         errorMessage = `❌ ${errorMessage}`;
       }
 
@@ -94,12 +132,15 @@ export default function RegisterOwner() {
         if (ownerUserId && restaurantPhoto) {
           const business = await getBusinessByOwner(ownerUserId);
           if (business) {
-            const logoUrl = await uploadBusinessLogo(business.id, restaurantPhoto);
+            const logoUrl = await uploadBusinessLogo(
+              business.id,
+              restaurantPhoto,
+            );
             await updateBusiness(business.id, { logo_url: logoUrl });
           }
         }
       } catch (uploadError) {
-        console.error('Error subiendo logo del restaurante:', uploadError);
+        console.error("Error subiendo logo del restaurante:", uploadError);
       }
 
       navigate("/pending-approval");
@@ -110,13 +151,13 @@ export default function RegisterOwner() {
     const file = e.target.files?.[0] || null;
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      setError('Por favor selecciona un archivo de imagen válido');
+    if (!file.type.startsWith("image/")) {
+      setError("Por favor selecciona un archivo de imagen válido");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setError('La imagen del restaurante no debe superar los 5MB');
+      setError("La imagen del restaurante no debe superar los 5MB");
       return;
     }
 
@@ -152,53 +193,72 @@ export default function RegisterOwner() {
 
       {/* Form */}
       <div className="flex-1 px-6 pb-8">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
           {/* Full Name Input */}
           <div className="flex flex-col gap-2">
-            <label htmlFor="fullName" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="fullName"
+              className="text-sm font-medium text-gray-700"
+            >
               Nombre completo
             </label>
             <input
               id="fullName"
               type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              {...register("fullName")}
               placeholder="Juan Pérez"
-              required
-              className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+              className={`w-full px-4 py-3.5 bg-gray-50 border rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all ${
+                formErrors.fullName ? "border-red-300" : "border-gray-200"
+              }`}
             />
+            {formErrors.fullName && (
+              <span className="text-sm text-red-500">
+                {formErrors.fullName.message}
+              </span>
+            )}
           </div>
 
           {/* Email Input */}
           <div className="flex flex-col gap-2">
-            <label htmlFor="email" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="email"
+              className="text-sm font-medium text-gray-700"
+            >
               Correo electrónico
             </label>
             <input
               id="email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              {...register("email")}
               placeholder="ejemplo@correo.com"
-              required
-              className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+              className={`w-full px-4 py-3.5 bg-gray-50 border rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all ${
+                formErrors.email ? "border-red-300" : "border-gray-200"
+              }`}
             />
+            {formErrors.email && (
+              <span className="text-sm text-red-500">
+                {formErrors.email.message}
+              </span>
+            )}
           </div>
 
           {/* Password Input */}
           <div className="flex flex-col gap-2">
-            <label htmlFor="password" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="password"
+              className="text-sm font-medium text-gray-700"
+            >
               Contraseña
             </label>
             <div className="relative">
               <input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                {...register("password")}
                 placeholder="••••••••"
-                required
-                className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all pr-12"
+                className={`w-full px-4 py-3.5 bg-gray-50 border rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all pr-12 ${
+                  formErrors.password ? "border-red-300" : "border-gray-200"
+                }`}
               />
               <button
                 type="button"
@@ -212,22 +272,32 @@ export default function RegisterOwner() {
                 )}
               </button>
             </div>
+            {formErrors.password && (
+              <span className="text-sm text-red-500">
+                {formErrors.password.message}
+              </span>
+            )}
           </div>
 
           {/* Confirm Password Input */}
           <div className="flex flex-col gap-2">
-            <label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="confirmPassword"
+              className="text-sm font-medium text-gray-700"
+            >
               Confirmar contraseña
             </label>
             <div className="relative">
               <input
                 id="confirmPassword"
                 type={showConfirmPassword ? "text" : "password"}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                {...register("confirmPassword")}
                 placeholder="••••••••"
-                required
-                className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all pr-12"
+                className={`w-full px-4 py-3.5 bg-gray-50 border rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all pr-12 ${
+                  formErrors.confirmPassword
+                    ? "border-red-300"
+                    : "border-gray-200"
+                }`}
               />
               <button
                 type="button"
@@ -241,54 +311,85 @@ export default function RegisterOwner() {
                 )}
               </button>
             </div>
+            {formErrors.confirmPassword && (
+              <span className="text-sm text-red-500">
+                {formErrors.confirmPassword.message}
+              </span>
+            )}
           </div>
 
           {/* Business Name Input */}
           <div className="flex flex-col gap-2">
-            <label htmlFor="businessName" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="businessName"
+              className="text-sm font-medium text-gray-700"
+            >
               Nombre del restaurante
             </label>
             <input
               id="businessName"
               type="text"
-              value={businessName}
-              onChange={(e) => setBusinessName(e.target.value)}
+              {...register("businessName")}
               placeholder="Mi Restaurante S.A."
-              required
-              className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+              className={`w-full px-4 py-3.5 bg-gray-50 border rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all ${
+                formErrors.businessName ? "border-red-300" : "border-gray-200"
+              }`}
             />
+            {formErrors.businessName && (
+              <span className="text-sm text-red-500">
+                {formErrors.businessName.message}
+              </span>
+            )}
           </div>
 
           {/* Business Address Input */}
           <div className="flex flex-col gap-2">
-            <label htmlFor="businessAddress" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="businessAddress"
+              className="text-sm font-medium text-gray-700"
+            >
               Dirección del restaurante
             </label>
             <input
               id="businessAddress"
               type="text"
-              value={businessAddress}
-              onChange={(e) => setBusinessAddress(e.target.value)}
+              {...register("businessAddress")}
               placeholder="Calle Principal 123, Ciudad"
-              required
-              className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+              className={`w-full px-4 py-3.5 bg-gray-50 border rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all ${
+                formErrors.businessAddress
+                  ? "border-red-300"
+                  : "border-gray-200"
+              }`}
             />
+            {formErrors.businessAddress && (
+              <span className="text-sm text-red-500">
+                {formErrors.businessAddress.message}
+              </span>
+            )}
           </div>
 
           {/* Phone Number Input */}
           <div className="flex flex-col gap-2">
-            <label htmlFor="phoneNumber" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="phoneNumber"
+              className="text-sm font-medium text-gray-700"
+            >
               Número de teléfono
             </label>
             <input
               id="phoneNumber"
               type="tel"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
+              {...register("phoneNumber")}
               placeholder="+1234567890"
-              required
-              className="w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+              className={`w-full px-4 py-3.5 bg-gray-50 border rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all ${
+                formErrors.phoneNumber ? "border-red-300" : "border-gray-200"
+              }`}
             />
+            {formErrors.phoneNumber && (
+              <span className="text-sm text-red-500">
+                {formErrors.phoneNumber.message}
+              </span>
+            )}
           </div>
 
           {/* Restaurant Photo Upload */}
@@ -330,15 +431,18 @@ export default function RegisterOwner() {
                   onChange={handlePhotoChange}
                   className="hidden"
                   id="restaurantPhoto"
-                  required={!restaurantPhoto}
                 />
                 <label
                   htmlFor="restaurantPhoto"
-                  className="inline-flex items-center gap-3 px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-all text-gray-600 font-medium w-full"
+                  className={`inline-flex items-center gap-3 px-4 py-3.5 bg-gray-50 border rounded-xl cursor-pointer hover:bg-gray-100 transition-all text-gray-600 font-medium w-full ${
+                    !restaurantPhoto && error.includes("foto")
+                      ? "border-red-300"
+                      : "border-gray-200"
+                  }`}
                 >
                   <Upload className="w-5 h-5 text-gray-400" />
                   <span>
-                    {imagePreview ? 'Cambiar foto' : 'Seleccionar archivo'}
+                    {imagePreview ? "Cambiar foto" : "Seleccionar archivo"}
                   </span>
                 </label>
                 <p className="text-xs text-gray-500 mt-2">
