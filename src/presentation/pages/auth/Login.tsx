@@ -9,7 +9,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signIn, signInWithGoogle, signInWithFacebook, user, role, businessActive } = useAuth();
+  const { signIn, signInWithGoogle, user, role, businessActive } = useAuth();
   const navigate = useNavigate();
 
   // Redirect if already logged in
@@ -91,15 +91,17 @@ export default function Login() {
     }
   };
 
-  const handleFacebookLogin = async () => {
-    setError("");
-    setLoading(true);
-    const { error } = await signInWithFacebook();
-    if (error) {
-      setError(`❌ Error al iniciar sesión con Facebook: ${error.message}`);
-      setLoading(false);
-    }
-  };
+  /*
+    const handleFacebookLogin = async () => {
+      setError("");
+      setLoading(true);
+      const { error } = await signInWithFacebook();
+      if (error) {
+        setError(`❌ Error al iniciar sesión con Facebook: ${error.message}`);
+        setLoading(false);
+      }
+    };
+  */
 
   return (
     <div className="min-h-screen bg-white flex flex-col">

@@ -12,7 +12,7 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signUp, signInWithGoogle, signInWithFacebook } = useAuth();
+  const { signUp, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,15 +99,17 @@ export default function Register() {
     }
   };
 
-  const handleFacebookLogin = async () => {
-    setError("");
-    setLoading(true);
-    const { error } = await signInWithFacebook();
-    if (error) {
-      setError(`❌ Error al registrarse con Facebook: ${error.message}`);
-      setLoading(false);
-    }
-  };
+  /*
+    const handleFacebookLogin = async () => {
+      setError("");
+      setLoading(true);
+      const { error } = await signInWithFacebook();
+      if (error) {
+        setError(`❌ Error al registrarse con Facebook: ${error.message}`);
+        setLoading(false);
+      }
+    };
+  */
 
   return (
     <div className="min-h-screen bg-white flex flex-col">

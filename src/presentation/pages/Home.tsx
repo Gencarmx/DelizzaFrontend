@@ -31,7 +31,7 @@ export default function Home() {
     allProducts: true
   });
   const [error, setError] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  // const scrollRef = useRef<HTMLDivElement>(null);
   const allProductsScrollRef = useRef<HTMLDivElement>(null);
 
   const filteredProducts = selectedCategory
@@ -167,13 +167,15 @@ export default function Home() {
     fetchData();
   }, []);
 
-  const scrollLeft = () => {
-    scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
-  };
-
-  const scrollRight = () => {
-    scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
-  };
+  /*
+    const scrollLeft = () => {
+      scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
+    };
+  
+    const scrollRight = () => {
+      scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
+    };
+  */
 
   const scrollAllProductsLeft = () => {
     allProductsScrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
