@@ -56,7 +56,7 @@ export function useEditProfileLogic() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Original data - stores initial values for change detection of image
-  const [originalImage, setOriginalImage] = useState<string | null>(null);
+  // const [originalImage, setOriginalImage] = useState<string | null>(null);
 
   // Effect: Load user profile data when component mounts or user changes
   useEffect(() => {
