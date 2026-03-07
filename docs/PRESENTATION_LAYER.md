@@ -469,6 +469,37 @@ export async function productsLoader() {
 - Change profile picture
 - Update contact details
 
+## 🧠 Logic Layer (`src/presentation/logic/`)
+
+La carpeta `src/presentation/logic/` contiene los archivos dedicados a la lógica necesaria para las funcionalidades de la aplicación dentro de la capa de presentación. Esta carpeta sirve para separar la lógica de negocio, la obtención de datos, la gestión de estado y la lógica específica de la vista de los componentes de la interfaz de usuario.
+
+### Propósito
+- Mantener una separación limpia entre la UI y la lógica.
+- Mejorar la reutilización y testabilidad del código.
+- Centralizar la lógica de negocio relacionada con la vista.
+- Seguir el Principio de Responsabilidad Única.
+
+### Tipos de Archivos
+1. **Hooks Personalizados**: Encapsulan lógica de fetching, gestión de formularios y efectos.
+2. **View Models**: Representan los datos y el comportamiento de vistas específicas.
+3. **Funciones de Servicio**: Utilidades para validación y cálculos UI.
+4. **Loaders**: Manejan la carga de datos para rutas específicas.
+
+### Convención de Nombres
+Los archivos de lógica para componentes de vista deben seguir la convención: `{ComponentName}Logic.ts`.
+
+**Ejemplos:**
+- `EditProfile.tsx` → `EditProfileLogic.ts`
+- `UserProfile.tsx` → `UserProfileLogic.ts`
+
+---
+
+## 📚 Related Documentation
+
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - Overall project architecture
+- [DATABASE_DOCUMENTATION.md](./DATABASE_DOCUMENTATION.md) - Database schema and RLS
+- [STATE_MANAGEMENT.md](./STATE_MANAGEMENT.md) - State management patterns
+
 **PaymentMethods** (`/payment-methods`):
 - Manage payment cards
 - Add new payment method
