@@ -1,282 +1,202 @@
-# 📚 Documentación Completa de Base de Datos
+# 📚 Documentación Completa de Base de Datos - Delizza
 
 **Proyecto:** Delizza - Plataforma de Delivery de Comida  
-**Fecha:** 2024  
-**Base de Datos:** Supabase (PostgreSQL)
+**Motor:** Supabase (PostgreSQL)  
+**Última Actualización:** Marzo 2026
 
 ---
 
 ## 📑 Tabla de Contenidos
 
-1. [Estructura de Tablas](#estructura-de-tablas)
-2. [Relaciones entre Tablas](#relaciones-entre-tablas)
-3. [Políticas RLS (Row Level Security)](#políticas-rls)
-4. [Triggers y Funciones](#triggers-y-funciones)
-5. [Índices y Optimizaciones](#índices-y-optimizaciones)
-6. [Constraints y Validaciones](#constraints-y-validaciones)
-7. [Guía de Uso](#guía-de-uso)
+1. [Estructura de Tablas](#1-estructura-de-tablas)
+2. [Relaciones (Llaves Foráneas)](#2-relaciones-llaves-foráneas)
+3. [Triggers y Funciones](#3-triggers-y-funciones)
+4. [Políticas de Seguridad (RLS)](#4-políticas-de-seguridad-rls)
 
 ---
 
 ## 1. Estructura de Tablas
 
-### 1.1 `profiles` - Perfiles de Usuario
+### 1.1 `profiles` (Perfiles de Usuario)
+| Columna | Tipo | Nulo | Valor por Defecto |
+|---------|------|------|--------------------|
+| `id` | uuid | NO | `gen_random_uuid()` |
+| `user_id` | uuid | YES | |
+| `phone_number` | varchar | YES | |
+| `full_name` | varchar | YES | |
+| `user_role` | text | YES | |
+| `active` | boolean | YES | `true` |
+| `created_at` | timestamptz | YES | `now()` |
+| `updated_at` | timestamptz | YES | `now()` |
 
-**Propósito:** Almacena información de todos los usuarios del sistema.
+### 1.2 `businesses` (Negocios/Restaurantes)
+| Columna | Tipo | Nulo | Valor por Defecto |
+|---------|------|------|--------------------|
+| `id` | uuid | NO | `gen_random_uuid()` |
+| `owner_id` | uuid | NO | |
+| `owner_user_id` | uuid | YES | |
+| `name` | varchar | NO | |
+| `logo_url` | text | YES | |
+| `address` | text | YES | |
+| `phone` | text | YES | |
+| `active` | boolean | YES | `true` |
+| `created_at` | timestamptz | YES | `now()` |
+| `updated_at` | timestamptz | YES | `now()` |
 
-| Columna | Tipo | Descripción | Constraints |
-|---------|------|-------------|-------------|
-| `id` | uuid | ID único del perfil | PRIMARY KEY |
-| `user_id` | uuid | Referencia a auth.users | UNIQUE, FK → auth.users |
-| `full_name` | text | Nombre completo | NOT NULL |
-| `phone_number` | text | Número de teléfono | UNIQUE |
-| `user_role` | text | Rol del usuario (client, owner, driver, seller) | NOT NULL |
-| `active` | boolean | Estado del perfil | NOT NULL, DEFAULT true |
-| `created_at` | timestamp | Fecha de creación | DEFAULT now() |
-| `updated_at` | timestamp | Última actualización | DEFAULT now() |
+### 1.3 `products` (Platillos/Productos)
+| Columna | Tipo | Nulo | Valor por Defecto |
+|---------|------|------|-------------------|
+| `id` | uuid | NO | `gen_random_uuid()` |
+| `business_id` | uuid | NO | |
+| `category_id` | uuid | NO | |
+| `name` | varchar | NO | |
+| `description` | text | YES | |
+| `price` | numeric | NO | |
+| `stock` | integer | NO | `0` |
+| `image_url` | text | YES | |
+| `active` | boolean | YES | `true` |
+| `created_at` | timestamptz | YES | `now()` |
+| `updated_at` | timestamptz | YES | `now()` |
 
-**Roles Disponibles:**
-- `client` - Cliente que realiza pedidos
-- `owner` - Dueño de restaurante
-- `driver` - Repartidor
-- `seller` - Vendedor/empleado
+### 1.4 `product_categories` (Categorías)
+| Columna | Tipo | Nulo | Valor por Defecto |
+|---------|------|------|-------------------|
+| `id` | uuid | NO | `gen_random_uuid()` |
+| `name` | varchar | NO | |
+| `icon` | varchar | YES | |
+| `description` | text | YES | |
+| `sort_order` | integer | YES | `0` |
+| `active` | boolean | YES | `true` |
+| `created_at` | timestamptz | YES | `now()` |
+| `updated_at` | timestamptz | YES | `now()` |
 
----
+### 1.5 `orders` (Pedidos)
+| Columna | Tipo | Nulo | Valor por Defecto |
+|---------|------|------|-------------------|
+| `id` | uuid | NO | `gen_random_uuid()` |
+| `customer_id` | uuid | YES | |
+| `customer_name` | text | YES | |
+| `business_id` | uuid | YES | |
+| `assigned_driver_id` | uuid | YES | |
+| `delivery_type` | text | YES | |
+| `payment_method` | text | YES | |
+| `total` | numeric | NO | |
+| `status` | text | YES | |
+| `active` | boolean | YES | `true` |
+| `created_at` | timestamptz | YES | `now()` |
+| `updated_at` | timestamptz | YES | `now()` |
 
-### 1.2 `businesses` - Restaurantes/Negocios
+### 1.6 `order_items` (Detalle de Pedido)
+| Columna | Tipo | Nulo | Valor por Defecto |
+|---------|------|------|-------------------|
+| `id` | uuid | NO | `gen_random_uuid()` |
+| `order_id` | uuid | YES | |
+| `product_id` | uuid | YES | |
+| `product_name` | text | YES | |
+| `quantity` | integer | NO | |
+| `price` | numeric | NO | |
+| `active` | boolean | YES | `true` |
+| `created_at` | timestamptz | YES | `now()` |
+| `updated_at` | timestamptz | YES | `now()` |
 
-**Propósito:** Almacena información de los restaurantes.
+### 1.7 `addresses` (Direcciones de Clientes)
+| Columna | Tipo | Nulo | Valor por Defecto |
+|---------|------|------|-------------------|
+| `id` | uuid | NO | `gen_random_uuid()` |
+| `profile_id` | uuid | NO | |
+| `label` | text | YES | |
+| `recipient_name` | text | YES | |
+| `phone` | text | YES | |
+| `line1` | text | NO | |
+| `line2` | text | YES | |
+| `city` | text | NO | `'Izamal'::text` |
+| `state` | text | YES | `'Yucatán'::text` |
+| `postal_code` | text | YES | `97460` |
+| `country` | text | NO | `'MX'::text` |
+| `is_default` | boolean | YES | `false` |
+| `created_at` | timestamptz | YES | `now()` |
+| `updated_at` | timestamptz | YES | `now()` |
 
-| Columna | Tipo | Descripción | Constraints |
-|---------|------|-------------|-------------|
-| `id` | uuid | ID único del negocio | PRIMARY KEY |
-| `owner_id` | uuid | ID del dueño | FK → profiles(id) |
-| `name` | text | Nombre del restaurante | NOT NULL |
-| `address` | text | Dirección | NOT NULL |
-| `phone` | text | Teléfono | UNIQUE, NOT NULL |
-| `logo_url` | text | URL del logo | |
-| `active` | boolean | Estado del negocio | NOT NULL, DEFAULT false |
-| `created_at` | timestamp | Fecha de creación | DEFAULT now() |
-| `updated_at` | timestamp | Última actualización | DEFAULT now() |
+### 1.8 `collaborators` (Colaboradores de Negocio)
+| Columna | Tipo | Nulo | Valor por Defecto |
+|---------|------|------|-------------------|
+| `id` | uuid | NO | `gen_random_uuid()` |
+| `user_id` | uuid | YES | |
+| `business_id` | uuid | YES | |
+| `role` | text | YES | |
+| `status` | text | YES | |
+| `invited_by` | uuid | YES | |
+| `active` | boolean | YES | `true` |
+| `created_at` | timestamptz | YES | `now()` |
+| `updated_at` | timestamptz | YES | `now()` |
 
-**Notas:**
-- `active = false` por defecto (requiere aprobación)
-- Un `owner` puede tener múltiples negocios
-- El teléfono debe ser único
-
----
-
-### 1.3 `products` - Productos
-
-**Propósito:** Almacena los productos/platillos de cada restaurante.
-
-| Columna | Tipo | Descripción | Constraints |
-|---------|------|-------------|-------------|
-| `id` | uuid | ID único del producto | PRIMARY KEY |
-| `business_id` | uuid | ID del restaurante | FK → businesses(id) |
-| `name` | text | Nombre del producto | NOT NULL |
-| `description` | text | Descripción | |
-| `price` | numeric | Precio | NOT NULL |
-| `image_url` | text | URL de la imagen | |
-| `stock` | integer | Cantidad en inventario | CHECK (stock >= 0) |
-| `active` | boolean | Estado del producto | NOT NULL, DEFAULT true |
-| `created_at` | timestamp | Fecha de creación | DEFAULT now() |
-| `updated_at` | timestamp | Última actualización | DEFAULT now() |
-
-**Notas:**
-- `stock` debe ser >= 0
-- Solo productos con `active = true` son visibles para clientes
-
----
-
-### 1.4 `product_categories` - Categorías de Productos
-
-**Propósito:** Categorías para organizar productos (Pizzas, Tacos, Bebidas, etc.).
-
-| Columna | Tipo | Descripción | Constraints |
-|---------|------|-------------|-------------|
-| `id` | uuid | ID único de categoría | PRIMARY KEY |
-| `name` | text | Nombre de la categoría | UNIQUE, NOT NULL |
-| `icon` | text | Emoji o icono | NOT NULL |
-| `sort_order` | integer | Orden de visualización | DEFAULT 0 |
-| `active` | boolean | Estado de la categoría | NOT NULL, DEFAULT true |
-| `created_at` | timestamp | Fecha de creación | DEFAULT now() |
-| `updated_at` | timestamp | Última actualización | DEFAULT now() |
-
----
-
-### 1.5 `orders` - Órdenes/Pedidos
-
-**Propósito:** Almacena los pedidos realizados por clientes.
-
-| Columna | Tipo | Descripción | Constraints |
-|---------|------|-------------|-------------|
-| `id` | uuid | ID único de la orden | PRIMARY KEY |
-| `customer_id` | uuid | ID del cliente | FK → profiles(id) |
-| `business_id` | uuid | ID del restaurante | FK → businesses(id) |
-| `assigned_driver_id` | uuid | ID del repartidor | FK → profiles(id) |
-| `status` | text | Estado del pedido | CHECK (valores específicos) |
-| `delivery_type` | text | Tipo de entrega | CHECK (PICKUP, DELIVERY) |
-| `delivery_address` | text | Dirección de entrega | |
-| `payment_method` | text | Método de pago | CHECK (CASH, CARD, TRANSFER) |
-| `subtotal` | numeric | Subtotal | NOT NULL |
-| `delivery_fee` | numeric | Costo de envío | DEFAULT 0 |
-| `total` | numeric | Total | NOT NULL |
-| `notes` | text | Notas especiales | |
-| `created_at` | timestamp | Fecha de creación | DEFAULT now() |
-| `updated_at` | timestamp | Última actualización | DEFAULT now() |
-
-**Estados de Orden:**
-- `PENDING` - Pendiente de confirmación
-- `CONFIRMED` - Confirmado por el restaurante
-- `PREPARING` - En preparación
-- `READY` - Listo para recoger/entregar
-- `IN_DELIVERY` - En camino
-- `DELIVERED` - Entregado
-- `CANCELLED` - Cancelado
-
-**Tipos de Entrega:**
-- `PICKUP` - Recoger en restaurante
-- `DELIVERY` - Envío a domicilio
-
-**Métodos de Pago:**
-- `CASH` - Efectivo
-- `CARD` - Tarjeta
-- `TRANSFER` - Transferencia
-
----
-
-### 1.6 `order_items` - Items de Orden
-
-**Propósito:** Detalle de productos en cada orden.
-
-| Columna | Tipo | Descripción | Constraints |
-|---------|------|-------------|-------------|
-| `id` | uuid | ID único del item | PRIMARY KEY |
-| `order_id` | uuid | ID de la orden | FK → orders(id) CASCADE |
-| `product_id` | uuid | ID del producto | FK → products(id) |
-| `quantity` | integer | Cantidad | NOT NULL |
-| `unit_price` | numeric | Precio unitario | NOT NULL |
-| `subtotal` | numeric | Subtotal del item | NOT NULL |
-| `notes` | text | Notas especiales | |
+### 1.9 `business_hours` (Horarios)
+| Columna | Tipo | Nulo | Valor por Defecto |
+|---------|------|------|-------------------|
+| `id` | uuid | NO | `gen_random_uuid()` |
+| `business_id` | uuid | NO | |
+| `day_of_week` | smallint | NO | |
+| `open_time` | time | NO | |
+| `close_time` | time | NO | |
+| `active` | boolean | NO | `true` |
+| `created_at` | timestamptz | NO | `now()` |
+| `updated_at` | timestamptz | NO | `now()` |
 
 ---
 
-### 1.7 `business_hours` - Horarios de Negocio
+## 2. Relaciones (Llaves Foráneas)
 
-**Propósito:** Horarios de apertura/cierre de restaurantes.
-
-| Columna | Tipo | Descripción | Constraints |
-|---------|------|-------------|-------------|
-| `id` | uuid | ID único | PRIMARY KEY |
-| `business_id` | uuid | ID del restaurante | FK → businesses(id) CASCADE |
-| `day_of_week` | integer | Día de la semana (0-6) | CHECK (0-6) |
-| `open_time` | time | Hora de apertura | NOT NULL |
-| `close_time` | time | Hora de cierre | NOT NULL |
-| `active` | boolean | Estado del horario | NOT NULL, DEFAULT true |
-
-**Días de la Semana:**
-- 0 = Domingo
-- 1 = Lunes
-- 2 = Martes
-- 3 = Miércoles
-- 4 = Jueves
-- 5 = Viernes
-- 6 = Sábado
-
-**Constraint:** `open_time` debe ser menor que `close_time`
+| Tabla Origen | Columna Origen | Tabla Destino | Columna Destino | Nombre Relación |
+|--------------|----------------|---------------|-----------------|-----------------|
+| `addresses` | `profile_id` | `profiles` | `id` | `addresses_profile_id_fkey` |
+| `business_hours` | `business_id` | `businesses` | `id` | `fk_business_hours_business` |
+| `businesses` | `owner_id` | `profiles` | `id` | `businesses_owner_id_fkey` |
+| `collaborators` | `business_id` | `businesses` | `id` | `collaborators_bus_id_fkey` |
+| `collaborators` | `user_id` | `profiles` | `id` | `collaborators_user_id_fkey` |
+| `order_items` | `order_id` | `orders` | `id` | `order_items_order_id_fkey` |
+| `order_items` | `product_id` | `products` | `id` | `order_items_product_id_fkey` |
+| `orders` | `business_id` | `businesses` | `id` | `orders_business_id_fkey` |
+| `orders` | `customer_id` | `profiles` | `id` | `orders_customer_id_fkey` |
+| `products` | `business_id` | `businesses` | `id` | `products_business_id_fkey` |
+| `products` | `category_id` | `product_categories` | `id` | `products_category_id_fkey` |
 
 ---
 
-### 1.8 `collaborators` - Colaboradores
+## 3. Triggers y Funciones
 
-**Propósito:** Empleados/colaboradores de restaurantes.
+### Funciones SQL Destacadas
+- **`handle_new_user()`**: Trigger en `auth.users` que mapea usuarios de Google/Email a `public.profiles`.
+- **`handle_new_business()`**: Crea automáticamente una entrada en `businesses` cuando un perfil con rol 'owner' es creado.
+- **`get_my_profile_id()`**: Función auxiliar para obtener el ID del perfil basado en `auth.uid()`.
 
-| Columna | Tipo | Descripción | Constraints |
-|---------|------|-------------|-------------|
-| `id` | uuid | ID único | PRIMARY KEY |
-| `business_id` | uuid | ID del restaurante | FK → businesses(id) |
-| `user_id` | uuid | ID del usuario | FK → profiles(id) |
-| `role` | text | Rol del colaborador | CHECK (owner, seller) |
-| `status` | text | Estado | CHECK (active, inactive, pending) |
-| `invited_by` | uuid | Quién invitó | FK → profiles(id) |
-| `active` | boolean | Estado activo | NOT NULL, DEFAULT true |
-| `created_at` | timestamp | Fecha de creación | DEFAULT now() |
-
-**Roles de Colaborador:**
-- `owner` - Dueño
-- `seller` - Vendedor/empleado
-
-**Estados:**
-- `active` - Activo
-- `inactive` - Inactivo
-- `pending` - Pendiente de aceptación
+### Triggers Implementados
+| Tabla | Nombre | Evento | Acción |
+|-------|--------|--------|--------|
+| `addresses` | `trg_addresses_updated` | BEFORE UPDATE | Setea `updated_at = now()` |
+| `profiles` | `trigger_handle_new_business` | AFTER INSERT | Ejecuta `handle_new_business()` |
+| `product_categories`| `trigger_update_updated_at` | BEFORE UPDATE | Setea `updated_at = now()` |
 
 ---
 
-### 1.9 `payments` - Pagos
+## 4. Políticas de Seguridad (RLS)
 
-**Propósito:** Registro de pagos de órdenes.
+### 4.1 Políticas de `addresses`
+- **SELECT**: Usuarios ven sus direcciones. Owners ven direcciones de clientes en sus pedidos.
+- **INSERT/UPDATE/DELETE**: Solo el dueño de la dirección.
 
-| Columna | Tipo | Descripción | Constraints |
-|---------|------|-------------|-------------|
-| `id` | uuid | ID único | PRIMARY KEY |
-| `order_id` | uuid | ID de la orden | FK → orders(id) CASCADE |
-| `amount` | numeric | Monto | NOT NULL |
-| `method` | text | Método de pago | CHECK (CASH, CARD, TRANSFER) |
-| `status` | text | Estado del pago | CHECK (PENDING, COMPLETED, FAILED) |
-| `transaction_id` | text | ID de transacción | |
-| `created_at` | timestamp | Fecha de creación | DEFAULT now() |
+### 4.2 Políticas de `businesses`
+- **SELECT**: Público ve activos. Owners ven sus propios negocios.
+- **INSERT/UPDATE/DELETE**: Propietarios autenticados (Owners).
 
----
+### 4.3 Políticas de `products`
+- **SELECT**: Público ve activos. Owners ven sus productos.
+- **INSERT/UPDATE/DELETE**: Owners y Colaboradores activos del negocio.
 
-## 2. Relaciones entre Tablas
+### 4.4 Políticas de `orders`
+- **INSERT**: Clientes autenticados.
+- **SELECT**: Clientes ven sus pedidos. Owners ven pedidos de su negocio. Repartidores ven sus asignados.
+- **UPDATE**: Owners y Repartidores (solo estados permitidos).
 
-### Diagrama de Relaciones
-
-```
-profiles (usuarios)
-    ├─→ businesses (owner_id)
-    │       ├─→ products (business_id)
-    │       ├─→ business_hours (business_id)
-    │       ├─→ orders (business_id)
-    │       └─→ collaborators (business_id)
-    │
-    ├─→ orders (customer_id)
-    │       ├─→ order_items (order_id)
-    │       └─→ payments (order_id)
-    │
-    ├─→ orders (assigned_driver_id)
-    └─→ collaborators (user_id, invited_by)
-
-product_categories
-    └─→ (relación futura con products)
-```
-
-### Relaciones Detalladas
-
-| Tabla Origen | Columna | Tabla Destino | Columna | ON DELETE |
-|--------------|---------|---------------|---------|-----------|
-| profiles | user_id | auth.users | id | CASCADE |
-| businesses | owner_id | profiles | id | NO ACTION |
-| products | business_id | businesses | id | NO ACTION |
-| business_hours | business_id | businesses | id | CASCADE |
-| orders | customer_id | profiles | id | NO ACTION |
-| orders | business_id | businesses | id | NO ACTION |
-| orders | assigned_driver_id | profiles | id | NO ACTION |
-| order_items | order_id | orders | id | CASCADE |
-| order_items | product_id | products | id | NO ACTION |
-| payments | order_id | orders | id | CASCADE |
-| collaborators | business_id | businesses | id | NO ACTION |
-| collaborators | user_id | profiles | id | NO ACTION |
-| collaborators | invited_by | profiles | id | NO ACTION |
-
----
-
-## 3. Políticas RLS (Row Level Security)
-
-### 3.1 Políticas de `profiles`
-
-#### SELECT - Ver
----
-
+### 4.5 Políticas de `profiles`
+- **SELECT**: Público puede ver nombres básicos.
+- **UPDATE**: Solo el dueño del perfil.

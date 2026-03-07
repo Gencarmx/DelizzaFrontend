@@ -228,28 +228,19 @@ const columns = [
 - Mobile-first responsive design
 - Custom design system
 
-### Backend & Data
-- **Supabase 2.89.0** - Backend as a Service
-- **@supabase/supabase-js** - Supabase client
-- Authentication and database
-- Real-time subscriptions (prepared)
+### 2. Backend & Database (Supabase)
 
-### UI Components & Icons
-- **Lucide React 0.562.0** - Icon library
-- **Recharts 3.6.0** - Chart library for analytics
+La capa de persistencia y servicios externos se maneja a través de Supabase, que integra PostgreSQL, Auth y Storage.
 
-### PWA
-- **vite-plugin-pwa 1.1.0** - PWA plugin for Vite
-- **workbox-core & workbox-window** - Service worker utilities
-- Offline-first capabilities
-- Auto-update functionality
+**Estructura del Backend**:
+- **PostgreSQL**: Tablas relacionales con restricciones de integridad y triggers para automatización (como `handle_new_user`).
+- **RLS (Row Level Security)**: Políticas integradas en la base de datos que aseguran que los usuarios solo accedan a lo que les corresponde.
+- **Functions (RPC)**: Lógica compleja ejecutada directamente en el servidor (ej: cálculo de ventas top).
+- **Storage**: Buckets públicos para imágenes de productos y logos.
 
-## 🔐 Security Considerations
+Para más detalles, consulta la [Documentación de Base de Datos](./DATABASE_DOCUMENTATION.md).
 
-### Authentication
-- Supabase Auth handles secure authentication
-- JWT tokens managed by Supabase client
-- Row Level Security (RLS) policies on database
+**Independence**: This layer has no dependencies on React components or external libraries (except for necessary infrastructure like Supabase client).
 
 ### Data Validation
 - TypeScript provides compile-time type checking
