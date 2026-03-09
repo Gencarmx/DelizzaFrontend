@@ -5,7 +5,7 @@ import { type User, type Session, type AuthError } from "@supabase/supabase-js";
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  role: "owner" | "client" | null;
+  role: "owner" | "client" | "admin" | null;
   businessActive: boolean | null;
   loading: boolean;
   isAuthReady: boolean;
@@ -38,21 +38,21 @@ const ROLE_CACHE_KEY = "dlizza-role";
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [role, setRole] = useState<"owner" | "client" | null>(null);
+  const [role, setRole] = useState<"owner" | "client" | "admin" | null>(null);
   const [businessActive, setBusinessActive] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthReady, setIsAuthReady] = useState(false);
 
-  const getCachedRole = (userId: string): "owner" | "client" | null => {
+  const getCachedRole = (userId: string): "owner" | "client" | "admin" | null => {
     try {
       const cached = localStorage.getItem(`${ROLE_CACHE_KEY}-${userId}`);
-      return cached as "owner" | "client" | null;
+      return cached as "owner" | "client" | "admin" | null;
     } catch {
       return null;
     }
   };
 
-  const setCachedRole = (userId: string, userRole: "owner" | "client") => {
+  const setCachedRole = (userId: string, userRole: "owner" | "client" | "admin") => {
     try {
       localStorage.setItem(`${ROLE_CACHE_KEY}-${userId}`, userRole);
     } catch {
@@ -79,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    const fetchRole = async (userId: string, userMetadata?: Record<string, unknown>): Promise<"owner" | "client"> => {
+    const fetchRole = async (userId: string, userMetadata?: Record<string, unknown>): Promise<"owner" | "client" | "admin"> => {
       try {
         const { data, error } = await supabase
           .from("profiles")
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .maybeSingle();
 
         if (!error && data?.user_role) {
-          const userRole = data.user_role as "owner" | "client";
+          const userRole = data.user_role as "owner" | "client" | "admin";
           setCachedRole(userId, userRole);
           return userRole;
         }
@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (userMetadata?.user_role) {
-        const metadataRole = userMetadata.user_role as "owner" | "client";
+        const metadataRole = userMetadata.user_role as "owner" | "client" | "admin";
         setCachedRole(userId, metadataRole);
         return metadataRole;
       }

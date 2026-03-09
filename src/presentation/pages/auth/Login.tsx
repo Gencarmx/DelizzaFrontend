@@ -46,7 +46,10 @@ export default function Login() {
       businessActive,
     );
     if (user && role) {
-      if (role === "owner") {
+      if (role === "admin") {
+        console.log("🔐 [Login] Redirecting to admin dashboard");
+        navigate("/admin", { replace: true });
+      } else if (role === "owner") {
         // Wait until businessActive is resolved (not null)
         if (businessActive === null) {
           console.log(

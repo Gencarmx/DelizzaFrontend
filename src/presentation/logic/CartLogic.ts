@@ -163,5 +163,8 @@ export function useCartLogic() {
     handleDeliveryTypeChange,
     handleDistanceChange,
     handleCheckout,
+    
+    // Address UI
+    selectedAddress,
   };
 }

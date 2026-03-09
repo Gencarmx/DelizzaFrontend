@@ -27,6 +27,9 @@ export const ProtectedRoute = ({
   }
 
   if (role && !allowedRoles.includes(role)) {
+    if (role === "admin") {
+      return <Navigate to="/admin" replace />;
+    }
     if (role === "owner") {
       return <Navigate to="/restaurant/dashboard" replace />;
     }

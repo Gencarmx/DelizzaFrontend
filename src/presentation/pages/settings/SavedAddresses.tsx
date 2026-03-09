@@ -11,8 +11,9 @@ import {
   X,
 } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@core/context";
+import { useAddress } from "@core/context/AddressContext";
 import { addressService, type Address } from "@core/services/addressService";
 import { supabase } from "@core/supabase/client";
 import { useForm } from "react-hook-form";
@@ -49,9 +50,8 @@ const getIconForType = (type: string) => {
 export default function SavedAddresses() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
+  const { addresses, loading, selectedAddress, refreshAddresses } = useAddress();
+  
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
@@ -77,38 +77,6 @@ export default function SavedAddresses() {
     },
   });
 
-  useEffect(() => {
-    loadAddresses();
-  }, [user]);
-
-  const loadAddresses = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (profile) {
-        const data = await addressService.getAddressesByProfileId(profile.id);
-        setAddresses(data);
-        const defaultAddr = data.find((addr) => addr.is_default);
-        if (defaultAddr) {
-          setSelectedAddress(defaultAddr.id);
-        }
-      }
-    } catch (error) {
-      console.error("Error loading addresses:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDeleteAddress = async (id: string) => {
     if (!confirm("¿Estás seguro de que deseas eliminar esta dirección?")) {
       return;
@@ -116,10 +84,7 @@ export default function SavedAddresses() {
 
     try {
       await addressService.deleteAddress(id);
-      setAddresses(addresses.filter((addr) => addr.id !== id));
-      if (selectedAddress === id) {
-        setSelectedAddress(null);
-      }
+      await refreshAddresses();
       setShowMenu(null);
     } catch (error) {
       console.error("Error deleting address:", error);
@@ -139,13 +104,7 @@ export default function SavedAddresses() {
 
       if (profile) {
         await addressService.setDefaultAddress(id, profile.id);
-        setAddresses(
-          addresses.map((addr) => ({
-            ...addr,
-            is_default: addr.id === id,
-          })),
-        );
-        setSelectedAddress(id);
+        await refreshAddresses();
       }
     } catch (error) {
       console.error("Error setting default address:", error);
@@ -188,17 +147,7 @@ export default function SavedAddresses() {
   const handleCloseForm = () => {
     setShowForm(false);
     setEditingAddress(null);
-    reset({
-      label: "",
-      line1: "",
-      line2: "",
-      city: "",
-      state: "",
-      postal_code: "",
-      country: "México",
-      recipient_name: "",
-      phone: "",
-    });
+    reset();
   };
 
   const onSubmit = async (data: AddressFormValues) => {
@@ -218,7 +167,7 @@ export default function SavedAddresses() {
       }
 
       if (editingAddress) {
-        const updated = await addressService.updateAddress(editingAddress.id, {
+        await addressService.updateAddress(editingAddress.id, {
           label: data.label,
           line1: data.line1,
           line2: data.line2 || null,
@@ -229,11 +178,8 @@ export default function SavedAddresses() {
           recipient_name: data.recipient_name || null,
           phone: data.phone || null,
         });
-        setAddresses(
-          addresses.map((addr) => (addr.id === updated.id ? updated : addr)),
-        );
       } else {
-        const newAddress = await addressService.createAddress({
+        await addressService.createAddress({
           profile_id: profile.id,
           label: data.label,
           line1: data.line1,
@@ -246,12 +192,9 @@ export default function SavedAddresses() {
           phone: data.phone || null,
           is_default: addresses.length === 0,
         });
-        setAddresses([newAddress, ...addresses]);
-        if (addresses.length === 0) {
-          setSelectedAddress(newAddress.id);
-        }
       }
 
+      await refreshAddresses();
       handleCloseForm();
     } catch (error) {
       console.error("Error saving address:", error);
@@ -311,7 +254,8 @@ export default function SavedAddresses() {
       ) : (
         <div className="flex flex-col gap-4 mb-6">
           {addresses.map((address) => {
-            const Icon = getIconForType(address.label);
+            const Icon = getIconForType(address.label || "");
+            const isSelected = selectedAddress?.id === address.id || address.is_default;
             return (
               <div
                 key={address.id}
@@ -389,12 +333,12 @@ export default function SavedAddresses() {
                     >
                       <div
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                          selectedAddress === address.id
+                          isSelected
                             ? "border-amber-400 bg-amber-400"
                             : "border-gray-300 dark:border-gray-600"
                         }`}
                       >
-                        {selectedAddress === address.id && (
+                        {isSelected && (
                           <Check
                             className="w-3 h-3 text-white"
                             strokeWidth={3}

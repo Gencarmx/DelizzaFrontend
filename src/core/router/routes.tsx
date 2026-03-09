@@ -28,6 +28,8 @@ import {
   ProductEdit,
   Orders,
 } from "@presentation/pages/restaurantUI";
+import AdminDashboard from "@presentation/pages/adminProfileUI/AdminDashboard";
+import AdminBillingDashboard from "@presentation/pages/adminProfileUI/adminBillingDashboard";
 
 export const routes: RouteObject[] = [
   {
@@ -122,6 +124,22 @@ export const routes: RouteObject[] = [
         element: <NotFound />,
       },
     ],
+  },
+  {
+    path: "/admin",
+    element: (
+      <ProtectedRoute allowedRoles={["admin"]}>
+        <AdminDashboard />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/admin/billing",
+    element: (
+      <ProtectedRoute allowedRoles={["admin"]}>
+        <AdminBillingDashboard />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/restaurant",

@@ -19,6 +19,7 @@ export default function Cart() {
     handleDeliveryTypeChange,
     // handleDistanceChange,
     handleCheckout,
+    selectedAddress,
   } = useCartLogic();
 
   if (items.length === 0) {
@@ -196,9 +197,46 @@ export default function Cart() {
             <p className="font-semibold text-gray-900 dark:text-white text-sm">
               Envío a domicilio
             </p>
-            {/* Distance Input */}
+            {/* Address Input */}
             {deliveryOption.type === "delivery" && (
-              <div className="flex flex-col gap-2 mt-3">
+              <div className="flex flex-col gap-2 mt-3 cursor-default" onClick={(e) => e.stopPropagation()}>
+                {selectedAddress ? (
+                  <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <p className="font-medium text-gray-800 dark:text-gray-200 text-sm">
+                      {selectedAddress.label && <span className="mr-1">{selectedAddress.label}:</span>}
+                      {selectedAddress.line1}
+                    </p>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">
+                      {selectedAddress.city}, {selectedAddress.state} {selectedAddress.postal_code}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        navigate("/saved-addresses");
+                      }}
+                      className="text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 text-xs font-semibold mt-2 inline-flex items-center gap-1"
+                    >
+                      Cambiar dirección
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-red-50 dark:bg-red-900/10 p-3 rounded-lg border border-red-200 dark:border-red-800 flex flex-col items-start gap-2">
+                    <p className="text-red-700 dark:text-red-400 text-sm">Debes agregar una dirección.</p>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        navigate("/saved-addresses");
+                      }}
+                      className="bg-amber-400 hover:bg-amber-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Agregar dirección
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
