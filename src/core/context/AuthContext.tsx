@@ -33,8 +33,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const ROLE_CACHE_KEY = "dlizza-role";
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -43,43 +41,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAuthReady, setIsAuthReady] = useState(false);
 
-  const getCachedRole = (userId: string): "owner" | "client" | "admin" | null => {
-    try {
-      const cached = localStorage.getItem(`${ROLE_CACHE_KEY}-${userId}`);
-      return cached as "owner" | "client" | "admin" | null;
-    } catch {
-      return null;
-    }
-  };
-
-  const setCachedRole = (userId: string, userRole: "owner" | "client" | "admin") => {
-    try {
-      localStorage.setItem(`${ROLE_CACHE_KEY}-${userId}`, userRole);
-    } catch {
-      // ignore
-    }
-  };
-
-  const clearRoleCache = (userId?: string) => {
-    try {
-      if (userId) {
-        localStorage.removeItem(`${ROLE_CACHE_KEY}-${userId}`);
-      } else {
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith(ROLE_CACHE_KEY)) {
-            localStorage.removeItem(key);
-          }
-        });
-      }
-    } catch {
-      // ignore
-    }
-  };
-
   useEffect(() => {
+    // Migración: eliminar cualquier entrada de caché de rol que pueda haber
+    // quedado de versiones anteriores (evita roles incorrectos entre sesiones)
+    try {
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith("dlizza-role")) localStorage.removeItem(key);
+      });
+    } catch {
+      // ignore — entorno sin localStorage (SSR, tests)
+    }
+
     let cancelled = false;
 
-    const fetchRole = async (userId: string, userMetadata?: Record<string, unknown>): Promise<"owner" | "client" | "admin"> => {
+    /**
+     * Fuente de verdad única para el rol:
+     * 1. Consulta profiles (autoritativa)
+     * 2. Si profiles falla, usa user_metadata del JWT (seteado en el registro)
+     * 3. Nunca usa caché local — elimina riesgo de roles incorrectos entre sesiones
+     */
+    const fetchRole = async (
+      userId: string,
+      userMetadata?: Record<string, unknown>
+    ): Promise<"owner" | "client" | "admin"> => {
       try {
         const { data, error } = await supabase
           .from("profiles")
@@ -88,22 +72,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .maybeSingle();
 
         if (!error && data?.user_role) {
-          const userRole = data.user_role as "owner" | "client" | "admin";
-          setCachedRole(userId, userRole);
-          return userRole;
+          return data.user_role as "owner" | "client" | "admin";
         }
       } catch {
-        // fall through to metadata/cache
+        // profiles no respondió — caer al metadata del JWT
       }
 
+      // Fallback: user_metadata seteado en el momento del registro (confiable)
       if (userMetadata?.user_role) {
-        const metadataRole = userMetadata.user_role as "owner" | "client" | "admin";
-        setCachedRole(userId, metadataRole);
-        return metadataRole;
+        return userMetadata.user_role as "owner" | "client" | "admin";
       }
-
-      const cachedRole = getCachedRole(userId);
-      if (cachedRole) return cachedRole;
 
       return "client";
     };
@@ -182,8 +160,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return false;
     };
 
-    const applySession = async (_event: string, currentSession: Session | null) => {
+    const applySession = async (_event: string, currentSession: Session | null, previousUserId?: string) => {
       if (cancelled) return;
+
+      // Solo bajar isAuthReady cuando cambia el usuario (login, logout, cambio de cuenta).
+      // En eventos de refresco de token (TOKEN_REFRESHED) el userId es el mismo,
+      // por lo que no hace falta bloquear la UI con el spinner — el rol no cambia.
+      // Esto evita flashes de spinner cada ~55 min cuando Supabase renueva el JWT.
+      const incomingUserId = currentSession?.user?.id ?? null;
+      const userChanged = incomingUserId !== previousUserId;
+      if (userChanged) {
+        setIsAuthReady(false);
+      }
 
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
@@ -211,16 +199,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAuthReady(true);
     };
 
+    // Rastrea el userId de la sesión anterior para detectar cambios de usuario.
+    // Permite que applySession decida si debe mostrar el spinner (userChanged=true)
+    // o actualizar silenciosamente (TOKEN_REFRESHED del mismo usuario).
+    let lastKnownUserId: string | null = null;
+
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       if (cancelled) return;
-      applySession("INITIAL_SESSION", initialSession ?? null);
+      const incomingId = initialSession?.user?.id ?? null;
+      applySession("INITIAL_SESSION", initialSession ?? null, lastKnownUserId ?? undefined);
+      lastKnownUserId = incomingId;
     });
 
     // Queries are deferred with setTimeout(0) to avoid the Supabase JS v2 deadlock
     // that occurs when making DB calls directly inside onAuthStateChange
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      const incomingId = currentSession?.user?.id ?? null;
+      const prevId = lastKnownUserId;
+      lastKnownUserId = incomingId;
       setTimeout(() => {
-        applySession(event, currentSession);
+        applySession(event, currentSession, prevId ?? undefined);
       }, 0);
     });
 
@@ -340,9 +338,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    if (user?.id) {
-      clearRoleCache(user.id);
-    }
     await supabase.auth.signOut();
   };
 

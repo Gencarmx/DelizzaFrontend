@@ -14,7 +14,14 @@ export const ProtectedRoute = ({
   const { user, role, businessActive, isAuthReady } = useAuth();
   const location = useLocation();
 
-  if (!isAuthReady) {
+  // Mostrar spinner mientras la sesión o el rol no están resueltos.
+  // Esto cubre dos casos:
+  //   1. Carga inicial (isAuthReady = false)
+  //   2. Re-disparo de onAuthStateChange donde user ya existe pero role
+  //      aún está en null (applySession corriendo de forma asíncrona).
+  //      Sin este guard, el ProtectedRoute evalúa las redirecciones con
+  //      role = null y puede dejar pasar o redirigir incorrectamente.
+  if (!isAuthReady || (user && role === null)) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
