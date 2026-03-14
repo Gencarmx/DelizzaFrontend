@@ -69,59 +69,37 @@ export default function Home() {
     const fetchData = async () => {
       try {
         setError(null);
-        setLoading(prev => ({ ...prev, categories: true }));
-        const categoriesData = await getActiveProductCategories();
-        setCategories(categoriesData);
-        setLoading(prev => ({ ...prev, categories: false }));
+        setLoading({ restaurants: true, categories: true, allProducts: true });
 
-        /* Favorites fetching hidden for future release
-        setLoading(prev => ({ ...prev, favorites: true }));
-        const { data: favoritesData, error: favoritesError } = await supabase
-          .from('products')
-          .select('id, name, price, description, image_url, active, business_id')
-          .eq('active', true)
-          .limit(10);
-        if (favoritesError) {
-          console.error('Error fetching favorites:', favoritesError);
-        } else {
-          const businessIds = [...new Set(favoritesData?.map(p => p.business_id) || [])];
-          const { data: businessesData } = await supabase
+        // Las tres fuentes son independientes — se ejecutan en paralelo.
+        const [categoriesData, allProductsResult, restaurantsResult] = await Promise.all([
+          getActiveProductCategories(),
+          supabase
+            .from('products')
+            .select('id, name, price, description, image_url, active, business_id, category_id')
+            .eq('active', true),
+          supabase
             .from('businesses')
-            .select('id, name')
-            .in('id', businessIds);
-          const businessMap = new Map(businessesData?.map(b => [b.id, b.name]) || []);
-          const mappedFavorites = favoritesData?.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            rating: "4.5",
-            delivery: "$30",
-            time: "30 min",
-            price: p.price,
-            restaurant: businessMap.get(p.business_id) || "Unknown",
-            restaurantId: p.business_id,
-            description: p.description || "",
-            image: p.image_url || "https://via.placeholder.com/200"
-          })) || [];
-          setFavorites(mappedFavorites);
-        }
-        setLoading(prev => ({ ...prev, favorites: false }));
-        */
+            .select('id, name, address, active, logo_url')
+            .eq('active', true),
+        ]);
 
-        setLoading(prev => ({ ...prev, allProducts: true }));
-        const { data: allProductsData, error: allProductsError } = await supabase
-          .from('products')
-          .select('id, name, price, description, image_url, active, business_id, category_id')
-          .eq('active', true);
-        if (allProductsError) {
-          console.error('Error fetching all products:', allProductsError);
+        // — Categorías —
+        setCategories(categoriesData);
+
+        // — Productos —
+        if (allProductsResult.error) {
+          console.error('Error fetching all products:', allProductsResult.error);
         } else {
-          const allBusinessIds = [...new Set(allProductsData?.map(p => p.business_id) || [])];
+          const allProductsData = allProductsResult.data ?? [];
+          // Obtener nombres de restaurantes en un solo query usando los IDs únicos
+          const allBusinessIds = [...new Set(allProductsData.map(p => p.business_id))];
           const { data: allBusinessesData } = await supabase
             .from('businesses')
             .select('id, name')
             .in('id', allBusinessIds);
           const allBusinessMap = new Map(allBusinessesData?.map(b => [b.id, b.name]) || []);
-          const mappedAllProducts = allProductsData?.map((p: any) => ({
+          setAllProducts(allProductsData.map((p: any) => ({
             id: p.id,
             name: p.name,
             rating: "4.5",
@@ -132,35 +110,28 @@ export default function Home() {
             restaurantId: p.business_id,
             description: p.description || "",
             image: p.image_url || "https://via.placeholder.com/200",
-            category_id: p.category_id
-          })) || [];
-          setAllProducts(mappedAllProducts);
+            category_id: p.category_id,
+          })));
         }
-        setLoading(prev => ({ ...prev, allProducts: false }));
 
-        setLoading(prev => ({ ...prev, restaurants: true }));
-        const { data: restaurantsData, error: restaurantsError } = await supabase
-          .from('businesses')
-          .select('id, name, address, active, logo_url')
-          .eq('active', true);
-        if (restaurantsError) {
-          console.error('Error fetching restaurants:', restaurantsError);
+        // — Restaurantes —
+        if (restaurantsResult.error) {
+          console.error('Error fetching restaurants:', restaurantsResult.error);
         } else {
-          const mappedRestaurants = restaurantsData?.map(b => ({
+          setRestaurants((restaurantsResult.data ?? []).map(b => ({
             id: b.id,
             name: b.name,
             address: b.address || "Dirección no disponible",
             status: b.active ? "Abierto" : "Cerrado",
-            logo: b.logo_url || "https://via.placeholder.com/200"
-          })) || [];
-          setRestaurants(mappedRestaurants);
+            logo: b.logo_url || "https://via.placeholder.com/200",
+          })));
         }
-        setLoading(prev => ({ ...prev, restaurants: false }));
 
+        setLoading({ restaurants: false, categories: false, allProducts: false });
       } catch (error) {
         console.error('Error general al cargar datos:', error);
         setError('Error al cargar los datos. Por favor, intenta de nuevo.');
-        setLoading({ /* favorites: false, */ restaurants: false, categories: false, allProducts: false });
+        setLoading({ restaurants: false, categories: false, allProducts: false });
       }
     };
 
@@ -366,9 +337,9 @@ export default function Home() {
               <ChevronLeft className="w-4 h-4" />
             </button>
             <div ref={allProductsScrollRef} className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x hide-scrollbar">
-              {filteredProducts.map((item, index) => (
+              {filteredProducts.map((item) => (
                 <div
-                  key={index}
+                  key={item.id}
                   onClick={() => handleProductClick(item)}
                   className="bg-white dark:bg-gray-800 rounded-2xl p-3 min-w-[160px] shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col gap-2 snap-start cursor-pointer hover:shadow-md transition-shadow"
                 >
@@ -420,9 +391,9 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {restaurants.map((item, index) => (
+            {restaurants.map((item) => (
               <div
-                key={index}
+                key={item.id}
                 onClick={() => navigate(`/restaurant-detail/${item.id}`)}
                 className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700 cursor-pointer hover:shadow-md transition-shadow group"
               >

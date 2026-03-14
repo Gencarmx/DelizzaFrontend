@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@core/supabase/client";
 import { Link, useLocation, useNavigate } from "react-router";
+import { useAuth } from "@core/context/AuthContext";
 import {
   Store,
   Phone,
@@ -63,6 +64,10 @@ interface BusinessRow {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  // Usar el signOut del contexto en lugar de supabase.auth.signOut() directamente.
+  // La llamada directa omite el reset de estado de AuthContext, dejando la app
+  // en un estado parcialmente autenticado hasta el próximo ciclo de renderizado.
+  const { signOut } = useAuth();
   const [businesses, setBusinesses] = useState<BusinessRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,13 +84,24 @@ export default function AdminDashboard() {
   } | null>(null);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     navigate("/login");
   };
 
+  // Ref para el timer del toast. Se limpia en unmount para evitar llamar
+  // setToast en un componente ya desmontado si el admin navega antes de 3.5s.
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
   const showToast = (message: string, type: "success" | "error") => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3500);
   };
 
   const fetchBusinesses = useCallback(async () => {

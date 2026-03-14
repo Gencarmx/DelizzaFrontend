@@ -18,6 +18,11 @@ import {
   subscribeToCartChanges,
 } from "@core/services/cartService";
 
+/** Genera un token único de sesión para identificar escrituras propias */
+function generateClientToken(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 interface UseCartSyncOptions {
   authUserId: string | null;
   items: CartItem[];
@@ -44,6 +49,10 @@ export function useCartSync({
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
+  // Token único de sesión: permite que el listener Realtime ignore los eventos
+  // generados por este cliente, evitando el loop escritura→evento→recarga→escritura.
+  const clientTokenRef = useRef<string>(generateClientToken());
+
   // ── Login / Logout ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!authUserId) {
@@ -59,18 +68,12 @@ export function useCartSync({
 
     const init = async () => {
       setIsLoading(true);
-      console.log("[CartSync] Iniciando sync para user:", authUserId);
 
       // 1. Cargar desde Supabase
       const remoteItems = await loadCartFromSupabase(authUserId);
       if (cancelled) return;
 
       if (remoteItems !== null) {
-        console.log(
-          "[CartSync] Cargado desde Supabase:",
-          remoteItems.length,
-          "items",
-        );
         isRemoteUpdateRef.current = true;
         setItems(remoteItems);
         localStorage.setItem(CART_LOCAL_KEY, JSON.stringify(remoteItems));
@@ -81,15 +84,19 @@ export function useCartSync({
       // 2. Suscribir a Realtime — recarga la fila completa en cada evento
       if (unsubscribeRef.current) unsubscribeRef.current();
 
-      unsubscribeRef.current = subscribeToCartChanges(authUserId, async () => {
-        if (cancelled) return;
-        console.log("[CartSync] Realtime: recargando desde Supabase...");
-        const updated = await loadCartFromSupabase(authUserId);
-        if (cancelled || updated === null) return;
-        isRemoteUpdateRef.current = true;
-        setItems(updated);
-        localStorage.setItem(CART_LOCAL_KEY, JSON.stringify(updated));
-      });
+      unsubscribeRef.current = subscribeToCartChanges(
+        authUserId,
+        async () => {
+          if (cancelled) return;
+          const updated = await loadCartFromSupabase(authUserId);
+          if (cancelled || updated === null) return;
+          isRemoteUpdateRef.current = true;
+          setItems(updated);
+          localStorage.setItem(CART_LOCAL_KEY, JSON.stringify(updated));
+        },
+        // Getter del token actual para filtrar eventos propios
+        () => clientTokenRef.current,
+      );
     };
 
     init();
@@ -115,12 +122,9 @@ export function useCartSync({
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
 
     debounceTimerRef.current = setTimeout(() => {
-      console.log(
-        "[CartSync] Guardando en Supabase:",
-        itemsRef.current.length,
-        "items",
-      );
-      saveCartToSupabase(authUserId, itemsRef.current);
+      // Generar un nuevo token para esta escritura específica
+      clientTokenRef.current = generateClientToken();
+      saveCartToSupabase(authUserId, itemsRef.current, clientTokenRef.current);
     }, DEBOUNCE_MS);
 
     return () => {

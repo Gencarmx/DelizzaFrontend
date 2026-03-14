@@ -105,11 +105,13 @@ export default function BusinessInfo() {
     }
 
     setSelectedFile(file);
+    let mounted = true;
     const reader = new FileReader();
     reader.onloadend = () => {
-      setImagePreview(reader.result as string);
+      if (mounted) setImagePreview(reader.result as string);
     };
     reader.readAsDataURL(file);
+    return () => { mounted = false; };
   };
 
   const handleRemoveImage = () => {

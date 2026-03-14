@@ -93,15 +93,14 @@ export function useCartLogic() {
 
       // Manejar resultados mixtos (éxito y fallo)
       if (successfulOrders.length > 0 && failedOrders.length === 0) {
-        // Todos los pedidos exitosos - limpiar todo y navegar
+        // Todos los pedidos exitosos — limpiar ANTES de navegar para que
+        // useCartSync no guarde el carrito lleno en el Supabase posterior.
+        clearCart();
         alert(`¡Pedidos procesados exitosamente!\n\n${successfulOrders.map(r =>
           `${r.restaurantName}: $${r.total}`
         ).join('\n')}\n\nTotal: $${successfulOrders.reduce((sum, r) => sum + r.total, 0).toFixed(2)}`);
 
         navigate("/");
-        setTimeout(() => {
-          clearCart();
-        }, 100);
       } else if (successfulOrders.length > 0 && failedOrders.length > 0) {
         // Algunos exitosos, algunos fallidos - limpiar solo los exitosos
         alert(`⚠️ Algunos pedidos se procesaron con éxito, pero otros fallaron:\n\n` +
@@ -110,16 +109,11 @@ export function useCartLogic() {
           `Los productos de los pedidos fallidos permanecen en tu carrito.`
         );
 
-        // Limpiar solo los restaurantes con pedidos exitosos
-        // Necesitamos el ID del restaurante, no el ID de la orden
-        // Obtener los IDs de restaurantes exitosos de los resultados
+        // Limpiar solo los restaurantes con pedidos exitosos usando restaurantId
+        // (más confiable que buscar por nombre — dos restaurantes podrían coincidir)
         const successfulRestaurantIds = results
-          .filter(r => r.success)
-          .map(r => {
-            // Buscar el ID del restaurante en las órdenes originales
-            const originalOrder = orders.find(o => o.restaurant.name === r.restaurantName);
-            return originalOrder?.restaurant?.id;
-          })
+          .filter(r => r.success && r.restaurantId)
+          .map(r => r.restaurantId)
           .filter((id): id is string => !!id);
 
         successfulRestaurantIds.forEach(restaurantId => {

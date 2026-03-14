@@ -6,11 +6,11 @@ import Input from "@components/restaurant-ui/forms/Input";
 import Select from "@components/restaurant-ui/forms/Select";
 import Textarea from "@components/restaurant-ui/forms/Textarea";
 import { useAuth } from "@core/context/AuthContext";
+import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
 import {
   createProduct,
   uploadProductImage,
 } from "@core/services/productService";
-import { getBusinessByOwner } from "@core/services/businessService";
 import { getActiveProductCategories } from "@core/services/productCategoryService";
 import type { SelectOption } from "@components/restaurant-ui/forms/Select";
 import { useForm } from "react-hook-form";
@@ -30,11 +30,13 @@ type ProductFormValues = z.infer<typeof productSchema>;
 
 export default function ProductAdd() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  useAuth(); // mantener el contexto activo (necesario para rutas protegidas)
+  // Leer businessId del contexto en lugar de re-consultar getBusinessByOwner().
+  // RestaurantNotificationsContext ya lo resuelve al montar el layout padre.
+  const { businessId } = useRestaurantNotifications();
   const [isLoading, setIsLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
-  const [businessId, setBusinessId] = useState<string | null>(null);
   const [categories, setCategories] = useState<SelectOption[]>([
     { value: "", label: "Selecciona una categoría" },
   ]);
@@ -55,21 +57,10 @@ export default function ProductAdd() {
     },
   });
 
-  // Cargar categorías dinámicas y obtener businessId
+  // Cargar categorías dinámicas (businessId viene del contexto — sin re-fetch)
   useEffect(() => {
-    const loadData = async () => {
-      if (!user?.id) return;
-
+    const loadCategories = async () => {
       try {
-        // Obtener el business del usuario
-        const business = await getBusinessByOwner(user.id);
-        if (!business) {
-          setGeneralError("No se encontró un restaurante asociado a tu cuenta");
-          return;
-        }
-        setBusinessId(business.id);
-
-        // Cargar categorías dinámicas
         const categoriesData = await getActiveProductCategories();
         const categoryOptions: SelectOption[] = [
           { value: "", label: "Selecciona una categoría" },
@@ -80,13 +71,13 @@ export default function ProductAdd() {
         ];
         setCategories(categoryOptions);
       } catch (err) {
-        console.error("Error cargando datos:", err);
-        setGeneralError("Error al cargar los datos necesarios");
+        console.error("Error cargando categorías:", err);
+        setGeneralError("Error al cargar las categorías");
       }
     };
 
-    loadData();
-  }, [user?.id]);
+    loadCategories();
+  }, []);
 
   const statusOptions: SelectOption[] = [
     { value: "active", label: "Activo" },
@@ -97,11 +88,13 @@ export default function ProductAdd() {
     const file = e.target.files?.[0];
     if (file) {
       setSelectedImageFile(file);
+      let mounted = true;
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result as string);
+        if (mounted) setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+      return () => { mounted = false; };
     }
   };
 

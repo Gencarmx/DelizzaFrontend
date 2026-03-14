@@ -6,6 +6,10 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   role: "owner" | "client" | "admin" | null;
+  /** profiles.id del usuario autenticado (distinto de auth.users.id).
+   *  Disponible tras el primer fetchRole exitoso. Centraliza el lookup
+   *  para que ningún componente necesite re-consultar la tabla profiles. */
+  profileId: string | null;
   businessActive: boolean | null;
   loading: boolean;
   isAuthReady: boolean;
@@ -37,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<"owner" | "client" | "admin" | null>(null);
+  const [profileId, setProfileId] = useState<string | null>(null);
   const [businessActive, setBusinessActive] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -56,34 +61,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     /**
      * Fuente de verdad única para el rol:
-     * 1. Consulta profiles (autoritativa)
-     * 2. Si profiles falla, usa user_metadata del JWT (seteado en el registro)
-     * 3. Nunca usa caché local — elimina riesgo de roles incorrectos entre sesiones
+     * 1. Consulta profiles (autoritativa — única fuente válida)
+     * 2. Si profiles falla o no responde, retorna "client" de forma segura (fail closed)
+     * 3. NUNCA usa user_metadata del JWT como fallback: ese campo es establecido por el
+     *    cliente al momento del registro y puede ser manipulado para auto-asignarse roles
+     *    elevados (owner/admin) si la DB está temporalmente no disponible.
+     * 4. Nunca usa caché local — elimina riesgo de roles incorrectos entre sesiones
      */
     const fetchRole = async (
       userId: string,
-      userMetadata?: Record<string, unknown>
-    ): Promise<"owner" | "client" | "admin"> => {
+    ): Promise<{ role: "owner" | "client" | "admin"; profileId: string | null }> => {
       try {
         const { data, error } = await supabase
           .from("profiles")
-          .select("user_role")
+          .select("id, user_role")
           .eq("user_id", userId)
           .maybeSingle();
 
         if (!error && data?.user_role) {
-          return data.user_role as "owner" | "client" | "admin";
+          return {
+            role: data.user_role as "owner" | "client" | "admin",
+            profileId: data.id ?? null,
+          };
         }
       } catch {
-        // profiles no respondió — caer al metadata del JWT
+        // profiles no respondió — fail closed: retornar el rol mínimo
       }
 
-      // Fallback: user_metadata seteado en el momento del registro (confiable)
-      if (userMetadata?.user_role) {
-        return userMetadata.user_role as "owner" | "client" | "admin";
-      }
-
-      return "client";
+      // Fail closed: si la DB no responde, asumir rol mínimo.
+      // No se usa user_metadata (inseguro, manipulable por el cliente).
+      return { role: "client", profileId: null };
     };
 
     const fetchBusinessStatus = async (userId: string): Promise<boolean> => {
@@ -176,12 +183,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
 
-      console.log('🔄 [AuthContext] applySession - Event:', _event, 'User:', currentSession?.user?.id);
-
       if (currentSession?.user) {
-        const userRole = await fetchRole(currentSession.user.id, currentSession.user.user_metadata);
+        const { role: userRole, profileId: fetchedProfileId } = await fetchRole(currentSession.user.id);
         if (cancelled) return;
         setRole(userRole);
+        setProfileId(fetchedProfileId);
 
         if (userRole === "owner") {
           const active = await fetchBusinessStatus(currentSession.user.id);
@@ -192,6 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         setRole(null);
+        setProfileId(null);
         setBusinessActive(null);
       }
 
@@ -204,13 +211,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // o actualizar silenciosamente (TOKEN_REFRESHED del mismo usuario).
     let lastKnownUserId: string | null = null;
 
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      if (cancelled) return;
-      const incomingId = initialSession?.user?.id ?? null;
-      applySession("INITIAL_SESSION", initialSession ?? null, lastKnownUserId ?? undefined);
-      lastKnownUserId = incomingId;
-    });
-
+    // Se usa únicamente onAuthStateChange (que incluye el evento INITIAL_SESSION)
+    // como fuente de verdad. Llamar también a getSession() causaba que applySession
+    // se ejecutara dos veces al inicio: una por INITIAL_SESSION y otra por la
+    // Promise de getSession(), duplicando las queries de rol y causando flicker.
     // Queries are deferred with setTimeout(0) to avoid the Supabase JS v2 deadlock
     // that occurs when making DB calls directly inside onAuthStateChange
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
@@ -259,7 +263,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      console.log('🔄 [AuthContext] Initiating Google Auth, Redirect URL:', `${window.location.origin}/`);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -283,7 +286,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithFacebook = async () => {
     try {
-      console.log('🔄 [AuthContext] Initiating Facebook Auth, Redirect URL:', `${window.location.origin}/`);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'facebook',
         options: {
@@ -345,6 +347,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     session,
     role,
+    profileId,
     businessActive,
     loading,
     isAuthReady,

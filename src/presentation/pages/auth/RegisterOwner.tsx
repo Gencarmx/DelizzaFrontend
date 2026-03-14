@@ -3,10 +3,10 @@ import { Link, useNavigate } from "react-router";
 import { useAuth } from "@core/context/AuthContext";
 import { Eye, EyeOff, Upload, Image as ImageIcon, X } from "lucide-react";
 import {
-  getBusinessByOwner,
   uploadBusinessLogo,
   updateBusiness,
 } from "@core/services/businessService";
+import { supabase } from "@core/supabase/client";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -42,13 +42,13 @@ export default function RegisterOwner() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signUpOwner, user } = useAuth();
+  const { signUpOwner } = useAuth();
   const navigate = useNavigate();
 
   const {
     register,
     handleSubmit,
-    formState: { errors: formErrors },
+    formState: { errors: formErrors, isSubmitting },
   } = useForm<RegisterOwnerFormValues>({
     resolver: zodResolver(registerOwnerSchema),
     defaultValues: {
@@ -127,22 +127,37 @@ export default function RegisterOwner() {
       setError(errorMessage);
       setLoading(false);
     } else {
-      try {
-        const ownerUserId = newUserId || user?.id;
-        if (ownerUserId && restaurantPhoto) {
-          const business = await getBusinessByOwner(ownerUserId);
-          if (business) {
-            const logoUrl = await uploadBusinessLogo(
-              business.id,
-              restaurantPhoto,
-            );
-            await updateBusiness(business.id, { logo_url: logoUrl });
+      // Subir el logo usando la función RPC con reintentos internos.
+      // Es necesario esperar a que el trigger de DB cree el profile y el
+      // business antes de poder obtener el business_id para subir la imagen.
+      if (newUserId && restaurantPhoto) {
+        try {
+          const { data: rpcResult, error: rpcError } = await supabase.rpc(
+            'get_business_by_owner_with_retry',
+            {
+              p_auth_user_id: newUserId,
+              p_max_attempts: 5,
+              p_delay_ms: 1500,
+            }
+          );
+
+          if (rpcError) {
+            console.error('Error buscando business tras registro:', rpcError);
+            setError('La cuenta fue creada pero la foto no pudo guardarse. Puedes actualizarla desde tu perfil.');
+          } else if (rpcResult?.found === true) {
+            const logoUrl = await uploadBusinessLogo(rpcResult.id, restaurantPhoto);
+            await updateBusiness(rpcResult.id, { logo_url: logoUrl });
+          } else {
+            console.warn('Business no encontrado tras registro:', rpcResult?.message);
+            setError('La cuenta fue creada pero la foto no pudo guardarse. Puedes actualizarla desde tu perfil.');
           }
+        } catch (uploadError) {
+          console.error('Error subiendo logo del restaurante:', uploadError);
+          setError('La cuenta fue creada pero la foto no pudo guardarse. Puedes actualizarla desde tu perfil.');
         }
-      } catch (uploadError) {
-        console.error("Error subiendo logo del restaurante:", uploadError);
       }
 
+      setLoading(false);
       navigate("/pending-approval");
     }
   };
@@ -164,11 +179,13 @@ export default function RegisterOwner() {
     setError("");
     setRestaurantPhoto(file);
 
+    let mounted = true;
     const reader = new FileReader();
     reader.onloadend = () => {
-      setImagePreview(reader.result as string);
+      if (mounted) setImagePreview(reader.result as string);
     };
     reader.readAsDataURL(file);
+    return () => { mounted = false; };
   };
 
   const handleRemoveImage = () => {
@@ -459,13 +476,15 @@ export default function RegisterOwner() {
             </div>
           )}
 
-          {/* Submit Button */}
+          {/* Submit Button — deshabilitado tanto con loading (estado local) como
+              con isSubmitting (react-hook-form, se activa síncronamente al primer
+              click para cubrir la ventana antes de que setLoading se ejecute) */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || isSubmitting}
             className="w-full bg-amber-400 hover:bg-amber-500 text-gray-900 font-bold py-4 rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
           >
-            {loading ? "Registrando..." : "Registrar Restaurante"}
+            {loading || isSubmitting ? "Registrando..." : "Registrar Restaurante"}
           </button>
         </form>
 

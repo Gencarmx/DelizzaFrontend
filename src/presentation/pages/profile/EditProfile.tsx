@@ -1,4 +1,4 @@
-import { ChevronLeft, User, Camera, Mail, Phone, Calendar } from "lucide-react";
+import { ChevronLeft, User, Mail, Phone } from "lucide-react";
 import { useNavigate } from "react-router";
 import ConfirmModal from "@components/restaurant-ui/modals/ConfirmModal";
 import { useEditProfileLogic } from "@presentation/logic";
@@ -73,16 +73,16 @@ export default function EditProfile() {
               <User className="w-12 h-12" strokeWidth={1.5} />
             )}
           </div>
-          <button
+          {/* <button
             onClick={() => fileInputRef.current?.click()}
             className="absolute bottom-0 right-0 w-8 h-8 bg-amber-400 rounded-full flex items-center justify-center shadow-lg hover:bg-amber-500 transition-colors"
           >
             <Camera className="w-4 h-4 text-white" strokeWidth={2} />
-          </button>
+          </button> */}
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+        {/* <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
           Toca para cambiar foto
-        </p>
+        </p> */}
       </div>
 
       {/* Form Fields */}
@@ -176,7 +176,7 @@ export default function EditProfile() {
           </p>
         )}
 
-        {/* Birthdate Field */}
+        {/* Birthdate Field
         <div
           className={`bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border ${
             formErrors.birthdate
@@ -202,7 +202,7 @@ export default function EditProfile() {
           <p className="text-sm text-red-500 ml-4">
             {formErrors.birthdate.message}
           </p>
-        )}
+        )} */}
       </form>
 
       {/* Change Warning */}
@@ -226,8 +226,15 @@ export default function EditProfile() {
         </p>
       </div>
 
-      {/* Delete Account Link */}
-      <button className="mt-6 text-center text-sm text-red-500 font-medium hover:text-red-600 transition-colors">
+      {/* Delete Account Link — type="button" evita que actúe como submit dentro del form */}
+      <button
+        type="button"
+        onClick={() => {
+          // TODO: implementar flujo de eliminación de cuenta con confirmación
+          alert("Para eliminar tu cuenta, por favor contacta a soporte.");
+        }}
+        className="mt-6 text-center text-sm text-red-500 font-medium hover:text-red-600 transition-colors"
+      >
         Eliminar mi cuenta
       </button>
 

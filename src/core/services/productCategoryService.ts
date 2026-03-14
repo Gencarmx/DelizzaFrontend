@@ -1,5 +1,21 @@
 import { supabase } from "@core/supabase/client";
 
+/**
+ * Caché de módulo para las categorías activas.
+ * Las categorías de productos son datos estáticos que rara vez cambian.
+ * Almacenar el resultado evita re-consultar Supabase en cada montaje de
+ * los componentes Home, ProductAdd y ProductEdit.
+ * TTL de 5 minutos para reflejar cambios eventuales sin consultas constantes.
+ */
+let _categoriesCache: ProductCategory[] | null = null;
+let _cacheTimestamp = 0;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+
+export function invalidateCategoriesCache() {
+  _categoriesCache = null;
+  _cacheTimestamp = 0;
+}
+
 export interface ProductCategory {
   id: string;
   name: string;
@@ -12,9 +28,16 @@ export interface ProductCategory {
 }
 
 /**
- * Obtiene todas las categorías de productos activas ordenadas por sort_order
+ * Obtiene todas las categorías de productos activas ordenadas por sort_order.
+ * Utiliza caché de módulo con TTL de 5 minutos para evitar re-consultas en
+ * cada montaje de componente (Home, ProductAdd, ProductEdit).
  */
 export async function getActiveProductCategories(): Promise<ProductCategory[]> {
+  const now = Date.now();
+  if (_categoriesCache && now - _cacheTimestamp < CACHE_TTL_MS) {
+    return _categoriesCache;
+  }
+
   try {
     const { data, error } = await supabase
       .from('product_categories')
@@ -24,13 +47,15 @@ export async function getActiveProductCategories(): Promise<ProductCategory[]> {
 
     if (error) {
       console.error('Error obteniendo categorías de productos:', error);
-      return [];
+      return _categoriesCache ?? []; // devolver caché vencida si hay error de red
     }
 
-    return data || [];
+    _categoriesCache = data || [];
+    _cacheTimestamp = now;
+    return _categoriesCache;
   } catch (error) {
     console.error('Error en getActiveProductCategories:', error);
-    return [];
+    return _categoriesCache ?? [];
   }
 }
 

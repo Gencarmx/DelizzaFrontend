@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
 import { ChevronLeft, Upload, X } from "lucide-react";
 import Button from "@components/restaurant-ui/buttons/Button";
@@ -35,6 +35,10 @@ export default function ProductEdit() {
   const [isLoadingProduct, setIsLoadingProduct] = useState(true);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  // Valor original de image_url al cargar el producto.
+  // Permite detectar si el usuario eliminó la imagen (imagePreview → null)
+  // aunque imageFile sea null (sin nueva imagen seleccionada).
+  const originalImageUrlRef = useRef<string | null>(null);
   const [businessId, setBusinessId] = useState<string>("");
   const [categories, setCategories] = useState<SelectOption[]>([
     { value: "", label: "Selecciona una categoría" },
@@ -104,6 +108,7 @@ export default function ProductEdit() {
         });
 
         setImagePreview(product.image_url || null);
+        originalImageUrlRef.current = product.image_url || null;
         setBusinessId(product.business_id);
       } catch (error) {
         console.error("Error cargando producto:", error);
@@ -126,11 +131,13 @@ export default function ProductEdit() {
     const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
+      let mounted = true;
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result as string);
+        if (mounted) setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+      return () => { mounted = false; };
     }
   };
 
@@ -148,7 +155,7 @@ export default function ProductEdit() {
       setIsLoading(true);
       setGeneralError("");
 
-      let imageUrl = imagePreview;
+      let imageUrl: string | null = imagePreview;
 
       // Si hay una nueva imagen, subirla primero
       if (imageFile && businessId) {
@@ -173,9 +180,16 @@ export default function ProductEdit() {
         category_id: data.category || null,
       };
 
-      // Solo actualizar image_url si cambió
-      if (imageUrl && imageUrl !== imagePreview) {
-        updateData.image_url = imageUrl;
+      // Siempre incluir image_url si el estado de imagen cambió respecto al
+      // valor original cargado. Esto cubre:
+      // 1. Nueva imagen subida (imageFile != null) → imageUrl = nueva URL
+      // 2. Imagen eliminada (removeImage()) → imageUrl = null
+      // 3. Sin cambio → imageUrl === originalImageUrlRef.current → no incluir
+      if (imageUrl !== originalImageUrlRef.current) {
+        // null se convierte a undefined para compatibilidad con el tipo Partial<ProductData>
+        // La ausencia del campo en el update preserva el valor actual en DB,
+        // pero aquí queremos eliminar la imagen (null → undefined borra el campo)
+        updateData.image_url = imageUrl ?? undefined;
       }
 
       // Actualizar producto

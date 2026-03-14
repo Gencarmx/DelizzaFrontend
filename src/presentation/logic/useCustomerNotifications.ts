@@ -4,6 +4,27 @@ import { useAuth } from "@core/context/AuthContext";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 
+/**
+ * AudioContext compartido a nivel de módulo.
+ * Crear uno nuevo por cada notificación agotaría el límite del navegador (~6
+ * instancias) y el sonido dejaría de funcionar silenciosamente.
+ */
+let sharedAudioContext: AudioContext | null = null;
+
+function getSharedAudioContext(): AudioContext | null {
+  try {
+    if (!sharedAudioContext || sharedAudioContext.state === "closed") {
+      const AudioContextClass =
+        window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return null;
+      sharedAudioContext = new AudioContextClass();
+    }
+    return sharedAudioContext;
+  } catch {
+    return null;
+  }
+}
+
 export function useCustomerNotifications(
   onOrderUpdate?: () => void,
   onInAppNotification?: (title: string, body: string) => void,
@@ -18,6 +39,10 @@ export function useCustomerNotifications(
   const profileIdRef = useRef<string | null>(null);
   const onOrderUpdateRef = useRef(onOrderUpdate);
   const onInAppNotificationRef = useRef(onInAppNotification);
+  // Flag global de desmontaje. Se verifica al inicio de setupSubscription
+  // para evitar que timers de reconexión que escaparon al cleanup sigan
+  // ejecutándose y llamen a setters de estado en un componente desmontado.
+  const unmountedRef = useRef(false);
 
   const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>("default");
 
@@ -44,9 +69,10 @@ export function useCustomerNotifications(
 
   const playNotificationSound = useCallback(async () => {
     try {
-      const audioContext = new (
-        window.AudioContext || (window as any).webkitAudioContext
-      )();
+      // Usar el AudioContext compartido a nivel de módulo en lugar de crear
+      // uno nuevo por cada notificación, evitando la fuga de recursos.
+      const audioContext = getSharedAudioContext();
+      if (!audioContext) return;
 
       if (audioContext.state === "suspended") {
         await audioContext.resume();
@@ -136,6 +162,9 @@ export function useCustomerNotifications(
   );
 
   const setupSubscription = useCallback(async (profileId: string) => {
+    // Verificar que el hook no haya sido desmontado antes de operar.
+    // Timers de reconexión retrasados pueden dispararse después del desmontaje.
+    if (unmountedRef.current) return;
     if (isSubscribedRef.current) return;
 
     if (subscriptionRef.current) {
@@ -221,6 +250,9 @@ export function useCustomerNotifications(
 
 
   useEffect(() => {
+    // Resetear el flag de desmontaje al (re)montar el hook.
+    unmountedRef.current = false;
+
     if (!user) return;
 
     let cancelled = false;
@@ -238,6 +270,9 @@ export function useCustomerNotifications(
 
     return () => {
       cancelled = true;
+      // Marcar como desmontado ANTES de cancelar el timer para que cualquier
+      // callback pendiente del setTimeout no vuelva a llamar setupSubscription.
+      unmountedRef.current = true;
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (subscriptionRef.current) {
         try { supabase.removeChannel(subscriptionRef.current); } catch { /* ignore */ }

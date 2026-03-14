@@ -283,11 +283,40 @@ export function useRealtimeNotifications(businessId?: string) {
 }
 
 /**
- * Reproduce un sonido de notificación
+ * AudioContext compartido a nivel de módulo.
+ * Los navegadores limitan las instancias concurrentes (~6). Crear uno nuevo por
+ * cada notificación agotaría el límite rápidamente y el sonido dejaría de
+ * funcionar silenciosamente. Un único contexto reutilizable evita esta fuga.
  */
-function playNotificationSound() {
+let sharedAudioContext: AudioContext | null = null;
+
+function getAudioContext(): AudioContext | null {
   try {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (!sharedAudioContext || sharedAudioContext.state === "closed") {
+      const AudioContextClass =
+        window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return null;
+      sharedAudioContext = new AudioContextClass();
+    }
+    return sharedAudioContext;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reproduce un sonido de notificación reutilizando el AudioContext compartido.
+ */
+async function playNotificationSound() {
+  try {
+    const audioContext = getAudioContext();
+    if (!audioContext) return;
+
+    // El contexto puede quedar suspendido si no hubo interacción del usuario.
+    if (audioContext.state === "suspended") {
+      await audioContext.resume();
+    }
+
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
 
@@ -302,8 +331,8 @@ function playNotificationSound() {
 
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.3);
-  } catch (error) {
-    // Silently fail if audio can't be played
+  } catch {
+    // Fallo silencioso si el audio no está disponible
   }
 }
 
@@ -322,9 +351,10 @@ function showBrowserNotification(orderData: any) {
         icon: '/favicon.svg',
         tag: `order-${orderData.id}`,
       });
-    } else if ('Notification' in window && Notification.permission !== 'denied') {
-      Notification.requestPermission();
     }
+    // No se solicita permiso aquí: requestPermission() requiere un gesto
+    // del usuario para funcionar en navegadores modernos. La solicitud
+    // se maneja desde NotificationPermissionBanner.
   } catch (error) {
     // Silently fail if notification can't be shown
   }

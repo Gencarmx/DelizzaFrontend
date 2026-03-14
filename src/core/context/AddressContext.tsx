@@ -19,14 +19,61 @@ export function AddressProvider({ children }: { children: ReactNode }) {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadAddresses = async () => {
-    if (!user) {
-      setAddresses([]);
-      setSelectedAddress(null);
-      setLoading(false);
-      return;
-    }
+  useEffect(() => {
+    // Flag de cancelación: evita que setters de estado se ejecuten si el usuario
+    // cambia (logout / login) mientras la carga asíncrona está en vuelo,
+    // previniendo que datos de una sesión anterior contaminen la nueva.
+    let cancelled = false;
 
+    const loadAddresses = async () => {
+      if (!user) {
+        setAddresses([]);
+        setSelectedAddress(null);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (cancelled) return;
+
+        if (profile) {
+          const userAddresses = await addressService.getAddressesByProfileId(profile.id);
+
+          if (cancelled) return;
+
+          setAddresses(userAddresses);
+
+          const defaultAddress = userAddresses.find(addr => addr.is_default);
+          if (defaultAddress) {
+            setSelectedAddress(defaultAddress);
+          } else if (userAddresses.length > 0) {
+            setSelectedAddress(userAddresses[0]);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) console.error("Error loading addresses:", error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadAddresses();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const refreshAddresses = async () => {
+    // Re-fetch directo sin flag de cancelación — se llama explícitamente por el usuario.
+    if (!user) return;
     try {
       setLoading(true);
       const { data: profile } = await supabase
@@ -38,7 +85,7 @@ export function AddressProvider({ children }: { children: ReactNode }) {
       if (profile) {
         const userAddresses = await addressService.getAddressesByProfileId(profile.id);
         setAddresses(userAddresses);
-        
+
         const defaultAddress = userAddresses.find(addr => addr.is_default);
         if (defaultAddress) {
           setSelectedAddress(defaultAddress);
@@ -47,18 +94,10 @@ export function AddressProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (error) {
-      console.error("Error loading addresses:", error);
+      console.error("Error refreshing addresses:", error);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadAddresses();
-  }, [user]);
-
-  const refreshAddresses = async () => {
-    await loadAddresses();
   };
 
   return (

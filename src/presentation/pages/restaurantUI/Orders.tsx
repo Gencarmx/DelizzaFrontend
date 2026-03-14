@@ -15,7 +15,10 @@ interface Order {
   fullId: string;
   customer: string;
   customerPhone?: string;
+  /** String resumido para búsqueda y columnas compactas */
   items: string;
+  /** Array estructurado de items — usado para renderizar sin depender de split por coma */
+  itemsList?: Array<{ quantity: number; productName: string }>;
   total: number;
   status: "pending" | "completed" | "cancelled" | "in_progress" | "ready" | "preparing";
   date: string;
@@ -104,18 +107,19 @@ export default function Orders() {
     loadBusinessInfo();
   }, [businessId]);
 
-  // Función para actualizar el estado de un pedido
-  const handleStatusChange = async (fullId: string, displayId: string, newStatus: string) => {
+  // Función para actualizar el estado de un pedido.
+  // updatingOrders usa el UUID completo (fullId) como clave para evitar
+  // colisiones entre órdenes que comparten los mismos últimos 8 caracteres.
+  const handleStatusChange = async (fullId: string, _displayId: string, newStatus: string) => {
     if (!fullId || fullId === 'undefined') {
       console.error('❌ Error: fullId es undefined o inválido');
       return;
     }
 
     try {
-      setUpdatingOrders(prev => new Set(prev).add(displayId));
+      setUpdatingOrders(prev => new Set(prev).add(fullId));
       await updateOrderStatus(fullId, newStatus as any);
 
-      // Actualizar el estado local
       setOrders(prev => prev.map(order =>
         order.fullId === fullId
           ? { ...order, status: mapOrderStatus(newStatus) }
@@ -126,7 +130,7 @@ export default function Orders() {
     } finally {
       setUpdatingOrders(prev => {
         const newSet = new Set(prev);
-        newSet.delete(displayId);
+        newSet.delete(fullId);
         return newSet;
       });
     }
@@ -135,30 +139,37 @@ export default function Orders() {
   // Función compartida para formatear órdenes
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const formatOrders = (ordersData: any[]): Order[] =>
-    ordersData.map(order => ({
-      id: order.id.slice(-8).toUpperCase(),
-      fullId: order.id,
-      customer: order.customer_name || 'Cliente',
+    ordersData.map(order => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      items: order.order_items?.map((item: any) =>
-        `${item.quantity}x ${item.product_name || 'Producto'}`
-      ).join(', ') || 'Sin items',
-      total: order.total,
-      status: mapOrderStatus(order.status || 'pending'),
-      originalStatus: order.status || undefined,
-      date: order.created_at
-        ? new Date(order.created_at).toLocaleString('es-ES', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-        : 'Sin fecha',
-      paymentMethod: order.payment_method || 'No especificado',
-      deliveryType: order.delivery_type || undefined,
-      customerId: order.customer_id || undefined,
-    }));
+      const rawItems: Array<{ quantity: number; productName: string }> =
+        order.order_items?.map((item: any) => ({
+          quantity: item.quantity ?? 1,
+          productName: item.product_name || 'Producto',
+        })) ?? [];
+
+      return {
+        id: order.id.slice(-8).toUpperCase(),
+        fullId: order.id,
+        customer: order.customer_name || 'Cliente',
+        items: rawItems.map(i => `${i.quantity}x ${i.productName}`).join(', ') || 'Sin items',
+        itemsList: rawItems,
+        total: order.total,
+        status: mapOrderStatus(order.status || 'pending'),
+        originalStatus: order.status || undefined,
+        date: order.created_at
+          ? new Date(order.created_at).toLocaleString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+          : 'Sin fecha',
+        paymentMethod: order.payment_method || 'No especificado',
+        deliveryType: order.delivery_type || undefined,
+        customerId: order.customer_id || undefined,
+      };
+    });
 
   // Cargar pedidos iniciales
   useEffect(() => {
@@ -340,7 +351,7 @@ export default function Orders() {
   // Determina qué acciones mostrar según el estado
   const getActionsForStatus = (order: Order) => {
     const { status } = order;
-    const isUpdating = updatingOrders.has(order.id);
+    const isUpdating = updatingOrders.has(order.fullId);
 
     // Debug: verificar que fullId existe
     if (!order.fullId) {
@@ -470,27 +481,21 @@ export default function Orders() {
       header: "Detalle del pedido",
       render: (order) => (
         <div className="flex flex-col gap-1">
-          {order.items.split(', ').map((item, index) => {
-            const match = item.match(/(\d+)x\s(.+)/);
-            if (match) {
-              const [, quantity, productName] = match;
-              return (
-                <div key={index} className="flex items-center gap-2 text-sm">
-                  <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full text-xs font-semibold">
-                    {quantity}x
-                  </span>
-                  <span className="text-gray-700 dark:text-gray-300">
-                    {productName}
-                  </span>
-                </div>
-              );
-            }
-            return (
-              <span key={index} className="text-gray-600 dark:text-gray-400 text-sm">
-                {item}
+          {/* Usar itemsList (array estructurado) en lugar de parsear el string
+              con split — evita errores con nombres de productos que contengan comas */}
+          {(order.itemsList && order.itemsList.length > 0 ? order.itemsList : []).map((item, index) => (
+            <div key={index} className="flex items-center gap-2 text-sm">
+              <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full text-xs font-semibold">
+                {item.quantity}x
               </span>
-            );
-          })}
+              <span className="text-gray-700 dark:text-gray-300">
+                {item.productName}
+              </span>
+            </div>
+          ))}
+          {(!order.itemsList || order.itemsList.length === 0) && (
+            <span className="text-gray-600 dark:text-gray-400 text-sm">{order.items}</span>
+          )}
         </div>
       ),
     },
@@ -817,6 +822,30 @@ export default function Orders() {
                 </span>
               </div>
 
+              <div className={`rounded-xl p-3 flex items-center justify-between ${
+                confirmCompleteOrder.deliveryType === 'delivery'
+                  ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800'
+                  : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+              }`}>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Comisión Delizza
+                  </span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {confirmCompleteOrder.deliveryType === 'delivery'
+                      ? 'Pedido a domicilio'
+                      : 'Pedido para recoger'}
+                  </span>
+                </div>
+                <span className={`font-bold text-lg ${
+                  confirmCompleteOrder.deliveryType === 'delivery'
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-blue-600 dark:text-blue-400'
+                }`}>
+                  ${confirmCompleteOrder.deliveryType === 'delivery' ? '18.00' : '10.00'}
+                </span>
+              </div>
+
               <div className="flex gap-3 pt-1">
                 <button
                   onClick={() => setConfirmCompleteOrder(null)}
@@ -829,10 +858,10 @@ export default function Orders() {
                     handleStatusChange(confirmCompleteOrder.fullId, confirmCompleteOrder.id, 'completed');
                     setConfirmCompleteOrder(null);
                   }}
-                  disabled={updatingOrders.has(confirmCompleteOrder.id)}
+                  disabled={updatingOrders.has(confirmCompleteOrder.fullId)}
                   className="flex-1 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {updatingOrders.has(confirmCompleteOrder.id) ? (
+                  {updatingOrders.has(confirmCompleteOrder.fullId) ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <CheckCircle className="w-4 h-4" />

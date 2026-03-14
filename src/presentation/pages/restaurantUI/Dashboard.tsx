@@ -93,8 +93,18 @@ export default function Dashboard() {
 
       setLoading(true);
       try {
-        // Cargar métricas
-        const businessMetrics = await getBusinessMetrics(businessId);
+        // Las 4 fuentes son independientes — se ejecutan en paralelo para
+        // reducir el tiempo de carga a max(t1,t2,t3,t4) en lugar de t1+t2+t3+t4.
+        const [businessMetrics, chartData, topProducts, orders] = await Promise.all([
+          getBusinessMetrics(businessId),
+          getSalesChartData(businessId, 'week'),
+          getTopProducts(businessId, 5),
+          getRecentOrders(businessId, 5),
+        ]);
+
+        // Verificar isMounted antes de cada setState para no actualizar un
+        // componente ya desmontado (navegación rápida entre páginas).
+        if (!isMounted.current) return;
         const metricsData = [
           {
             title: "Ventas del día",
@@ -127,28 +137,24 @@ export default function Dashboard() {
         ];
         setMetrics(metricsData);
 
-        // Cargar datos del gráfico de ventas
-        const chartData = await getSalesChartData(businessId, 'week');
+        if (!isMounted.current) return;
         setSalesData(chartData.datasets[0]?.data.map((value, index) => ({
           date: chartData.labels[index],
           sales: value
         })) || []);
 
-        // Cargar productos más vendidos
-        const topProducts = await getTopProducts(businessId, 5);
+        if (!isMounted.current) return;
         setProductsData(topProducts.map(product => ({
           name: product.product_name,
           sales: product.total_sold
         })));
 
-        // Cargar pedidos recientes
-        const orders = await getRecentOrders(businessId, 5);
+        if (!isMounted.current) return;
 
         const formattedOrders: Order[] = orders.map((order) => {
           return {
             id: order.id,
             customer: order.customer_name || 'Cliente',
-
             items: order.order_items?.map(item => `${item.quantity}x ${item.product_name || 'Producto'}`).join(', ') || 'Productos varios',
             total: order.total,
             status: mapOrderStatus(order.status || 'pending'),
@@ -160,18 +166,14 @@ export default function Dashboard() {
         });
         setRecentOrders(formattedOrders);
 
-
-
-
         // Determinar si hay datos relevantes
         const hasRelevantData =
           businessMetrics.total_orders > 0 ||
-          salesData.length > 0 ||
-          productsData.length > 0 ||
           formattedOrders.length > 0;
 
         setHasData(hasRelevantData);
       } catch (error) {
+        if (!isMounted.current) return;
         // En caso de error, usar datos por defecto
         setMetrics([
           {
@@ -205,9 +207,7 @@ export default function Dashboard() {
         ]);
         setHasData(false);
       } finally {
-        // Always set loading to false, even if component unmounted
-        // This prevents infinite loading state
-        setLoading(false);
+        if (isMounted.current) setLoading(false);
       }
     };
 

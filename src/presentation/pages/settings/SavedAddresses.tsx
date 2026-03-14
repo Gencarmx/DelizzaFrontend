@@ -61,7 +61,7 @@ export default function SavedAddresses() {
     register,
     handleSubmit,
     reset,
-    formState: { errors: formErrors },
+    formState: { errors: formErrors, isSubmitting },
   } = useForm<AddressFormValues>({
     resolver: zodResolver(addressSchema),
     defaultValues: {
@@ -570,12 +570,14 @@ export default function SavedAddresses() {
                 >
                   Cancelar
                 </button>
+                {/* isSubmitting (react-hook-form) se activa síncronamente en el
+                    primer click, cubriendo la ventana antes de que setSaving se ejecute */}
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || isSubmitting}
                   className="flex-1 px-4 py-3 bg-amber-500 text-white font-medium rounded-xl hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {saving ? "Guardando..." : "Guardar"}
+                  {saving || isSubmitting ? "Guardando..." : "Guardar"}
                 </button>
               </div>
             </form>

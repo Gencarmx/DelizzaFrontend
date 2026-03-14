@@ -36,18 +36,25 @@ export async function loadCartFromSupabase(
 
 /**
  * Guarda (upsert) los items del carrito en Supabase.
- * @param authUserId - auth.users.id del usuario autenticado
- * @param items - Array de CartItem a guardar
+ * Incluye un `client_token` único por sesión para que el listener Realtime
+ * pueda ignorar el evento generado por esta misma escritura y evitar el loop:
+ *   guardada local → evento Realtime → recarga → nueva guardada → ...
+ *
+ * @param authUserId  - auth.users.id del usuario autenticado
+ * @param items       - Array de CartItem a guardar
+ * @param clientToken - Token de sesión del cliente que realizó la escritura
  */
 export async function saveCartToSupabase(
   authUserId: string,
   items: CartItem[],
+  clientToken?: string,
 ): Promise<void> {
   const { error } = await supabase.from("carts").upsert(
     {
       user_id: authUserId,
       items: items as unknown as Record<string, unknown>[],
       updated_at: new Date().toISOString(),
+      ...(clientToken ? { client_token: clientToken } : {}),
     },
     { onConflict: "user_id" },
   );
@@ -61,16 +68,18 @@ export async function saveCartToSupabase(
 
 /**
  * Suscribe a cambios Realtime en el carrito del usuario.
- * El callback es llamado ante cualquier cambio; useCartSync recarga
- * la fila completa desde Supabase para garantizar datos correctos.
+ * Ignora eventos generados por el propio cliente (mismo `client_token`) para
+ * evitar el loop: escritura local → evento Realtime → recarga → escritura...
  *
- * @param authUserId - auth.users.id del usuario autenticado
- * @param onChange   - Callback llamado cuando hay algún cambio
+ * @param authUserId        - auth.users.id del usuario autenticado
+ * @param onChange          - Callback llamado cuando hay algún cambio externo
+ * @param getClientToken    - Getter del token del cliente actual (puede cambiar)
  * @returns Función para cancelar la suscripción
  */
 export function subscribeToCartChanges(
   authUserId: string,
   onChange: () => void,
+  getClientToken?: () => string | undefined,
 ): () => void {
   let channel: RealtimeChannel;
 
@@ -84,15 +93,18 @@ export function subscribeToCartChanges(
         table: "carts",
         filter: `user_id=eq.${authUserId}`,
       },
-      (_payload) => {
-        console.log("[cartService] Realtime evento:", _payload.eventType);
+      (payload) => {
+        // Si el evento incluye el mismo client_token que usamos al guardar,
+        // es nuestra propia escritura — ignorarla para evitar loops.
+        const eventToken = (payload.new as Record<string, unknown>)?.client_token as string | undefined;
+        const ownToken = getClientToken?.();
+        if (ownToken && eventToken === ownToken) {
+          return;
+        }
         onChange();
       },
     )
     .subscribe((status, err) => {
-      if (status === "SUBSCRIBED") {
-        console.log("[cartService] Realtime suscrito para user:", authUserId);
-      }
       if (status === "CHANNEL_ERROR") {
         console.error("[cartService] Error en canal Realtime:", err);
       }

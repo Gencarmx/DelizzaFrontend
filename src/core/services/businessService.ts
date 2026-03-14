@@ -107,7 +107,16 @@ export async function getBusinesses(filters?: BusinessFilters): Promise<Business
     }
 
     if (filters?.search) {
-      query = query.or(`name.ilike.%${filters.search}%,address.ilike.%${filters.search}%`);
+      // Escapar caracteres especiales de la sintaxis de filtros PostgREST antes
+      // de interpolar en la cadena or(). Los caracteres "(", ")", "," tienen
+      // significado especial en el lenguaje de filtros y podrían romper la query
+      // o producir resultados inesperados si el usuario los incluye en su búsqueda.
+      const sanitizedTerm = filters.search
+        .trim()
+        .replace(/[(),\\]/g, "\\$&"); // escapar caracteres especiales PostgREST
+      query = query.or(
+        `name.ilike.%${sanitizedTerm}%,address.ilike.%${sanitizedTerm}%`
+      );
     }
 
     const { data, error } = await query;
@@ -246,7 +255,11 @@ export async function uploadBusinessLogo(
   file: File
 ): Promise<string> {
   try {
-    const fileExt = file.name.split('.').pop();
+    // Derivar extensión del nombre del archivo; si no tiene punto, usar el MIME type
+    // como fallback para evitar paths corruptos como "uuid/logo.undefined"
+    const extFromName = file.name.includes('.') ? file.name.split('.').pop() : undefined;
+    const extFromMime = file.type.split('/')[1]?.replace('jpeg', 'jpg') ?? 'jpg';
+    const fileExt = extFromName ?? extFromMime;
     const fileName = `${businessId}/logo.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
@@ -319,18 +332,35 @@ export async function getBusinessStats(): Promise<{
 }
 
 /**
- * Verifica si un usuario puede gestionar un restaurante
+ * Verifica si un usuario puede gestionar un restaurante.
+ *
+ * @param authUserId - El auth.users.id del usuario (NO el profiles.id).
+ *   La función resuelve internamente el profileId correspondiente para
+ *   comparar con businesses.owner_id, evitando confusión entre los dos
+ *   tipos de UUID que coexisten en el schema.
+ * @param businessId - El ID del negocio a verificar.
  */
 export async function canUserManageBusiness(
-  userId: string,
+  authUserId: string,
   businessId: string
 ): Promise<boolean> {
   try {
+    // Paso 1: resolver el profileId a partir del authUserId.
+    // businesses.owner_id referencia profiles.id, no auth.users.id.
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', authUserId)
+      .maybeSingle();
+
+    if (profileError || !profile) return false;
+
+    // Paso 2: verificar que el negocio pertenece a ese perfil.
     const { data, error } = await supabase
       .from('businesses')
       .select('owner_id')
       .eq('id', businessId)
-      .eq('owner_id', userId)
+      .eq('owner_id', profile.id)
       .single();
 
     if (error) {

@@ -8,6 +8,8 @@ export interface ActionItem {
   icon?: ReactNode;
   onClick: () => void;
   variant?: "default" | "danger";
+  /** Deshabilita el ítem mientras una operación async está en vuelo */
+  disabled?: boolean;
 }
 
 export interface ActionDropdownProps {
@@ -74,11 +76,13 @@ export default function ActionDropdown({ actions }: ActionDropdownProps) {
             {actions.map((action, index) => (
               <button
                 key={index}
+                disabled={action.disabled}
                 onClick={() => {
+                  if (action.disabled) return;
                   action.onClick();
                   setIsOpen(false);
                 }}
-                className={`w-full px-4 py-2.5 text-left text-sm font-medium flex items-center gap-3 transition-colors ${
+                className={`w-full px-4 py-2.5 text-left text-sm font-medium flex items-center gap-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   action.variant === "danger"
                     ? "text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                     : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"

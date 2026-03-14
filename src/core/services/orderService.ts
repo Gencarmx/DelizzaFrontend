@@ -148,7 +148,9 @@ export async function getOrderDetails(
 }
 
 /**
- * Actualiza el estado de un pedido y notifica al cliente vía Broadcast
+ * Actualiza el estado de un pedido y notifica al cliente vía Broadcast.
+ * Verifica que el usuario autenticado sea el propietario del negocio
+ * asociado al pedido antes de permitir cualquier modificación.
  */
 export async function updateOrderStatus(
   orderId: string,
@@ -166,6 +168,17 @@ export async function updateOrderStatus(
     ];
     if (!validStatuses.includes(status)) {
       throw new Error("Estado de pedido inválido");
+    }
+
+    // Verificar autorización: el usuario autenticado debe ser el dueño
+    // del negocio al que pertenece el pedido.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("No autorizado: sesión no encontrada");
+    }
+    const authorized = await canUserManageOrder(user.id, orderId);
+    if (!authorized) {
+      throw new Error("No autorizado: no tienes permisos para gestionar este pedido");
     }
 
     const updateData: OrderUpdate = {
@@ -193,14 +206,25 @@ export async function updateOrderStatus(
 
     const updatedOrder = data[0];
 
-    // Notificar al cliente vía Broadcast (sin RLS, entrega instantánea)
+    // Notificar al cliente vía Broadcast (sin RLS, entrega instantánea).
+    // Se usa un timeout de seguridad para limpiar el canal si nunca alcanza
+    // el estado SUBSCRIBED (error de red, servidor no disponible), evitando
+    // canales zombie que se acumularían con cada cambio de estado de pedido.
     if (updatedOrder.customer_id) {
+      const CHANNEL_TIMEOUT_MS = 8000;
       try {
         const channel = supabase.channel(`customer_orders_${updatedOrder.customer_id}`, {
           config: { broadcast: { ack: true } },
         });
+
+        const safetyTimer = setTimeout(async () => {
+          console.warn("[updateOrderStatus] Timeout esperando SUBSCRIBED — limpiando canal");
+          try { await supabase.removeChannel(channel); } catch { /* ignorar */ }
+        }, CHANNEL_TIMEOUT_MS);
+
         channel.subscribe(async (status) => {
           if (status === 'SUBSCRIBED') {
+            clearTimeout(safetyTimer);
             const resp = await channel.send({
               type: "broadcast",
               event: "order_status_update",
@@ -214,7 +238,10 @@ export async function updateOrderStatus(
               },
             });
             console.log("[updateOrderStatus] Broadcast sent response:", resp);
-            await supabase.removeChannel(channel);
+            try { await supabase.removeChannel(channel); } catch { /* ignorar */ }
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            clearTimeout(safetyTimer);
+            try { await supabase.removeChannel(channel); } catch { /* ignorar */ }
           }
         });
       } catch (broadcastErr) {
@@ -234,10 +261,22 @@ export async function updateOrderStatus(
 
 
 /**
- * Marca un pedido como pagado en efectivo
+ * Marca un pedido como pagado en efectivo.
+ * Verifica que el usuario autenticado sea el propietario del negocio
+ * asociado al pedido antes de permitir cualquier modificación.
  */
 export async function markOrderAsPaid(orderId: string): Promise<Order> {
   try {
+    // Verificar autorización primero
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("No autorizado: sesión no encontrada");
+    }
+    const authorized = await canUserManageOrder(user.id, orderId);
+    if (!authorized) {
+      throw new Error("No autorizado: no tienes permisos para gestionar este pedido");
+    }
+
     // Verificar que el pedido existe y está en estado válido
     const order = await getOrderDetails(orderId);
     if (!order) {
@@ -274,13 +313,25 @@ export async function markOrderAsPaid(orderId: string): Promise<Order> {
 }
 
 /**
- * Cancela un pedido
+ * Cancela un pedido.
+ * Verifica que el usuario autenticado sea el propietario del negocio
+ * asociado al pedido antes de permitir la cancelación.
  */
 export async function cancelOrder(
   orderId: string,
   _reason: string,
 ): Promise<Order> {
   try {
+    // Verificar autorización primero
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("No autorizado: sesión no encontrada");
+    }
+    const authorized = await canUserManageOrder(user.id, orderId);
+    if (!authorized) {
+      throw new Error("No autorizado: no tienes permisos para cancelar este pedido");
+    }
+
     // Verificar que el pedido puede ser cancelado
     const order = await getOrderDetails(orderId);
     if (!order) {

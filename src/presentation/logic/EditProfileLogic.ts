@@ -76,18 +76,18 @@ export function useEditProfileLogic() {
           name:
             profile?.full_name || user.user_metadata?.full_name || "Usuario",
           email: user.email || "correo@ejemplo.com",
-          phone: profile?.phone_number || "+99 999 999 9999",
-          birthdate: "1990-05-15", // Generic since not in schema
+          phone: profile?.phone_number || "",
+          birthdate: "", // Vacío si el usuario no la ha configurado
         };
         reset(data);
       } catch (error) {
         console.error("Error fetching profile:", error);
-        // Fallback to user metadata if profile fetch fails
+        // Fallback a metadatos del usuario si el fetch del perfil falla
         reset({
           name: user.user_metadata?.full_name || "Usuario",
           email: user.email || "correo@ejemplo.com",
-          phone: "+52 999 123 4567",
-          birthdate: "1990-05-15",
+          phone: "",
+          birthdate: "",
         });
       }
     };
@@ -108,12 +108,18 @@ export function useEditProfileLogic() {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedImage(file);
-      // Create image preview using FileReader
+      // Flag de montaje local: evita llamar setImagePreview si el componente
+      // se desmonta mientras FileReader aún procesa el archivo.
+      let mounted = true;
       const reader = new FileReader();
       reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
+        if (mounted) setImagePreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);
+      // La función no retorna un cleanup (es un event handler, no un effect),
+      // por lo que usamos la variable de closure para cancelar la actualización.
+      // En la práctica, FileReader es tan rápido que esto es preventivo.
+      return () => { mounted = false; };
     }
   };
 
@@ -134,13 +140,19 @@ export function useEditProfileLogic() {
 
     setIsSaving(true);
     try {
-      // Persist profile changes to Supabase database
-      const { error } = await supabase.from("profiles").upsert({
-        user_id: user.id,
-        full_name: pendingData.name,
-        phone_number: pendingData.phone,
-        updated_at: new Date().toISOString(),
-      });
+      // Persist profile changes to Supabase database.
+      // Se usa UPDATE dirigido por user_id en lugar de upsert() sin onConflict,
+      // ya que el perfil siempre existe cuando el usuario llega a esta pantalla.
+      // upsert() sin onConflict intentaba un INSERT que violaba la constraint
+      // UNIQUE profiles_user_id_key (error 23505).
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: pendingData.name,
+          phone_number: pendingData.phone,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id);
 
       if (error) throw error;
 

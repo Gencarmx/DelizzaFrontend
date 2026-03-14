@@ -33,6 +33,9 @@ export interface OrderResult {
   success: boolean;
   orderId?: string;
   restaurantName: string;
+  /** ID del restaurante — se usa para limpiar el carrito por restaurante.
+   *  Más confiable que buscar por nombre (dos restaurantes podrían tener el mismo). */
+  restaurantId: string;
   total: number;
   error?: string;
 }
@@ -60,20 +63,20 @@ export async function processMultiRestaurantCheckout(
     return [{
       success: false,
       restaurantName: 'Carrito vacío',
+      restaurantId: '',
       total: 0,
       error: 'No hay productos en el carrito para procesar'
     }];
   }
 
-  // Procesar cada pedido por restaurante por separado
   for (const order of orders) {
     try {
-      // Validar que el restaurante tenga un ID válido
       if (!order.restaurant?.id || order.restaurant.id === 'unknown' || !isValidUUID(order.restaurant.id)) {
         console.error('ID de restaurante inválido:', order.restaurant?.id);
         results.push({
           success: false,
           restaurantName: order.restaurant?.name || 'Restaurante desconocido',
+          restaurantId: order.restaurant?.id || '',
           total: order.total,
           error: 'ID de restaurante inválido. Por favor, elimina los productos de este restaurante y agrégalos nuevamente.'
         });
@@ -87,6 +90,7 @@ export async function processMultiRestaurantCheckout(
       results.push({
         success: false,
         restaurantName: order.restaurant.name,
+        restaurantId: order.restaurant.id,
         total: order.total,
         error: error instanceof Error ? error.message : 'Error desconocido'
       });
@@ -115,60 +119,44 @@ async function createRestaurantOrder(
       throw new Error(`ID de restaurante inválido: ${order.restaurant.id}`);
     }
 
-    // 2. Crear el pedido en la base de datos
-    const { data: orderData, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        business_id: order.restaurant.id,
-        customer_id: customerProfile.id,
-        customer_name: customerProfile.full_name || 'Cliente',
-        status: 'pending',
-        total: order.total,
-        delivery_type: checkoutData.deliveryOption.type,
-        payment_method: checkoutData.paymentMethod,
-      })
-      .select()
-      .single();
-
-    if (orderError) throw orderError;
-
-    // 3. Crear los items del pedido
+    // 2. Crear la orden y sus items en una sola transacción atómica (RC1 fix).
+    // El stored procedure create_order_with_items hace BEGIN/COMMIT en PostgreSQL,
+    // eliminando la condición de carrera del rollback manual previo.
     const orderItems = order.items.map(item => ({
-      order_id: orderData.id,
       product_id: item.id,
       product_name: item.name,
       price: item.price,
       quantity: item.quantity,
     }));
 
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .insert(orderItems);
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      'create_order_with_items',
+      {
+        p_business_id:    order.restaurant.id,
+        p_customer_id:    customerProfile.id,
+        p_customer_name:  customerProfile.full_name || 'Cliente',
+        p_total:          order.total,
+        p_delivery_type:  checkoutData.deliveryOption.type,
+        p_payment_method: checkoutData.paymentMethod,
+        p_items:          orderItems,
+      }
+    );
 
-    // 4. Si falla la creación de items, cancelar la orden (rollback manual)
-    if (itemsError) {
-      console.error('Error creando items del pedido, cancelando orden:', itemsError);
+    if (rpcError) throw rpcError;
 
-      // Cancelar la orden creada
-      await supabase
-        .from('orders')
-        .update({ status: 'cancelled', cancelled_reason: 'Error al crear items del pedido' })
-        .eq('id', orderData.id);
-
-      throw new Error(`Error al crear los items del pedido: ${itemsError.message}`);
-    }
-
+    const orderId: string = rpcData.order_id;
+    const orderCreatedAt: string = rpcData.created_at ?? new Date().toISOString();
 
     // 3. Aquí iría la integración con MercadoPago
-    // await processPayment(orderData.id, order.total, checkoutData.paymentMethod);
+    // await processPayment(orderId, order.total, checkoutData.paymentMethod);
 
     // 4. Notificar al restaurante sobre el nuevo pedido vía Broadcast
-    await notifyRestaurant(orderData.id, {
+    await notifyRestaurant(orderId, {
       business_id: order.restaurant.id,
       customer_name: customerProfile.full_name || 'Cliente',
       total: order.total,
       delivery_type: checkoutData.deliveryOption.type,
-      created_at: orderData.created_at,
+      created_at: orderCreatedAt,
       order_items: order.items.map(item => ({
         product_name: item.name,
         quantity: item.quantity,
@@ -178,8 +166,9 @@ async function createRestaurantOrder(
 
     return {
       success: true,
-      orderId: orderData.id,
+      orderId: orderId,
       restaurantName: order.restaurant.name,
+      restaurantId: order.restaurant.id,
       total: order.total
     };
 
@@ -211,6 +200,10 @@ export async function processPayment(
 /**
  * Notifica al restaurante de un nuevo pedido usando Supabase Broadcast.
  * Broadcast no requiere RLS, por lo que siempre se entrega al canal destino.
+ *
+ * El canal temporal se limpia con un timeout de seguridad para evitar canales
+ * zombie si la suscripción nunca alcanza el estado SUBSCRIBED (error de red,
+ * timeout del servidor, etc.).
  */
 export async function notifyRestaurant(orderId: string, orderData?: {
   business_id: string;
@@ -222,14 +215,24 @@ export async function notifyRestaurant(orderId: string, orderData?: {
 }): Promise<void> {
   if (!orderData) return;
 
+  const CHANNEL_TIMEOUT_MS = 8000; // Máximo tiempo de espera para el canal
+
   try {
     // Usar el mismo nombre de canal que escucha useRealtimeNotifications
     const channel = supabase.channel(`restaurant_orders_${orderData.business_id}`, {
       config: { broadcast: { ack: true } },
     });
 
+    // Timeout de seguridad: si el canal nunca llega a SUBSCRIBED (error de red,
+    // servidor no disponible), lo removemos para evitar canales zombie.
+    const safetyTimer = setTimeout(async () => {
+      console.warn('[notifyRestaurant] Timeout esperando SUBSCRIBED — limpiando canal');
+      try { await supabase.removeChannel(channel); } catch { /* ignorar */ }
+    }, CHANNEL_TIMEOUT_MS);
+
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
+        clearTimeout(safetyTimer);
         const resp = await channel.send({
           type: 'broadcast',
           event: 'new_order',
@@ -247,7 +250,10 @@ export async function notifyRestaurant(orderId: string, orderData?: {
         console.log("[notifyRestaurant] Broadcast sent response:", resp);
 
         // Limpiar el canal temporal (el del restaurante tiene su propio canal persistente)
-        await supabase.removeChannel(channel);
+        try { await supabase.removeChannel(channel); } catch { /* ignorar */ }
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        clearTimeout(safetyTimer);
+        try { await supabase.removeChannel(channel); } catch { /* ignorar */ }
       }
     });
   } catch (err) {

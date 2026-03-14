@@ -7,9 +7,8 @@ import ActionDropdown from "@components/restaurant-ui/dropdowns/ActionDropdown";
 import Button from "@components/restaurant-ui/buttons/Button";
 import Input from "@components/restaurant-ui/forms/Input";
 import ConfirmModal from "@components/restaurant-ui/modals/ConfirmModal";
-import { useAuth } from "@core/context/AuthContext";
+import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
 import { getProductsByBusiness, createProduct } from "@core/services/productService";
-import { getBusinessByOwner } from "@core/services/businessService";
 import { deleteProduct } from "@core/services/productService";
 import type { Column } from "@components/restaurant-ui/tables/DataTable";
 import type { ActionItem } from "@components/restaurant-ui/dropdowns/ActionDropdown";
@@ -28,12 +27,12 @@ interface Product {
 
 export default function ProductList() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  // businessId viene del contexto en lugar de re-consultar getBusinessByOwner()
+  const { businessId } = useRestaurantNotifications();
   const [searchQuery, setSearchQuery] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [businessId, setBusinessId] = useState<string | null>(null);
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
     productId: string | null;
@@ -43,11 +42,14 @@ export default function ProductList() {
     productId: null,
     productName: "",
   });
+  // IDs de productos que están siendo eliminados o duplicados (guards anti-doble-click)
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [duplicatingIds, setDuplicatingIds] = useState<Set<string>>(new Set());
 
-  // Cargar productos desde la base de datos
+  // Cargar productos usando businessId del contexto (sin re-fetch de business)
   useEffect(() => {
     const loadProducts = async () => {
-      if (!user?.id) {
+      if (!businessId) {
         setLoading(false);
         return;
       }
@@ -56,18 +58,7 @@ export default function ProductList() {
         setLoading(true);
         setError(null);
 
-        // Obtener el business del usuario
-        const business = await getBusinessByOwner(user.id);
-        if (!business) {
-          setError("No se encontró un restaurante asociado a tu cuenta");
-          setLoading(false);
-          return;
-        }
-
-        setBusinessId(business.id);
-
-        // Obtener productos del restaurante
-        const productsData = await getProductsByBusiness(business.id);
+        const productsData = await getProductsByBusiness(businessId);
         setProducts(productsData);
 
       } catch (err) {
@@ -79,7 +70,7 @@ export default function ProductList() {
     };
 
     loadProducts();
-  }, [user?.id]);
+  }, [businessId]);
 
   const handleEdit = (productId: string) => {
     navigate(`/restaurant/products/edit/${productId}`);
@@ -95,23 +86,30 @@ export default function ProductList() {
 
   const confirmDelete = async () => {
     if (!deleteModal.productId) return;
+    // Guard: evita doble confirmación mientras la request está en vuelo
+    if (deletingId === deleteModal.productId) return;
 
+    const idToDelete = deleteModal.productId;
+    setDeletingId(idToDelete);
     try {
-      await deleteProduct(deleteModal.productId);
-      setProducts((prev) => prev.filter((p) => p.id !== deleteModal.productId));
+      await deleteProduct(idToDelete);
+      setProducts((prev) => prev.filter((p) => p.id !== idToDelete));
       setDeleteModal({ isOpen: false, productId: null, productName: "" });
     } catch (err) {
       console.error("Error eliminando producto:", err);
-      // Aquí podrías mostrar un toast de error
+    } finally {
+      setDeletingId(null);
     }
   };
 
   const handleDuplicate = async (productId: string) => {
     const product = products.find((p) => p.id === productId);
     if (!product || !businessId) return;
+    // Guard: evita crear múltiples copias si el usuario hace doble clic
+    if (duplicatingIds.has(productId)) return;
 
+    setDuplicatingIds(prev => new Set(prev).add(productId));
     try {
-      // Crear una copia del producto con un nombre diferente
       const duplicatedProduct = {
         name: `${product.name} (Copia)`,
         description: product.description || undefined,
@@ -123,10 +121,14 @@ export default function ProductList() {
 
       const newProduct = await createProduct(duplicatedProduct);
       setProducts((prev) => [...prev, newProduct]);
-
     } catch (err) {
       console.error("Error duplicando producto:", err);
-      // Aquí podrías mostrar un toast de error
+    } finally {
+      setDuplicatingIds(prev => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
+      });
     }
   };
 
@@ -137,9 +139,12 @@ export default function ProductList() {
       onClick: () => handleEdit(product.id),
     },
     {
-      label: "Duplicar",
-      icon: <Copy className="w-4 h-4" />,
+      label: duplicatingIds.has(product.id) ? "Duplicando..." : "Duplicar",
+      icon: duplicatingIds.has(product.id)
+        ? <Loader2 className="w-4 h-4 animate-spin" />
+        : <Copy className="w-4 h-4" />,
       onClick: () => handleDuplicate(product.id),
+      disabled: duplicatingIds.has(product.id),
     },
     {
       label: "Eliminar",
@@ -292,15 +297,17 @@ export default function ProductList() {
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={deleteModal.isOpen}
-        onClose={() =>
-          setDeleteModal({ isOpen: false, productId: null, productName: "" })
-        }
+        onClose={() => {
+          if (deletingId) return; // no cerrar mientras elimina
+          setDeleteModal({ isOpen: false, productId: null, productName: "" });
+        }}
         onConfirm={confirmDelete}
         title="Desactivar producto"
         message={`¿Estás seguro de que deseas desactivar "${deleteModal.productName}"? El producto no se eliminará de la base de datos por razones de integridad de datos, solo se desactivará y dejará de estar visible para los clientes.`}
         confirmText="Desactivar"
         cancelText="Cancelar"
         variant="danger"
+        isLoading={!!deletingId}
       />
     </div>
   );
