@@ -516,13 +516,26 @@ export async function getOrdersByCustomer(
 }
 
 /**
- * Verifica si un usuario puede gestionar un pedido
+ * Verifica si un usuario puede gestionar un pedido.
+ * Traduce auth.users.id → profiles.id antes de comparar con businesses.owner_id,
+ * siguiendo el mismo patrón que canUserManageBusiness en businessService.ts.
  */
 export async function canUserManageOrder(
   userId: string,
   orderId: string,
 ): Promise<boolean> {
   try {
+    // Paso 1: resolver profiles.id a partir de auth.users.id
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (profileError) throw profileError;
+    if (!profile) return false;
+
+    // Paso 2: verificar que el negocio del pedido pertenece a este perfil
     const { data, error } = await supabase
       .from("orders")
       .select(
@@ -532,7 +545,7 @@ export async function canUserManageOrder(
       `,
       )
       .eq("id", orderId)
-      .eq("businesses.owner_id", userId)
+      .eq("businesses.owner_id", profile.id)
       .single();
 
     if (error) {

@@ -9,8 +9,7 @@ import StatusBadge from "@components/restaurant-ui/badges/StatusBadge";
 import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
 import { getBusinessMetrics, getSalesChartData, getTopProducts } from "@core/services/analyticsService";
 import { getRecentOrders } from "@core/services/orderService";
-import { setBusinessPaused } from "@core/services/businessService";
-import { supabase } from "@core/supabase/client";
+import { setBusinessPaused, getBusinessPausedState } from "@core/services/businessService";
 import type { Column } from "@components/restaurant-ui/tables/DataTable";
 
 interface Order {
@@ -66,14 +65,9 @@ export default function Dashboard() {
   // Cargar estado inicial de is_paused desde la BD
   useEffect(() => {
     if (!businessId) return;
-    supabase
-      .from('businesses')
-      .select('is_paused')
-      .eq('id', businessId)
-      .single()
-      .then(({ data }) => {
-        if (data) setIsPaused(data.is_paused);
-      });
+    getBusinessPausedState(businessId).then((paused) => {
+      if (paused !== null) setIsPaused(paused);
+    });
   }, [businessId]);
 
   const handleTogglePause = async () => {

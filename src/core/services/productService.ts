@@ -251,7 +251,8 @@ export async function uploadProductImage(
     }
 
     // Generar nombre único para el archivo
-    const fileExt = file.name.split('.').pop();
+    // Fallback de extensión: si el nombre no tiene punto se infiere del MIME type
+    const fileExt = file.name.split('.').pop() || file.type.split('/').pop() || 'jpg';
     const fileName = `${businessId}/${productId || 'temp'}_${Date.now()}.${fileExt}`;
 
     // Subir archivo a Supabase Storage

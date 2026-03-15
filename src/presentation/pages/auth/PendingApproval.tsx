@@ -33,7 +33,6 @@ export default function PendingApproval() {
       console.log(
         `Attempt ${attempts}/${MAX_RETRIES} to fetch business status`,
       );
-      console.log("🔍 USER ID:", user.id); // ← AGREGAR ESTE LOG
 
       try {
         // First get the profile id

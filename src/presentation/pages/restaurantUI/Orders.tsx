@@ -285,7 +285,7 @@ export default function Orders() {
             .from('profiles')
             .select('full_name, phone_number')
             .eq('id', customerId)
-            .single(),
+            .maybeSingle(),
           supabase
             .from('addresses')
             .select('*')
@@ -294,23 +294,31 @@ export default function Orders() {
             .limit(1),
         ]);
 
-        if (profileResult.data) {
+        // Los errores de perfil y dirección son no-bloqueantes: se registran
+        // en consola pero el modal se abre igual con los datos base del pedido.
+        if (profileResult.error) {
+          console.warn('No se pudo cargar perfil del cliente:', profileResult.error.message);
+        } else if (profileResult.data) {
           customerName = profileResult.data.full_name || order.customer;
           customerPhone = profileResult.data.phone_number || addressResult.data?.[0]?.phone || '';
         }
 
-        const address = addressResult.data?.[0];
-        if (address) {
-          deliveryAddress = {
-            line1: address.line1 || '',
-            line2: address.line2 || undefined,
-            city: address.city || '',
-            state: address.state || undefined,
-            postalCode: address.postal_code || undefined,
-            country: address.country || undefined,
-            recipientName: address.recipient_name || undefined,
-            recipientPhone: address.phone || undefined,
-          };
+        if (addressResult.error) {
+          console.warn('No se pudo cargar dirección del cliente:', addressResult.error.message);
+        } else {
+          const address = addressResult.data?.[0];
+          if (address) {
+            deliveryAddress = {
+              line1: address.line1 || '',
+              line2: address.line2 || undefined,
+              city: address.city || '',
+              state: address.state || undefined,
+              postalCode: address.postal_code || undefined,
+              country: address.country || undefined,
+              recipientName: address.recipient_name || undefined,
+              recipientPhone: address.phone || undefined,
+            };
+          }
         }
       }
 

@@ -216,6 +216,26 @@ export async function updateBusiness(
 }
 
 /**
+ * Obtiene el estado de pausa (hibernación) de un restaurante.
+ * Retorna null si el negocio no existe o hay un error.
+ */
+export async function getBusinessPausedState(businessId: string): Promise<boolean | null> {
+  try {
+    const { data, error } = await supabase
+      .from('businesses')
+      .select('is_paused')
+      .eq('id', businessId)
+      .single();
+
+    if (error) throw error;
+    return data?.is_paused ?? false;
+  } catch (error) {
+    console.error('Error obteniendo estado de pausa:', error);
+    return null;
+  }
+}
+
+/**
  * Activa o desactiva el modo hibernación del restaurante.
  * En modo pausa, el restaurante sigue visible para clientes pero no acepta pedidos.
  * @param businessId - ID del restaurante
