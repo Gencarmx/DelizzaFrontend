@@ -5,7 +5,31 @@ import ProductModal from "@presentation/components/common/ProductModal";
 import { SearchBar } from "@presentation/components/layout/SearchBar";
 import { supabase } from "@core/supabase/client";
 import { getActiveProductCategories, type ProductCategory } from "@core/services/productCategoryService";
+import { isBusinessOpenNow } from "@core/services/businessHoursService";
 import { useAddress } from "@core/context/AddressContext";
+import type { Database } from "@core/supabase/types";
+
+type BusinessHour = Database['public']['Tables']['business_hours']['Row'];
+
+type RestaurantStatus =
+  | { type: 'open';   label: 'Abierto' }
+  | { type: 'paused'; label: 'No recibimos pedidos' }
+  | { type: 'closed'; label: 'Cerrado por el momento' };
+
+function computeRestaurantStatus(
+  active: boolean | null,
+  isPaused: boolean,
+  hours: BusinessHour[]
+): RestaurantStatus {
+  if (!active) return { type: 'closed', label: 'Cerrado por el momento' };
+  if (isPaused) return { type: 'paused', label: 'No recibimos pedidos' };
+
+  const openNow = isBusinessOpenNow(hours);
+
+  if (openNow === null) return { type: 'open', label: 'Abierto' };
+  if (openNow === false) return { type: 'closed', label: 'Cerrado por el momento' };
+  return { type: 'open', label: 'Abierto' };
+}
 
 export default function Home() {
   const { selectedAddress, loading: addressLoading } = useAddress();
@@ -80,7 +104,7 @@ export default function Home() {
             .eq('active', true),
           supabase
             .from('businesses')
-            .select('id, name, address, active, logo_url')
+            .select('id, name, address, active, logo_url, is_paused')
             .eq('active', true),
         ]);
 
@@ -114,17 +138,40 @@ export default function Home() {
           })));
         }
 
-        // — Restaurantes —
+        // — Restaurantes con estado tricolor —
         if (restaurantsResult.error) {
           console.error('Error fetching restaurants:', restaurantsResult.error);
         } else {
-          setRestaurants((restaurantsResult.data ?? []).map(b => ({
-            id: b.id,
-            name: b.name,
-            address: b.address || "Dirección no disponible",
-            status: b.active ? "Abierto" : "Cerrado",
-            logo: b.logo_url || "https://via.placeholder.com/200",
-          })));
+          const restaurantList = restaurantsResult.data ?? [];
+
+          // Fetch horarios de todos los restaurantes en un solo query
+          const restaurantIds = restaurantList.map(b => b.id);
+          const { data: hoursData } = restaurantIds.length > 0
+            ? await supabase
+                .from('business_hours')
+                .select('business_id, day_of_week, open_time, close_time, active, id, created_at, updated_at')
+                .in('business_id', restaurantIds)
+            : { data: [] };
+
+          // Agrupar horarios por business_id para consulta O(1)
+          const hoursMap = new Map<string, BusinessHour[]>();
+          for (const hour of (hoursData ?? [])) {
+            const existing = hoursMap.get(hour.business_id) ?? [];
+            existing.push(hour as BusinessHour);
+            hoursMap.set(hour.business_id, existing);
+          }
+
+          setRestaurants(restaurantList.map(b => {
+            const hours = hoursMap.get(b.id) ?? [];
+            const restaurantStatus = computeRestaurantStatus(b.active, b.is_paused, hours);
+            return {
+              id: b.id,
+              name: b.name,
+              address: b.address || "Dirección no disponible",
+              status: restaurantStatus,
+              logo: b.logo_url || "https://via.placeholder.com/200",
+            };
+          }));
         }
 
         setLoading({ restaurants: false, categories: false, allProducts: false });
@@ -403,8 +450,14 @@ export default function Home() {
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     alt={item.name}
                   />
-                  <span className={`absolute top-2 left-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${item.status === 'Abierto' ? 'bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
-                    {item.status}
+                  <span className={`absolute top-2 left-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                    item.status.type === 'open'
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/60 dark:text-green-300'
+                      : item.status.type === 'paused'
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300'
+                        : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                  }`}>
+                    {item.status.label}
                   </span>
                 </div>
                 <div className="p-3">

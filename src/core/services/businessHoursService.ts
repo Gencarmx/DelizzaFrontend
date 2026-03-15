@@ -140,3 +140,35 @@ export async function toggleBusinessHour(
     throw new Error('No se pudo cambiar el estado del horario');
   }
 }
+
+/**
+ * Calcula si un negocio está abierto en este momento basándose en sus horarios.
+ * Función pura — no realiza llamadas a la BD, recibe el array ya obtenido.
+ *
+ * @param hours - Array de horarios del negocio obtenidos desde la BD
+ * @returns true si está abierto, false si está cerrado,
+ *          null si no hay horarios configurados (significa "sin restricción horaria")
+ */
+export function isBusinessOpenNow(hours: BusinessHour[]): boolean | null {
+  if (!hours || hours.length === 0) return null;
+
+  const now = new Date();
+  // getDay() retorna 0=Domingo, 1=Lunes ... 6=Sábado — igual que day_of_week en BD
+  const todayDayOfWeek = now.getDay();
+
+  // Buscar el horario del día actual que esté activo
+  const todaySchedule = hours.find(
+    h => h.day_of_week === todayDayOfWeek && h.active === true
+  );
+
+  // Si el día de hoy no tiene horario activo, el negocio está cerrado
+  if (!todaySchedule) return false;
+
+  // Comparar hora actual vs open_time y close_time
+  // Los tiempos en BD están en formato "HH:MM:SS" o "HH:MM"
+  const currentTime = now.toTimeString().slice(0, 5); // "HH:MM"
+  const openTime = todaySchedule.open_time.slice(0, 5);   // "HH:MM"
+  const closeTime = todaySchedule.close_time.slice(0, 5); // "HH:MM"
+
+  return currentTime >= openTime && currentTime < closeTime;
+}

@@ -18,9 +18,11 @@ export interface ProductModalProps {
     };
     description?: string;
   };
+  /** Estado del restaurante — determina si se pueden realizar pedidos */
+  restaurantStatus?: 'open' | 'paused' | 'closed';
 }
 
-export default function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
+export default function ProductModal({ isOpen, onClose, product, restaurantStatus = 'open' }: ProductModalProps) {
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const { addToCart } = useCart();
@@ -32,6 +34,17 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
   const hasValidRestaurant = product.restaurant?.id && 
     product.restaurant.id !== 'unknown' && 
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(product.restaurant.id);
+
+  // El restaurante puede recibir pedidos solo si está abierto y tiene restaurante válido
+  const canOrder = hasValidRestaurant && restaurantStatus === 'open';
+
+  // Mensaje de bloqueo según el estado del restaurante
+  const restaurantBlockMessage =
+    restaurantStatus === 'paused'
+      ? 'Este restaurante no está recibiendo pedidos por el momento'
+      : restaurantStatus === 'closed'
+        ? 'Este restaurante está cerrado en este momento'
+        : null;
 
   const handleDecrease = () => {
     if (quantity > 1) {
@@ -49,6 +62,7 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
       setError("No se puede agregar este producto: información del restaurante no disponible. Por favor, intenta con otro producto.");
       return;
     }
+    if (!canOrder) return;
 
     addToCart({
       id: product.id,
@@ -68,6 +82,7 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
       setError("No se puede agregar este producto: información del restaurante no disponible. Por favor, intenta con otro producto.");
       return;
     }
+    if (!canOrder) return;
 
     addToCart({
       id: product.id,
@@ -152,6 +167,16 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
                 </p>
               </div>
             )}
+
+            {/* Aviso de restaurante cerrado o en pausa */}
+            {restaurantBlockMessage && (
+              <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg mt-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                <p className="text-xs text-amber-700 dark:text-amber-300">
+                  {restaurantBlockMessage}
+                </p>
+              </div>
+            )}
           </div>
 
 
@@ -191,25 +216,25 @@ export default function ProductModal({ isOpen, onClose, product }: ProductModalP
           <div className="fixed bottom-16 left-0 right-0 px-6 py-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 z-[60] flex gap-3">
             <button
               onClick={handleAddToCart}
-              disabled={!hasValidRestaurant}
+              disabled={!canOrder}
               className={`flex-1 font-bold py-4 px-4 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2 ${
-                hasValidRestaurant
+                canOrder
                   ? "bg-amber-400 hover:bg-amber-500 text-white"
-                  : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                  : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-50"
               }`}
             >
               <ShoppingCart className="w-5 h-5" strokeWidth={2.5} />
               <span className="text-sm">
-                {hasValidRestaurant ? "Agregar" : "No disponible"}
+                {canOrder ? "Agregar" : "No disponible"}
               </span>
             </button>
             <button
               onClick={handleOrderNow}
-              disabled={!hasValidRestaurant}
+              disabled={!canOrder}
               className={`flex-1 font-bold py-4 px-4 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2 ${
-                hasValidRestaurant
+                canOrder
                   ? "bg-gray-900 hover:bg-gray-700 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900"
-                  : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                  : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-50"
               }`}
             >
               <Zap className="w-5 h-5" strokeWidth={2.5} />

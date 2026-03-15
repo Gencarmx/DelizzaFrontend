@@ -1,4 +1,4 @@
-import { DollarSign, ShoppingBag, Users, TrendingUp, Loader2, Wifi, WifiOff, RefreshCw, AlertTriangle } from "lucide-react";
+import { DollarSign, ShoppingBag, Users, TrendingUp, Loader2, Wifi, WifiOff, RefreshCw, AlertTriangle, PauseCircle } from "lucide-react";
 
 import { useState, useEffect, useRef } from "react";
 import MetricCard from "@components/restaurant-ui/cards/MetricCard";
@@ -9,6 +9,8 @@ import StatusBadge from "@components/restaurant-ui/badges/StatusBadge";
 import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
 import { getBusinessMetrics, getSalesChartData, getTopProducts } from "@core/services/analyticsService";
 import { getRecentOrders } from "@core/services/orderService";
+import { setBusinessPaused } from "@core/services/businessService";
+import { supabase } from "@core/supabase/client";
 import type { Column } from "@components/restaurant-ui/tables/DataTable";
 
 interface Order {
@@ -53,48 +55,71 @@ export default function Dashboard() {
   } = useRestaurantNotifications();
 
 
-  const [loading, setLoading] = useState(true);
-  const isMounted = useRef(true);
+  const [loading, setLoading] = useState(false);
   const [metrics, setMetrics] = useState<any[]>([]);
 
-  // Safety timeout to prevent infinite loading
-  useEffect(() => {
-    const safetyTimeout = setTimeout(() => {
-      if (isMounted.current && loading) {
-        setLoading(false);
-      }
-    }, 10000); // 10 seconds max loading time
+  // — Modo Hibernación —
+  const [isPaused, setIsPaused] = useState(false);
+  const [pauseLoading, setPauseLoading] = useState(false);
+  const [pauseToast, setPauseToast] = useState<string | null>(null);
 
-    return () => {
-      clearTimeout(safetyTimeout);
-    };
-  }, [loading]);
-
-  // Cleanup on unmount
+  // Cargar estado inicial de is_paused desde la BD
   useEffect(() => {
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
+    if (!businessId) return;
+    supabase
+      .from('businesses')
+      .select('is_paused')
+      .eq('id', businessId)
+      .single()
+      .then(({ data }) => {
+        if (data) setIsPaused(data.is_paused);
+      });
+  }, [businessId]);
+
+  const handleTogglePause = async () => {
+    if (!businessId || pauseLoading) return;
+    const newPaused = !isPaused;
+    // Optimistic UI — actualizar UI antes de la respuesta
+    setIsPaused(newPaused);
+    setPauseLoading(true);
+    try {
+      await setBusinessPaused(businessId, newPaused);
+      setPauseToast(
+        newPaused
+          ? 'Modo hibernación activado. Los clientes no podrán realizar nuevos pedidos.'
+          : 'Modo hibernación desactivado. El restaurante acepta pedidos normalmente.'
+      );
+    } catch {
+      // Revertir en caso de error
+      setIsPaused(!newPaused);
+      setPauseToast('No se pudo cambiar el modo. Inténtalo de nuevo.');
+    } finally {
+      setPauseLoading(false);
+      setTimeout(() => setPauseToast(null), 4000);
+    }
+  };
 
   const [salesData, setSalesData] = useState<any[]>([]);
   const [productsData, setProductsData] = useState<any[]>([]);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [hasData, setHasData] = useState(false);
 
-  // Cargar datos reales cuando tenemos businessId del contexto
-
+  // Cargar datos cuando tenemos businessId.
+  // Usa `cancelled` local en lugar de isMounted ref para evitar que
+  // re-renders de StrictMode o desmontajes intermedios dejen loading=true.
   useEffect(() => {
-    const loadDashboardData = async () => {
-      if (!businessId) {
-        setLoading(false);
-        return;
-      }
+    if (!businessId) return;
 
-      setLoading(true);
+    let cancelled = false;
+    setLoading(true);
+
+    // Safety net: si el fetch no termina en 8s, salir del spinner.
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 8000);
+
+    const run = async () => {
       try {
-        // Las 4 fuentes son independientes — se ejecutan en paralelo para
-        // reducir el tiempo de carga a max(t1,t2,t3,t4) en lugar de t1+t2+t3+t4.
         const [businessMetrics, chartData, topProducts, orders] = await Promise.all([
           getBusinessMetrics(businessId),
           getSalesChartData(businessId, 'week'),
@@ -102,10 +127,9 @@ export default function Dashboard() {
           getRecentOrders(businessId, 5),
         ]);
 
-        // Verificar isMounted antes de cada setState para no actualizar un
-        // componente ya desmontado (navegación rápida entre páginas).
-        if (!isMounted.current) return;
-        const metricsData = [
+        if (cancelled) return;
+
+        setMetrics([
           {
             title: "Ventas del día",
             value: `$${businessMetrics.completed_orders_today * businessMetrics.average_order_value || 0}`,
@@ -134,84 +158,56 @@ export default function Dashboard() {
             trend: { value: 0, isPositive: true },
             subtitle: "Por pedido",
           },
-        ];
-        setMetrics(metricsData);
+        ]);
 
-        if (!isMounted.current) return;
         setSalesData(chartData.datasets[0]?.data.map((value, index) => ({
           date: chartData.labels[index],
           sales: value
         })) || []);
 
-        if (!isMounted.current) return;
         setProductsData(topProducts.map(product => ({
           name: product.product_name,
           sales: product.total_sold
         })));
 
-        if (!isMounted.current) return;
-
-        const formattedOrders: Order[] = orders.map((order) => {
-          return {
-            id: order.id,
-            customer: order.customer_name || 'Cliente',
-            items: order.order_items?.map(item => `${item.quantity}x ${item.product_name || 'Producto'}`).join(', ') || 'Productos varios',
-            total: order.total,
-            status: mapOrderStatus(order.status || 'pending'),
-            date: order.created_at ? new Date(order.created_at).toLocaleTimeString('es-ES', {
-              hour: '2-digit',
-              minute: '2-digit'
-            }) : 'Sin fecha'
-          };
-        });
+        const formattedOrders: Order[] = orders.map((order) => ({
+          id: order.id,
+          customer: order.customer_name || 'Cliente',
+          items: order.order_items?.map(item => `${item.quantity}x ${item.product_name || 'Producto'}`).join(', ') || 'Productos varios',
+          total: order.total,
+          status: mapOrderStatus(order.status || 'pending'),
+          date: order.created_at ? new Date(order.created_at).toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit'
+          }) : 'Sin fecha'
+        }));
         setRecentOrders(formattedOrders);
 
-        // Determinar si hay datos relevantes
-        const hasRelevantData =
-          businessMetrics.total_orders > 0 ||
-          formattedOrders.length > 0;
-
-        setHasData(hasRelevantData);
-      } catch (error) {
-        if (!isMounted.current) return;
-        // En caso de error, usar datos por defecto
+        setHasData(businessMetrics.total_orders > 0 || formattedOrders.length > 0);
+      } catch {
+        if (cancelled) return;
         setMetrics([
-          {
-            title: "Ventas del día",
-            value: "$0",
-            icon: <DollarSign className="w-6 h-6 text-amber-600" />,
-            trend: { value: 0, isPositive: true },
-            subtitle: "Sin datos",
-          },
-          {
-            title: "Pedidos totales",
-            value: "0",
-            icon: <ShoppingBag className="w-6 h-6 text-amber-600" />,
-            trend: { value: 0, isPositive: true },
-            subtitle: "Este mes",
-          },
-          {
-            title: "Pedidos pendientes",
-            value: "0",
-            icon: <Users className="w-6 h-6 text-amber-600" />,
-            trend: { value: 0, isPositive: false },
-            subtitle: "Requieren atención",
-          },
-          {
-            title: "Ticket promedio",
-            value: "$0",
-            icon: <TrendingUp className="w-6 h-6 text-amber-600" />,
-            trend: { value: 0, isPositive: true },
-            subtitle: "Por pedido",
-          },
+          { title: "Ventas del día",      value: "$0", icon: <DollarSign className="w-6 h-6 text-amber-600" />, trend: { value: 0, isPositive: true },  subtitle: "Sin datos" },
+          { title: "Pedidos totales",     value: "0",  icon: <ShoppingBag className="w-6 h-6 text-amber-600" />, trend: { value: 0, isPositive: true },  subtitle: "Este mes" },
+          { title: "Pedidos pendientes",  value: "0",  icon: <Users className="w-6 h-6 text-amber-600" />,       trend: { value: 0, isPositive: false }, subtitle: "Requieren atención" },
+          { title: "Ticket promedio",     value: "$0", icon: <TrendingUp className="w-6 h-6 text-amber-600" />,  trend: { value: 0, isPositive: true },  subtitle: "Por pedido" },
         ]);
         setHasData(false);
       } finally {
-        if (isMounted.current) setLoading(false);
+        clearTimeout(timeoutId);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    loadDashboardData();
+    run();
+
+    // El cleanup marca esta ejecución como obsoleta y limpia el timeout.
+    // Funciona correctamente con React StrictMode (double-invoke) y con
+    // cambios reales de businessId (navegación).
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, [businessId]);
 
   // Track processed order IDs to avoid duplicates
@@ -456,6 +452,54 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Modo Hibernación — Toggle de acceso rápido */}
+      <div className={`rounded-2xl border p-4 transition-colors ${
+        isPaused
+          ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+          : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700'
+      }`}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <PauseCircle className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+              isPaused ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'
+            }`} />
+            <div>
+              <p className={`text-sm font-semibold ${
+                isPaused ? 'text-amber-800 dark:text-amber-300' : 'text-gray-800 dark:text-gray-200'
+              }`}>
+                Modo Hibernación
+              </p>
+              <p className={`text-xs mt-0.5 ${
+                isPaused ? 'text-amber-700 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'
+              }`}>
+                {isPaused
+                  ? 'Activado — los clientes no pueden realizar nuevos pedidos'
+                  : 'Al activarlo, los clientes verán tu restaurante pero no podrán realizar nuevos pedidos'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleTogglePause}
+            disabled={pauseLoading}
+            className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+              isPaused ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'
+            } ${pauseLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            aria-label={isPaused ? 'Desactivar modo hibernación' : 'Activar modo hibernación'}
+          >
+            <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+              isPaused ? 'translate-x-6' : 'translate-x-0.5'
+            }`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Toast de confirmación del modo hibernación */}
+      {pauseToast && (
+        <div className="bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm px-4 py-3 rounded-xl shadow-lg animate-slide-in">
+          {pauseToast}
+        </div>
+      )}
 
       {!hasData && (
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-6">

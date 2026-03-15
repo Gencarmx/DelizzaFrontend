@@ -75,26 +75,27 @@ export async function getBusinessMetrics(
 
     if (ordersError) throw ordersError;
 
-    // Obtener productos más vendidos - Consulta corregida
-    const { data: topProductsData, error: productsError } = await supabase
+    // Obtener productos más vendidos
+    // Se usa left join en products para no excluir items de productos eliminados.
+    // Un error aquí no debe bloquear el resto de métricas.
+    const { data: topProductsData } = await supabase
       .from('order_items')
       .select(`
         product_id,
         quantity,
         price,
+        product_name,
         orders!inner (
           business_id,
           created_at
         ),
-        products!inner (
+        products (
           name
         )
       `)
       .eq('orders.business_id', businessId)
       .gte('orders.created_at', period.from)
       .lte('orders.created_at', period.to);
-
-    if (productsError) throw productsError;
 
     // Calcular métricas
     const totalOrders = orders?.length || 0;
@@ -115,7 +116,7 @@ export async function getBusinessMetrics(
     topProductsData?.forEach((item: any) => {
       const productId = item.product_id;
       const existing = productSales.get(productId) || {
-        name: (item.products as any)?.name || 'Producto desconocido',
+        name: (item.products as any)?.name || item.product_name || 'Producto desconocido',
         quantity: 0,
         revenue: 0
       };
@@ -230,11 +231,12 @@ export async function getTopProducts(
         product_id,
         quantity,
         price,
+        product_name,
         orders!inner (
           business_id,
           status
         ),
-        products!inner (
+        products (
           name
         )
       `)
@@ -249,7 +251,7 @@ export async function getTopProducts(
     data?.forEach((item: any) => {
       const productId = item.product_id;
       const existing = productStats.get(productId) || {
-        name: (item.products as any)?.name || 'Producto desconocido',
+        name: (item.products as any)?.name || item.product_name || 'Producto desconocido',
         quantity: 0,
         revenue: 0
       };

@@ -2,64 +2,25 @@ import { Outlet } from "react-router";
 import { Loader2, Bell, X } from "lucide-react";
 import { RestaurantBottomNav } from "@presentation/components/layout/RestaurantBottomNav";
 import { RestaurantNotificationsProvider, useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
-import { useAuth } from "@core/context/AuthContext";
 import { AndroidInstallButton } from "@presentation/components/common/AndroidInstallButton";
-import { useEffect, useState } from "react";
-import { getBusinessByOwner } from "@core/services/businessService";
-
+import { useState, useEffect } from "react";
 
 // Componente interno que maneja la lógica
 function RestaurantLayoutContent() {
-  const { user, isAuthReady } = useAuth();
-  const { 
-    setBusinessId, 
-    hasNewOrder, 
-    latestOrder, 
-    markAsRead 
+  const {
+    businessIdLoading,
+    hasNewOrder,
+    latestOrder,
+    markAsRead,
   } = useRestaurantNotifications();
-  const [localLoading, setLocalLoading] = useState(true);
+
   const [showNotification, setShowNotification] = useState(false);
 
-
-  // Efecto para cargar businessId real desde la base de datos
-  useEffect(() => {
-    const loadBusinessId = async () => {
-      if (!isAuthReady) {
-        return;
-      }
-      
-      if (!user?.id) {
-        setLocalLoading(false);
-        return;
-      }
-
-      try {
-        // Obtener el negocio real del owner autenticado
-        const business = await getBusinessByOwner(user.id);
-        
-        if (business) {
-          setBusinessId(business.id);
-        } else {
-          console.warn('No se encontró restaurante asociado al usuario');
-          setBusinessId(null);
-        }
-      } catch (error) {
-        console.error('Error cargando businessId:', error);
-        setBusinessId(null);
-      } finally {
-        setLocalLoading(false);
-      }
-    };
-
-    loadBusinessId();
-  }, [isAuthReady, user, setBusinessId]);
-
-  // Efecto para mostrar notificación cuando llega un nuevo pedido
+  // Mostrar toast cuando llega un nuevo pedido
   useEffect(() => {
     if (hasNewOrder && latestOrder) {
       setShowNotification(true);
 
-      // Auto-ocultar después de 10 segundos
       const timer = setTimeout(() => {
         setShowNotification(false);
         markAsRead();
@@ -69,9 +30,10 @@ function RestaurantLayoutContent() {
     }
   }, [hasNewOrder, latestOrder, markAsRead]);
 
-  // Mostrar spinner mientras no esté listo
-  if (!isAuthReady || localLoading) {
-
+  // Mostrar spinner mientras el contexto resuelve el businessId por primera vez.
+  // Esto reemplaza el localLoading anterior que vivía en el layout y podía
+  // desmontar/remontar el Outlet causando loops de carga en el Dashboard.
+  if (businessIdLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -86,21 +48,19 @@ function RestaurantLayoutContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
-      {/* Notificación de Nuevo Pedido - Visible en todas las pantallas */}
+      {/* Notificación de Nuevo Pedido */}
       {showNotification && latestOrder && (
         <div className="fixed top-4 right-4 z-50 max-w-sm">
           <div className="bg-green-500 text-white rounded-lg shadow-lg p-4 flex items-start gap-3 animate-slide-in">
             <Bell className="w-6 h-6 flex-shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               <h4 className="font-bold text-sm">¡Nuevo Pedido!</h4>
-              {/* Nombre del cliente */}
               <p className="text-sm font-medium mt-1">
                 {latestOrder.customer_name || 'Cliente'}
               </p>
               <p className="text-sm opacity-90 mt-1">
                 ${latestOrder.total.toFixed(2)} - {latestOrder.order_items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0} productos
               </p>
-              {/* Lista de productos */}
               <div className="mt-2 space-y-0.5">
                 {latestOrder.order_items?.slice(0, 3).map((item, idx) => (
                   <p key={idx} className="text-xs opacity-80 truncate">
@@ -131,7 +91,6 @@ function RestaurantLayoutContent() {
       )}
 
       <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-4 py-4">
-
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-amber-400 rounded-full flex items-center justify-center text-white font-bold text-xl">
             D
@@ -150,27 +109,16 @@ function RestaurantLayoutContent() {
       <RestaurantBottomNav />
       <AndroidInstallButton />
 
-      {/* Estilos para animación de notificación */}
       <style>{`
         @keyframes slide-in {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
+          from { transform: translateX(100%); opacity: 0; }
+          to   { transform: translateX(0);    opacity: 1; }
         }
-
-        .animate-slide-in {
-          animation: slide-in 0.5s ease-out;
-        }
+        .animate-slide-in { animation: slide-in 0.5s ease-out; }
       `}</style>
     </div>
   );
 }
-
 
 // Layout principal con provider
 export default function RestaurantLayout() {

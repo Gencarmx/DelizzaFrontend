@@ -216,6 +216,38 @@ export async function updateBusiness(
 }
 
 /**
+ * Activa o desactiva el modo hibernación del restaurante.
+ * En modo pausa, el restaurante sigue visible para clientes pero no acepta pedidos.
+ * @param businessId - ID del restaurante
+ * @param paused - true para activar pausa, false para desactivar
+ */
+export async function setBusinessPaused(
+  businessId: string,
+  paused: boolean
+): Promise<Business> {
+  try {
+    const { data, error } = await supabase
+      .from('businesses')
+      .update({
+        is_paused: paused,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', businessId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return data;
+  } catch (error) {
+    console.error('Error cambiando modo pausa del restaurante:', error);
+    throw error instanceof Error
+      ? error
+      : new Error('Error desconocido al cambiar modo pausa');
+  }
+}
+
+/**
  * Activa/desactiva un restaurante
  */
 export async function toggleBusinessStatus(businessId: string): Promise<Business> {
