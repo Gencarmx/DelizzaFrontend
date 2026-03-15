@@ -1,9 +1,10 @@
-import { Outlet } from "react-router";
+import { MainLayout } from "../components/layout/MainLayout";
+import { CustomerNotificationsProvider } from "@core/context/CustomerNotificationsContext";
 
 export default function RootLayout() {
   return (
-    <div className="app-container">
-      <Outlet />
-    </div>
+    <CustomerNotificationsProvider>
+      <MainLayout />
+    </CustomerNotificationsProvider>
   );
 }

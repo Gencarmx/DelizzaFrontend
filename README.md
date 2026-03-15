@@ -161,9 +161,21 @@ import PWABadge from "@presentation/components/common/PWABadge/PWABadge";
 - **React 19** - Librería UI
 - **TypeScript 5.9** - Tipado estático
 - **Vite 7** - Build tool y dev server
+- **Tailwind CSS 4** - Framework CSS con dark mode
 - **PWA** - Progressive Web App con service workers
 - **ESLint** - Linting y calidad de código
-- **CSS Modules** - Estilos con scope local
+
+## 🎨 Dark Mode
+
+La aplicación incluye soporte completo para modo oscuro/claro:
+
+- ✅ **Toggle manual** desde la página de Settings
+- ✅ **Persistencia** en localStorage
+- ✅ **Detección del sistema** (opcional)
+- ✅ **Transiciones suaves** entre modos
+- ✅ **Tailwind CSS v4** con estrategia basada en clase
+
+Para más detalles sobre la implementación, consulta [docs/DARK_MODE_IMPLEMENTATION.md](docs/DARK_MODE_IMPLEMENTATION.md)
 
 ## 📱 PWA (Progressive Web App)
 
