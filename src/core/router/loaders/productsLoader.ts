@@ -109,10 +109,12 @@ async function getAllActiveProducts(): Promise<Product[]> {
         businesses: business_id (
           name,
           address,
-          logo_url
+          logo_url,
+          active
         )
       `)
       .eq('active', true)
+      .eq('businesses.active', true)
       .order('created_at', { ascending: false })
       .limit(50);
 

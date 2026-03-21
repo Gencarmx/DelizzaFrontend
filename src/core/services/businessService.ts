@@ -358,6 +358,61 @@ export async function deleteBusinessLogo(logoUrl: string): Promise<void> {
 }
 
 /**
+ * Configuración de entrega de un restaurante
+ */
+export interface DeliverySettings {
+  has_delivery: boolean;
+  has_pickup: boolean;
+  delivery_fee: number;
+  min_order_amount: number;
+}
+
+/**
+ * Obtiene la configuración de entrega de un restaurante
+ */
+export async function getDeliverySettings(businessId: string): Promise<DeliverySettings | null> {
+  try {
+    const { data, error } = await supabase
+      .from('businesses')
+      .select('has_delivery, has_pickup, delivery_fee, min_order_amount')
+      .eq('id', businessId)
+      .single();
+
+    if (error) throw error;
+    return data as DeliverySettings;
+  } catch (error) {
+    console.error('Error obteniendo configuración de entrega:', error);
+    return null;
+  }
+}
+
+/**
+ * Actualiza la configuración de entrega de un restaurante
+ */
+export async function updateDeliverySettings(
+  businessId: string,
+  settings: DeliverySettings
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('businesses')
+      .update({
+        has_delivery: settings.has_delivery,
+        has_pickup: settings.has_pickup,
+        delivery_fee: settings.delivery_fee,
+        min_order_amount: settings.min_order_amount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', businessId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error actualizando configuración de entrega:', error);
+    throw error instanceof Error ? error : new Error('Error desconocido al actualizar configuración');
+  }
+}
+
+/**
  * Obtiene estadísticas generales de restaurantes
  */
 export async function getBusinessStats(): Promise<{

@@ -133,9 +133,15 @@ export default function ProductModal({ isOpen, onClose, product, restaurantStatu
           {/* Product Info */}
           <div className="flex flex-col gap-2">
             {product.restaurant && (
-              <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+              <button
+                onClick={() => {
+                  onClose();
+                  navigate(`/restaurant-detail/${product.restaurant!.id}`);
+                }}
+                className="text-sm text-amber-500 dark:text-amber-400 font-medium hover:underline text-left w-fit"
+              >
                 {product.restaurant.name}
-              </span>
+              </button>
             )}
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{product.name}</h2>
             {product.description && (

@@ -12,7 +12,7 @@ import {
   uploadProductImage,
 } from "@core/services/productService";
 import { getActiveProductCategories } from "@core/services/productCategoryService";
-import { useForm } from "react-hook-form";
+import { useForm, type FieldErrors } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -21,7 +21,7 @@ const productSchema = z.object({
   category: z.string().min(1, "La categoría es requerida"),
   price: z.number().positive("El precio debe ser mayor a 0"),
   stock: z.number().min(0, "El stock debe ser mayor o igual a 0"),
-  description: z.string().min(1, "La descripción es requerida"),
+  description: z.string().optional().default(""),
   status: z.enum(["active", "inactive"]),
 });
 
@@ -44,11 +44,13 @@ export default function ProductEdit() {
     { value: "", label: "Selecciona una categoría" },
   ]);
   const [generalError, setGeneralError] = useState("");
+  const [successToast, setSuccessToast] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     reset,
+    setFocus,
     formState: { errors: formErrors },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -195,8 +197,8 @@ export default function ProductEdit() {
       // Actualizar producto
       await updateProduct(productId, updateData);
 
-      alert("Producto actualizado exitosamente");
-      navigate("/restaurant/products");
+      setSuccessToast("¡Producto actualizado correctamente!");
+      setTimeout(() => navigate("/restaurant/products"), 1800);
     } catch (error) {
       console.error("Error actualizando producto:", error);
       setGeneralError(
@@ -206,6 +208,13 @@ export default function ProductEdit() {
       );
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const onValidationError = (errors: FieldErrors<ProductFormValues>) => {
+    const firstErrorField = Object.keys(errors)[0] as keyof ProductFormValues;
+    if (firstErrorField) {
+      setFocus(firstErrorField);
     }
   };
 
@@ -265,7 +274,7 @@ export default function ProductEdit() {
       )}
 
       {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
+      <form onSubmit={handleSubmit(onSubmit, onValidationError)} className="flex flex-col gap-6">
         {/* Image Upload */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700">
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">
@@ -385,6 +394,12 @@ export default function ProductEdit() {
           </Button>
         </div>
       </form>
+
+      {successToast && (
+        <div className="fixed bottom-6 left-4 right-4 z-50 bg-green-600 text-white text-sm px-4 py-4 rounded-2xl shadow-xl text-center font-semibold">
+          ✓ {successToast}
+        </div>
+      )}
     </div>
   );
 }

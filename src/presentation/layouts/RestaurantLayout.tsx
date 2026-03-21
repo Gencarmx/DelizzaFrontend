@@ -1,5 +1,5 @@
-import { Outlet } from "react-router";
-import { Loader2, Bell, X } from "lucide-react";
+import { Outlet, useNavigate } from "react-router";
+import { Loader2, Bell, X, Bike } from "lucide-react";
 import { RestaurantBottomNav } from "@presentation/components/layout/RestaurantBottomNav";
 import { RestaurantNotificationsProvider, useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
 import { AndroidInstallButton } from "@presentation/components/common/AndroidInstallButton";
@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 
 // Componente interno que maneja la lógica
 function RestaurantLayoutContent() {
+  const navigate = useNavigate();
   const {
     businessIdLoading,
     hasNewOrder,
@@ -90,8 +91,12 @@ function RestaurantLayoutContent() {
         </div>
       )}
 
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-4 py-4">
-        <div className="flex items-center gap-3">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-4 py-4 flex items-center justify-between">
+        <button
+          onClick={() => navigate("/restaurant/dashboard")}
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+          aria-label="Ir al dashboard"
+        >
           <div className="w-10 h-10 bg-amber-400 rounded-full flex items-center justify-center text-white font-bold text-xl">
             D
           </div>
@@ -99,7 +104,19 @@ function RestaurantLayoutContent() {
             <span className="font-bold text-xl text-gray-900 dark:text-white">LIZZA</span>
             <span className="text-[10px] text-gray-400 block">RESTAURANTE</span>
           </div>
-        </div>
+        </button>
+
+        {/* Acceso rápido a opciones de entrega */}
+        <button
+          onClick={() => navigate("/restaurant/settings/business-info")}
+          className="flex items-center gap-2 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-400 px-3 py-2 rounded-xl transition-colors"
+          title="Configura si ofreces domicilio o retiro en tienda"
+        >
+          <Bike className="w-4 h-4 flex-shrink-0" />
+          <span className="text-xs font-semibold leading-tight">
+            Opciones<br className="hidden xs:block" /> de entrega
+          </span>
+        </button>
       </header>
 
       <main className="flex-1 p-4">

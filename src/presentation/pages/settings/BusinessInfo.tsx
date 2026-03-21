@@ -9,6 +9,8 @@ import {
   Phone,
   Upload,
   X,
+  Bike,
+  DollarSign,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
@@ -17,7 +19,10 @@ import {
   updateBusiness,
   uploadBusinessLogo,
   deleteBusinessLogo,
+  getDeliverySettings,
+  updateDeliverySettings,
 } from "@core/services/businessService";
+import type { DeliverySettings } from "@core/services/businessService";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -42,6 +47,16 @@ export default function BusinessInfo() {
   const [imagePreview, setImagePreview] = useState<string>("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Delivery settings state
+  const [deliverySettings, setDeliverySettings] = useState<DeliverySettings>({
+    has_delivery: true,
+    has_pickup: true,
+    delivery_fee: 15,
+    min_order_amount: 0,
+  });
+  const [savingDelivery, setSavingDelivery] = useState(false);
+  const [deliverySaveMessage, setDeliverySaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const {
     register,
@@ -71,7 +86,10 @@ export default function BusinessInfo() {
     }
 
     try {
-      const business = await getBusinessById(businessId);
+      const [business, delivery] = await Promise.all([
+        getBusinessById(businessId),
+        getDeliverySettings(businessId),
+      ]);
 
       if (business) {
         reset({
@@ -82,11 +100,33 @@ export default function BusinessInfo() {
         setOriginalLogoUrl(business.logo_url || "");
         setImagePreview(business.logo_url || "");
       }
+
+      if (delivery) {
+        setDeliverySettings(delivery);
+      }
     } catch (error) {
       console.error("Error loading business info:", error);
       alert("Error al cargar la información del negocio");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveDeliverySettings = async () => {
+    if (!businessId) return;
+    if (!deliverySettings.has_delivery && !deliverySettings.has_pickup) {
+      setDeliverySaveMessage({ type: 'error', text: 'Debes habilitar al menos una opción de entrega.' });
+      return;
+    }
+    setSavingDelivery(true);
+    try {
+      await updateDeliverySettings(businessId, deliverySettings);
+      setDeliverySaveMessage({ type: 'success', text: 'Configuración guardada correctamente.' });
+      setTimeout(() => setDeliverySaveMessage(null), 3000);
+    } catch {
+      setDeliverySaveMessage({ type: 'error', text: 'Error al guardar la configuración.' });
+    } finally {
+      setSavingDelivery(false);
     }
   };
 
@@ -244,7 +284,7 @@ export default function BusinessInfo() {
         </div>
       </div>
 
-      <div className="p-4 max-w-2xl mx-auto pb-24 sm:pb-8">
+      <div className="p-4 max-w-2xl mx-auto pb-24">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           <form className="p-6 space-y-6" onSubmit={handleSubmit(onSubmit)}>
             <div className="space-y-4">
@@ -453,6 +493,167 @@ export default function BusinessInfo() {
             <strong>Nota:</strong> Los cambios en la información del negocio se
             reflejarán inmediatamente en la aplicación.
           </p>
+        </div>
+
+        {/* Delivery Settings Card */}
+        <div className="mt-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="p-6 space-y-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Bike className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                Opciones de entrega
+              </h2>
+            </div>
+
+            {/* has_pickup toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Retiro en tienda</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">El cliente recoge su pedido en el local</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeliverySettings((s) => ({ ...s, has_pickup: !s.has_pickup }))}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  deliverySettings.has_pickup ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                }`}
+                aria-checked={deliverySettings.has_pickup}
+                role="switch"
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    deliverySettings.has_pickup ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* has_delivery toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Envío a domicilio</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Entregas a la dirección del cliente</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeliverySettings((s) => ({ ...s, has_delivery: !s.has_delivery }))}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  deliverySettings.has_delivery ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                }`}
+                aria-checked={deliverySettings.has_delivery}
+                role="switch"
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    deliverySettings.has_delivery ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* delivery_fee — solo lectura, definido por la plataforma */}
+            {deliverySettings.has_delivery && (
+              <div className="flex items-start gap-3">
+                <DollarSign className="w-5 h-5 text-gray-500 dark:text-gray-400 mt-1 flex-shrink-0" />
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Tarifa de envío a domicilio
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    Definida por la plataforma. Contacta al administrador para modificarla.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 dark:text-gray-400 text-sm">$</span>
+                    <span className="px-3 py-2 bg-gray-100 dark:bg-gray-700/60 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 text-sm font-medium min-w-[7rem] inline-block">
+                      {deliverySettings.delivery_fee.toFixed(2)}
+                    </span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 italic">Solo lectura</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* pickup_fee — solo lectura, siempre gratuito para el cliente */}
+            {deliverySettings.has_pickup && (
+              <div className="flex items-start gap-3">
+                <DollarSign className="w-5 h-5 text-gray-500 dark:text-gray-400 mt-1 flex-shrink-0" />
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Tarifa de retiro en tienda
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    Se agregará al costo total del pedido del cliente. Favor de retenerlo.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 dark:text-gray-400 text-sm">$</span>
+                    <span className="px-3 py-2 bg-gray-100 dark:bg-gray-700/60 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 text-sm font-medium min-w-[7rem] inline-block">
+                      10.00
+                    </span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 italic">Solo lectura</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* min_order_amount */}
+            <div className="flex items-start gap-3">
+              <DollarSign className="w-5 h-5 text-gray-500 dark:text-gray-400 mt-1 flex-shrink-0" />
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Pedido mínimo
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Monto mínimo para aceptar un pedido. Usa 0 para sin mínimo.</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 dark:text-gray-400 text-sm">$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={deliverySettings.min_order_amount}
+                    onChange={(e) =>
+                      setDeliverySettings((s) => ({
+                        ...s,
+                        min_order_amount: parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                    className="w-28 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Save message */}
+            {deliverySaveMessage && (
+              <div
+                className={`p-3 rounded-lg text-sm font-medium ${
+                  deliverySaveMessage.type === 'success'
+                    ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800'
+                    : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800'
+                }`}
+              >
+                {deliverySaveMessage.text}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleSaveDeliverySettings}
+              disabled={savingDelivery}
+              className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {savingDelivery ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Guardando...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-5 h-5" />
+                  <span>Guardar configuración</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
