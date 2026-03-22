@@ -123,7 +123,7 @@ export default function Home() {
             .select('id, name')
             .in('id', allBusinessIds);
           const allBusinessMap = new Map(allBusinessesData?.map(b => [b.id, b.name]) || []);
-          setAllProducts(allProductsData.map((p: any) => ({
+          setAllProducts(allProductsData.filter((p: any) => allBusinessMap.has(p.business_id)).map((p: any) => ({
             id: p.id,
             name: p.name,
             rating: "4.5",
@@ -208,7 +208,7 @@ export default function Home() {
       return "Cargando...";
     }
     if (!selectedAddress) {
-      return "No tienes direcciones guardadas. Agrega una en tu perfil.";
+      return "Toca aquí para agregar una dirección";
     }
     return `${selectedAddress.line1}, ${selectedAddress.city}, ${selectedAddress.state}`;
   };
@@ -232,7 +232,7 @@ export default function Home() {
       )}
 
       {/* Address Selector */}
-      <button className="flex items-center gap-1 bg-white dark:bg-gray-800 px-4 py-2 rounded-full w-fit shadow-sm border border-gray-100 dark:border-gray-700 cursor-pointer">
+      <button onClick={() => navigate('/saved-addresses')} className="flex items-center gap-1 bg-white dark:bg-gray-800 px-4 py-2 rounded-full w-fit shadow-sm border border-gray-100 dark:border-gray-700 cursor-pointer">
         <MapPin className="w-5 h-5 text-gray-800 dark:text-gray-200" />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
           {getAddressDisplay()}

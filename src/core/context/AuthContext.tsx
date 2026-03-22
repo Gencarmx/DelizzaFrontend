@@ -16,7 +16,8 @@ interface AuthContextType {
   signUp: (
     email: string,
     password: string,
-    fullName: string
+    fullName: string,
+    phoneNumber: string
   ) => Promise<{ error: AuthError | null }>;
   signUpOwner: (
     email: string,
@@ -33,6 +34,8 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signInWithFacebook: () => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
+  forgotPassword: (email: string) => Promise<{ error: AuthError | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -232,7 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string, phoneNumber: string) => {
     try {
       const { error } = await supabase.auth.signUp({
         email,
@@ -240,6 +243,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         options: {
           data: {
             full_name: fullName,
+            phone_number: phoneNumber,
             user_role: "client",
           },
         },
@@ -343,6 +347,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const forgotPassword = async (email: string): Promise<{ error: AuthError | null }> => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    return { error };
+  };
+
+  const updatePassword = async (newPassword: string): Promise<{ error: AuthError | null }> => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    return { error };
+  };
+
   const value = {
     user,
     session,
@@ -357,6 +373,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signInWithGoogle,
     signInWithFacebook,
     signOut,
+    forgotPassword,
+    updatePassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

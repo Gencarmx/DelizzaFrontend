@@ -14,7 +14,7 @@ export function Header(props: ComponentProps<"header">) {
       className={`flex items-center justify-between p-4 bg-white dark:bg-gray-800 sticky top-0 z-50 ${props.className}`}
       {...props}
     >
-      <div className="flex items-center gap-2">
+      <button onClick={() => navigate("/")} className="flex items-center gap-2 cursor-pointer">
         <div className="w-10 h-10 bg-amber-400 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-sm">
           D
         </div>
@@ -26,7 +26,7 @@ export function Header(props: ComponentProps<"header">) {
             DELIVERY APP
           </span>
         </div>
-      </div>
+      </button>
       <div className="flex items-center gap-2">
         <CustomerConnectionStatus />
         <button

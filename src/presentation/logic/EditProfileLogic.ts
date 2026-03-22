@@ -14,7 +14,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 export const editProfileSchema = z.object({
   name: z.string().min(1, "El nombre es obligatorio"),
   email: z.email("Correo electrónico inválido"),
-  phone: z.string().min(1, "El teléfono es obligatorio"),
+  phone: z
+    .string()
+    .min(1, "El teléfono es obligatorio")
+    .regex(
+      /^\+[1-9][\d\s\-]{6,18}$/,
+      "Incluye el código de país, ej: +52 999 123 4567"
+    ),
   birthdate: z.string().optional(),
 });
 

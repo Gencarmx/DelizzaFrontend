@@ -159,16 +159,20 @@ export default function EditProfile() {
             <Phone className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
             <div className="flex-1 w-full">
               <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Teléfono
+                Teléfono <span className="text-red-400">*</span>
               </div>
               <input
                 type="tel"
+                inputMode="tel"
                 {...register("phone")}
                 className="w-full text-sm font-medium text-gray-900 dark:text-white bg-transparent border-none outline-none focus:ring-0 p-0"
-                placeholder="+** 999 999 9999"
+                placeholder="+52 999 123 4567"
               />
             </div>
           </label>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 ml-8">
+            Formato: +código de país + número · Ej: +52 999 123 4567 · +1 555 234 5678
+          </p>
         </div>
         {formErrors.phone && (
           <p className="text-sm text-red-500 ml-4">
