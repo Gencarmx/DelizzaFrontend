@@ -82,7 +82,7 @@ export function SearchBar({ onProductSelect, onRestaurantSelect }: SearchBarProp
 
         const businessMap = new Map(businessesData?.map((b) => [b.id, b]) || []);
 
-        const products: ProductResult[] = (productsData || []).map((p) => ({
+        const products: ProductResult[] = (productsData || []).filter((p) => businessMap.has(p.business_id)).map((p) => ({
           id: p.id,
           name: p.name,
           price: p.price,

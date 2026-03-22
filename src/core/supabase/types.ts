@@ -140,9 +140,13 @@ export type Database = {
           active: boolean | null
           address: string | null
           created_at: string | null
+          delivery_fee: number
+          has_delivery: boolean
+          has_pickup: boolean
           id: string
           is_paused: boolean
           logo_url: string | null
+          min_order_amount: number
           name: string
           owner_id: string
           owner_user_id: string | null
@@ -153,9 +157,13 @@ export type Database = {
           active?: boolean | null
           address?: string | null
           created_at?: string | null
+          delivery_fee?: number
+          has_delivery?: boolean
+          has_pickup?: boolean
           id?: string
           is_paused?: boolean
           logo_url?: string | null
+          min_order_amount?: number
           name: string
           owner_id: string
           owner_user_id?: string | null
@@ -166,9 +174,13 @@ export type Database = {
           active?: boolean | null
           address?: string | null
           created_at?: string | null
+          delivery_fee?: number
+          has_delivery?: boolean
+          has_pickup?: boolean
           id?: string
           is_paused?: boolean
           logo_url?: string | null
+          min_order_amount?: number
           name?: string
           owner_id?: string
           owner_user_id?: string | null

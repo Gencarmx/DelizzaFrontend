@@ -9,7 +9,7 @@ import { productsLoader } from "@core/router/loaders/productsLoader";
 import NotFound from "@presentation/pages/NotFound";
 // import Favorites from "@presentation/pages/Favorites";
 import Activity from "@presentation/pages/Activity";
-import { Login, Register, RegisterOwner, PendingApproval } from "@presentation/pages/auth";
+import { Login, Register, RegisterOwner, PendingApproval, ForgotPassword, ResetPassword } from "@presentation/pages/auth";
 import { Account, UserProfile, EditProfile } from "@presentation/pages/profile";
 import {
   Settings,
@@ -43,6 +43,14 @@ export const routes: RouteObject[] = [
   {
     path: "/register-owner",
     element: <RegisterOwner />,
+  },
+  {
+    path: "/forgot-password",
+    element: <ForgotPassword />,
+  },
+  {
+    path: "/reset-password",
+    element: <ResetPassword />,
   },
   {
     path: "/pending-approval",

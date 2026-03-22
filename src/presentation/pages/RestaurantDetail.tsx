@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
-import { ChevronLeft, /* Star */ Loader2, BellOff, Clock as ClockIcon } from "lucide-react";
+import { ChevronLeft, /* Star */ Loader2, BellOff, Clock as ClockIcon, Bike, Store as StoreIcon } from "lucide-react";
 import { supabase } from "@core/supabase/client";
 import ProductModal from "@presentation/components/common/ProductModal";
 import { isBusinessOpenNow } from "@core/services/businessHoursService";
@@ -38,6 +38,8 @@ export default function RestaurantDetail() {
     address: string;
     logo: string;
     restaurantStatus: RestaurantStatus;
+    hasDelivery: boolean;
+    hasPickup: boolean;
   } | null>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +62,7 @@ export default function RestaurantDetail() {
         const [businessResult, hoursResult] = await Promise.all([
           supabase
             .from("businesses")
-            .select("id, name, address, active, logo_url, is_paused")
+            .select("id, name, address, active, logo_url, is_paused, has_delivery, has_pickup")
             .eq("id", restaurantId)
             .single(),
           supabase
@@ -89,6 +91,8 @@ export default function RestaurantDetail() {
           address: businessData.address || "Dirección no disponible",
           logo: businessData.logo_url || "https://via.placeholder.com/200",
           restaurantStatus,
+          hasDelivery: businessData.has_delivery ?? true,
+          hasPickup: businessData.has_pickup ?? true,
         });
 
         const { data: productsData, error: productsError } = await supabase
@@ -177,6 +181,20 @@ export default function RestaurantDetail() {
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
             {restaurant.address}
           </p>
+          <div className="flex gap-2 mt-3">
+            {restaurant.hasDelivery && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800">
+                <Bike className="w-3 h-3" />
+                Domicilio
+              </span>
+            )}
+            {restaurant.hasPickup && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-100 dark:border-amber-800">
+                <StoreIcon className="w-3 h-3" />
+                Recoger
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

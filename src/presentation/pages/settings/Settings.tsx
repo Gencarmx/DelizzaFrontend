@@ -195,7 +195,7 @@ export default function Settings() {
       {/* Header */}
       <div className="flex items-center gap-3 mb-4 bg-white dark:bg-gray-800 sticky top-0 z-10 py-2">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(isRestaurant ? "/restaurant/dashboard" : "/")}
           className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
         >
           <ChevronLeft className="w-5 h-5 text-gray-700 dark:text-gray-200" />

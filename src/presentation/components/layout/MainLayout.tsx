@@ -2,6 +2,7 @@ import { Outlet } from "react-router";
 import { Header } from "./Header";
 import { BottomNav } from "./BottomNav";
 import { NotificationPermissionBanner } from "@presentation/components/common/NotificationPermissionBanner";
+import { MissingPhoneBanner } from "@presentation/components/common/MissingPhoneBanner";
 import { IOSInstallBanner } from "@presentation/components/common/IOSInstallBanner";
 import { AndroidInstallButton } from "@presentation/components/common/AndroidInstallButton";
 import { useCustomerNotificationsContext } from "@core/context/CustomerNotificationsContext";
@@ -30,6 +31,7 @@ export function MainLayout() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col font-sans relative">
       <Header />
       <NotificationPermissionBanner />
+      <MissingPhoneBanner />
       <IOSInstallBanner />
 
       {/* Global InApp Notifications */}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "@core/context/AuthContext";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Phone } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,6 +9,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 const registerSchema = z
   .object({
     fullName: z.string().min(2, "El nombre completo es requerido"),
+    phone: z
+      .string()
+      .min(1, "El número de teléfono es requerido")
+      .regex(
+        /^\+[1-9][\d\s\-]{6,18}$/,
+        "Incluye el código de país, ej: +52 999 123 4567"
+      ),
     email: z.email("Formato de correo inválido"),
     password: z
       .string()
@@ -38,6 +45,7 @@ export default function Register() {
     resolver: zodResolver(registerSchema),
     defaultValues: {
       fullName: "",
+      phone: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -48,7 +56,7 @@ export default function Register() {
     setError("");
     setLoading(true);
 
-    const { error } = await signUp(data.email, data.password, data.fullName);
+    const { error } = await signUp(data.email, data.password, data.fullName, data.phone);
 
     if (error) {
       // Parse error message to provide user-friendly feedback with specific field information
@@ -168,6 +176,38 @@ export default function Register() {
             {formErrors.fullName && (
               <span className="text-sm text-red-500">
                 {formErrors.fullName.message}
+              </span>
+            )}
+          </div>
+
+          {/* Phone Input */}
+          <div className="flex flex-col gap-2">
+            <label
+              htmlFor="phone"
+              className="text-sm font-medium text-gray-700"
+            >
+              Número de teléfono <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                id="phone"
+                type="tel"
+                inputMode="tel"
+                {...register("phone")}
+                placeholder="+52 999 123 4567"
+                autoComplete="tel"
+                className={`w-full pl-10 pr-4 py-3.5 bg-gray-50 border rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all ${
+                  formErrors.phone ? "border-red-300" : "border-gray-200"
+                }`}
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              Incluye el código de tu país · Ej: +52 (México), +1 (USA), +34 (España)
+            </p>
+            {formErrors.phone && (
+              <span className="text-sm text-red-500">
+                {formErrors.phone.message}
               </span>
             )}
           </div>

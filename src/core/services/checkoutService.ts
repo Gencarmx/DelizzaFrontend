@@ -54,7 +54,8 @@ function isValidUUID(id: string): boolean {
  */
 export async function processMultiRestaurantCheckout(
   orders: CartOrder[],
-  checkoutData: CheckoutData
+  checkoutData: CheckoutData,
+  deliveryTypeByRestaurant?: Record<string, 'pickup' | 'delivery'>
 ): Promise<OrderResult[]> {
   const results: OrderResult[] = [];
 
@@ -83,7 +84,31 @@ export async function processMultiRestaurantCheckout(
         continue;
       }
 
-      const result = await createRestaurantOrder(order, checkoutData);
+      // Usar el tipo de entrega específico del restaurante si está disponible
+      const orderDeliveryType =
+        deliveryTypeByRestaurant?.[order.restaurant.id] ?? checkoutData.deliveryOption.type;
+
+      const orderCheckoutData: CheckoutData = {
+        ...checkoutData,
+        deliveryOption: {
+          ...checkoutData.deliveryOption,
+          type: orderDeliveryType,
+        },
+      };
+
+      const validation = await validateOrderItems(order, orderDeliveryType);
+      if (!validation.valid) {
+        results.push({
+          success: false,
+          restaurantName: order.restaurant.name,
+          restaurantId: order.restaurant.id,
+          total: order.total,
+          error: validation.errors.join('. '),
+        });
+        continue;
+      }
+
+      const result = await createRestaurantOrder(order, orderCheckoutData);
       results.push(result);
     } catch (error) {
       console.error(`Error procesando pedido para ${order.restaurant.name}:`, error);
@@ -263,17 +288,44 @@ export async function notifyRestaurant(orderId: string, orderData?: {
 }
 
 /**
- * Valida que todos los productos estén disponibles
+ * Valida que el restaurante esté disponible y que la opción de entrega sea válida
  */
-export async function validateOrderItems(_order: CartOrder): Promise<{
+export async function validateOrderItems(
+  order: CartOrder,
+  deliveryType: 'pickup' | 'delivery'
+): Promise<{
   valid: boolean;
   errors: string[];
 }> {
   const errors: string[] = [];
 
-  // TODO: Verificar stock disponible
-  // TODO: Verificar precios no hayan cambiado
-  // TODO: Verificar restaurante esté activo
+  const { data: business } = await supabase
+    .from('businesses')
+    .select('active, is_paused, has_delivery, has_pickup, min_order_amount')
+    .eq('id', order.restaurant.id)
+    .maybeSingle();
+
+  if (!business) {
+    errors.push(`No se encontró el restaurante "${order.restaurant.name}"`);
+  } else {
+    if (!business.active) {
+      errors.push(`El restaurante "${order.restaurant.name}" está desactivado`);
+    }
+    if (business.is_paused) {
+      errors.push(`El restaurante "${order.restaurant.name}" no está recibiendo pedidos`);
+    }
+    if (deliveryType === 'delivery' && !business.has_delivery) {
+      errors.push(`El restaurante "${order.restaurant.name}" no ofrece servicio a domicilio`);
+    }
+    if (deliveryType === 'pickup' && !business.has_pickup) {
+      errors.push(`El restaurante "${order.restaurant.name}" no acepta retiro en tienda`);
+    }
+    if (business.min_order_amount > 0 && order.subtotal < business.min_order_amount) {
+      errors.push(
+        `El pedido mínimo de "${order.restaurant.name}" es $${business.min_order_amount.toFixed(2)}. Tu pedido es $${order.subtotal.toFixed(2)}`
+      );
+    }
+  }
 
   return {
     valid: errors.length === 0,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router";
 import { ChevronLeft, Upload, X } from "lucide-react";
 import Button from "@components/restaurant-ui/buttons/Button";
@@ -12,7 +12,7 @@ import {
   uploadProductImage,
 } from "@core/services/productService";
 import { getActiveProductCategories } from "@core/services/productCategoryService";
-import { useForm } from "react-hook-form";
+import { useForm, type FieldErrors } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -21,11 +21,11 @@ const productSchema = z.object({
   category: z.string().min(1, "La categoría es requerida"),
   price: z.number().positive("El precio debe ser mayor a 0"),
   stock: z.number().min(0, "El stock debe ser mayor o igual a 0"),
-  description: z.string().min(1, "La descripción es requerida"),
+  description: z.string(),
   status: z.enum(["active", "inactive"]),
 });
 
-type ProductFormValues = z.infer<typeof productSchema>;
+type ProductFormValues = z.output<typeof productSchema>;
 
 export default function ProductEdit() {
   const navigate = useNavigate();
@@ -44,11 +44,13 @@ export default function ProductEdit() {
     { value: "", label: "Selecciona una categoría" },
   ]);
   const [generalError, setGeneralError] = useState("");
+  const [successToast, setSuccessToast] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     reset,
+    setFocus,
     formState: { errors: formErrors },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -101,7 +103,7 @@ export default function ProductEdit() {
         reset({
           name: product.name || "",
           category: product.category_id || "",
-          price: product.price || ("" as unknown as number),
+          price: product.price ?? 0,
           stock: product.stock ?? 0,
           description: product.description || "",
           status: product.active ? "active" : "inactive",
@@ -127,19 +129,29 @@ export default function ProductEdit() {
     { value: "inactive", label: "Inactivo" },
   ];
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Leer el fichero seleccionado y mostrar preview.
+  // Se gestiona dentro de un useEffect para poder cancelar la operación
+  // si el componente se desmonta mientras FileReader aún está en curso.
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (!pendingFile) return;
+    let cancelled = false;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (!cancelled) setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(pendingFile);
+    return () => { cancelled = true; };
+  }, [pendingFile]);
+
+  const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
-      let mounted = true;
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (mounted) setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-      return () => { mounted = false; };
+      setPendingFile(file);
     }
-  };
+  }, []);
 
   const removeImage = () => {
     setImagePreview(null);
@@ -186,17 +198,20 @@ export default function ProductEdit() {
       // 2. Imagen eliminada (removeImage()) → imageUrl = null
       // 3. Sin cambio → imageUrl === originalImageUrlRef.current → no incluir
       if (imageUrl !== originalImageUrlRef.current) {
-        // null se convierte a undefined para compatibilidad con el tipo Partial<ProductData>
-        // La ausencia del campo en el update preserva el valor actual en DB,
-        // pero aquí queremos eliminar la imagen (null → undefined borra el campo)
-        updateData.image_url = imageUrl ?? undefined;
+        // Pasar null explícitamente cuando se eliminó la imagen para que Supabase
+        // limpie la columna en BD. undefined omite el campo y no actualiza nada.
+        updateData.image_url = imageUrl ?? undefined; // string | undefined para el tipo
+        // Nota: si imageUrl es null queremos borrar en BD → se pasa null al servicio
+        if (imageUrl === null) {
+          (updateData as Record<string, unknown>).image_url = null;
+        }
       }
 
       // Actualizar producto
       await updateProduct(productId, updateData);
 
-      alert("Producto actualizado exitosamente");
-      navigate("/restaurant/products");
+      setSuccessToast("¡Producto actualizado correctamente!");
+      setTimeout(() => navigate("/restaurant/products"), 1800);
     } catch (error) {
       console.error("Error actualizando producto:", error);
       setGeneralError(
@@ -206,6 +221,13 @@ export default function ProductEdit() {
       );
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const onValidationError = (errors: FieldErrors<ProductFormValues>) => {
+    const firstErrorField = Object.keys(errors)[0] as keyof ProductFormValues;
+    if (firstErrorField) {
+      setFocus(firstErrorField);
     }
   };
 
@@ -265,7 +287,7 @@ export default function ProductEdit() {
       )}
 
       {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
+      <form onSubmit={handleSubmit(onSubmit, onValidationError)} className="flex flex-col gap-6">
         {/* Image Upload */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700">
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">
@@ -385,6 +407,12 @@ export default function ProductEdit() {
           </Button>
         </div>
       </form>
+
+      {successToast && (
+        <div className="fixed bottom-6 left-4 right-4 z-50 bg-green-600 text-white text-sm px-4 py-4 rounded-2xl shadow-xl text-center font-semibold">
+          ✓ {successToast}
+        </div>
+      )}
     </div>
   );
 }
