@@ -141,65 +141,12 @@ export function useRealtimeNotifications(businessId?: string) {
             broadcast: { self: true },
           },
         })
-        // ── BROADCAST (canal principal, sin RLS) ──────────────────────────────
+        // ── BROADCAST (canal único — sin RLS, latencia mínima) ───────────────
         .on(
           'broadcast',
           { event: 'new_order' },
           ({ payload }) => {
             handleNewOrder(payload as OrderNotification);
-          }
-        )
-        // ── POSTGRES_CHANGES (backup, puede fallar si RLS bloquea el evento) ──
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'orders',
-            filter: `business_id=eq.${businessId}`,
-          },
-          async (payload) => {
-            try {
-              // Fetch order details with items
-              const { data: orderDetails, error } = await supabase
-                .from('orders')
-                .select(`
-                  *,
-                  order_items (
-                    product_name,
-                    quantity,
-                    price
-                  )
-                `)
-                .eq('id', payload.new.id)
-                .single();
-
-              if (error || !orderDetails) {
-                console.warn('[Realtime][pg_changes] No se pudo obtener detalle del pedido, usando payload base');
-                const fallbackOrder = {
-                  ...payload.new as Record<string, unknown>,
-                  order_items: [],
-                } as unknown as OrderNotification;
-                handleNewOrder(fallbackOrder);
-                return;
-              }
-
-              handleNewOrder(orderDetails as unknown as OrderNotification);
-            } catch (error) {
-              console.error('[Realtime][pg_changes] Error procesando notificación:', error);
-            }
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'orders',
-            filter: `business_id=eq.${businessId}`,
-          },
-          (_payload) => {
-            // Pedido actualizado - reservado para uso futuro
           }
         )
         .subscribe((status) => {

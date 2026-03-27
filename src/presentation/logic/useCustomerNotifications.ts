@@ -191,29 +191,13 @@ export function useCustomerNotifications(
       .channel(`customer_orders_${profileId}`, {
         config: { broadcast: { ack: true } },
       })
-      // ── BROADCAST (canal principal, sin RLS) ─────────────────────────────
+      // ── BROADCAST (canal único — sin RLS, latencia mínima) ───────────────
       .on(
         "broadcast",
         { event: "order_status_update" },
         ({ payload }) => {
           console.log("[Customer] ✅ Actualización de pedido recibida (Broadcast):", payload);
           handleOrderUpdate(payload as { id: string; status: string });
-        },
-      )
-      // ── POSTGRES_CHANGES (backup, puede fallar si RLS bloquea el evento) ─
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "orders",
-          filter: `customer_id=eq.${profileId}`,
-        },
-        async (payload) => {
-          console.log("[Customer] 📡 postgres_changes UPDATE recibido:", payload);
-          if (payload.new && payload.new.status) {
-            handleOrderUpdate(payload.new as { id: string; status: string });
-          }
         },
       )
       .subscribe((status) => {
