@@ -96,45 +96,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { role: "client", profileId: null };
     };
 
-    const fetchBusinessStatus = async (userId: string): Promise<boolean> => {
+    // Recibe profileId directamente (ya resuelto por fetchRole) para evitar
+    // una query redundante a profiles que duplicaría la que hace fetchRole.
+    const fetchBusinessStatus = async (profileId: string): Promise<boolean> => {
       const MAX_ATTEMPTS = 5;
       const RETRY_DELAY_MS = 1500;
       const QUERY_TIMEOUT_MS = 8000;
 
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
-          const profilePromise = supabase
-            .from("profiles")
-            .select("id")
-            .eq("user_id", userId)
-            .maybeSingle();
-
-          const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`TIMEOUT profiles intento ${attempt}`)), QUERY_TIMEOUT_MS)
-          );
-
-          const { data: profile, error: profileError } = await Promise.race([profilePromise, timeoutPromise]) as Awaited<typeof profilePromise>;
-
-          if (profileError) {
-            if (attempt < MAX_ATTEMPTS) {
-              await new Promise(res => setTimeout(res, RETRY_DELAY_MS));
-              continue;
-            }
-            return false;
-          }
-
-          if (!profile) {
-            if (attempt < MAX_ATTEMPTS) {
-              await new Promise(res => setTimeout(res, RETRY_DELAY_MS));
-              continue;
-            }
-            return false;
-          }
-
           const businessPromise = supabase
             .from("businesses")
             .select("active")
-            .eq("owner_id", profile.id)
+            .eq("owner_id", profileId)
             .maybeSingle();
 
           const businessTimeoutPromise = new Promise<never>((_, reject) =>
@@ -193,7 +167,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfileId(fetchedProfileId);
 
         if (userRole === "owner") {
-          const active = await fetchBusinessStatus(currentSession.user.id);
+          const active = fetchedProfileId
+            ? await fetchBusinessStatus(fetchedProfileId)
+            : false;
           if (cancelled) return;
           setBusinessActive(active);
         } else {

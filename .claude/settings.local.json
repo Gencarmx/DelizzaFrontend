@@ -1,7 +1,24 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npx vite:*)",
+      "Bash(grep -r analyticsService /c/laragon/www/GENCAR/Delizza/DelizzaFrontend/src --include=*.ts --include=*.tsx --include=*.js --include=*.jsx)",
+      "Bash(grep -r import.*from.*['']../ /c/laragon/www/GENCAR/Delizza/DelizzaFrontend/src --include=*.ts --include=*.tsx)",
+      "Bash(grep -r import.*from.*['']@ /c/laragon/www/GENCAR/Delizza/DelizzaFrontend/src --include=*.ts --include=*.tsx)",
+      "Bash(grep -r ProtectedRoute /c/laragon/www/GENCAR/Delizza/DelizzaFrontend/src --include=*.tsx --include=*.ts)",
+      "Bash(grep -r \"Dynamic\\\\|dynamic\\\\|suspense\\\\|Suspense\" /c/laragon/www/GENCAR/Delizza/DelizzaFrontend/src --include=*.tsx --include=*.ts)",
+      "Bash(grep -r 'from @' /c/laragon/www/GENCAR/Delizza/DelizzaFrontend/src --include=*.tsx --include=*.ts)",
+      "Bash(grep -r import.*supabase /c/laragon/www/GENCAR/Delizza/DelizzaFrontend/src --include=*.tsx --include=*.ts)",
+      "Bash(grep -r \"React.FC\\\\|React.ReactNode\" /c/laragon/www/GENCAR/Delizza/DelizzaFrontend/src --include=*.tsx)",
+      "Bash(grep -rn \"hardcoded\\\\|TODO\\\\|FIXME\\\\|XXX\\\\|HACK\" /c/laragon/www/GENCAR/Delizza/DelizzaFrontend/src --include=*.ts --include=*.tsx)",
+      "Bash(while read:*)",
+      "Bash(do if:*)",
+      "Bash(then echo:*)",
+      "Bash(ls:*)",
+      "Bash(find /c/laragon/www/GENCAR/Delizza/DelizzaFrontend -maxdepth 2 -type f \\\\\\(-name vitest.config.* -o -name jest.config.* -o -name *.test.* -o -name *.spec.* -o -name setupTests.* \\\\\\))",
+      "Bash(find /c/laragon/www/GENCAR/Delizza/DelizzaFrontend -maxdepth 1 -type f -name .*)",
+      "Bash(bun add:*)"
     ]
   }
 }

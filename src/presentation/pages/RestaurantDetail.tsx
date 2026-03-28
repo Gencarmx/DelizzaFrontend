@@ -4,13 +4,14 @@ import { ChevronLeft, /* Star */ Loader2, BellOff, Clock as ClockIcon, Bike, Sto
 import { supabase } from "@core/supabase/client";
 import ProductModal from "@presentation/components/common/ProductModal";
 import { isBusinessOpenNow } from "@core/services/businessHoursService";
+import { getActiveProductCategories, type ProductCategory } from "@core/services/productCategoryService";
 import type { Database } from "@core/supabase/types";
 
 type BusinessHour = Database['public']['Tables']['business_hours']['Row'];
 
 type RestaurantStatus =
   | { type: 'open';   label: 'Abierto' }
-  | { type: 'paused'; label: 'No recibimos pedidos' }
+  | { type: 'paused'; label: 'Pausado por el momento' }
   | { type: 'closed'; label: 'Cerrado por el momento' };
 
 function computeRestaurantStatus(
@@ -19,13 +20,23 @@ function computeRestaurantStatus(
   hours: BusinessHour[]
 ): RestaurantStatus {
   if (!active) return { type: 'closed', label: 'Cerrado por el momento' };
-  if (isPaused) return { type: 'paused', label: 'No recibimos pedidos' };
+  if (isPaused) return { type: 'paused', label: 'Pausado por el momento' };
 
   const openNow = isBusinessOpenNow(hours);
 
   if (openNow === null) return { type: 'open', label: 'Abierto' };
   if (openNow === false) return { type: 'closed', label: 'Cerrado por el momento' };
   return { type: 'open', label: 'Abierto' };
+}
+
+interface MappedProduct {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  image: string;
+  restaurantId: string;
+  category_id: string | null;
 }
 
 export default function RestaurantDetail() {
@@ -41,7 +52,8 @@ export default function RestaurantDetail() {
     hasDelivery: boolean;
     hasPickup: boolean;
   } | null>(null);
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<MappedProduct[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<{
     id: string;
@@ -58,8 +70,8 @@ export default function RestaurantDetail() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch business e horarios en paralelo
-        const [businessResult, hoursResult] = await Promise.all([
+        // Fetch business, horarios, categorías y productos en paralelo
+        const [businessResult, hoursResult, categoriesData, productsResult] = await Promise.all([
           supabase
             .from("businesses")
             .select("id, name, address, active, logo_url, is_paused, has_delivery, has_pickup")
@@ -67,8 +79,14 @@ export default function RestaurantDetail() {
             .single(),
           supabase
             .from("business_hours")
-            .select("*")
+            .select("day_of_week, open_time, close_time, active")
             .eq("business_id", restaurantId),
+          getActiveProductCategories(),
+          supabase
+            .from("products")
+            .select("id, name, price, description, image_url, active, business_id, category_id")
+            .eq("business_id", restaurantId)
+            .eq("active", true),
         ]);
 
         const { data: businessData, error: businessError } = businessResult;
@@ -95,25 +113,21 @@ export default function RestaurantDetail() {
           hasPickup: businessData.has_pickup ?? true,
         });
 
-        const { data: productsData, error: productsError } = await supabase
-          .from("products")
-          .select("id, name, price, description, image_url, active, business_id")
-          .eq("business_id", restaurantId)
-          .eq("active", true);
+        setCategories(categoriesData);
 
-        if (productsError) {
-          console.error("Error fetching products:", productsError);
-        } else {
-          const mapped =
-            productsData?.map((p: any) => ({
-              id: p.id,
-              name: p.name,
-              price: p.price,
-              description: p.description || "",
-              image: p.image_url || "https://via.placeholder.com/200",
-              restaurantId: p.business_id,
-            })) || [];
+        if (!productsResult.error) {
+          const mapped: MappedProduct[] = (productsResult.data ?? []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            description: p.description || "",
+            image: p.image_url || "https://via.placeholder.com/200",
+            restaurantId: p.business_id,
+            category_id: p.category_id ?? null,
+          }));
           setProducts(mapped);
+        } else {
+          console.error("Error fetching products:", productsResult.error);
         }
       } catch (err) {
         console.error("Error general:", err);
@@ -125,7 +139,7 @@ export default function RestaurantDetail() {
     fetchData();
   }, [restaurantId, navigate]);
 
-  const handleProductClick = (product: any) => {
+  const handleProductClick = (product: MappedProduct) => {
     setSelectedProduct({
       ...product,
       restaurant: restaurant
@@ -133,6 +147,18 @@ export default function RestaurantDetail() {
         : undefined,
     });
   };
+
+  // Agrupar productos por categoría.
+  // Solo se incluyen las categorías que tienen al menos un producto en este restaurante.
+  const productsByCategory = categories
+    .map(cat => ({
+      category: cat,
+      items: products.filter(p => p.category_id === cat.id),
+    }))
+    .filter(group => group.items.length > 0);
+
+  // Productos sin categoría asignada
+  const uncategorizedProducts = products.filter(p => !p.category_id);
 
   if (loading) {
     return (
@@ -154,12 +180,14 @@ export default function RestaurantDetail() {
         <span className="text-sm font-medium">Volver</span>
       </button>
 
+      {/* Cabecera del restaurante */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700">
         <div className="relative h-48 bg-gray-100 dark:bg-gray-700">
           <img
             src={restaurant.logo}
             alt={restaurant.name}
             className="w-full h-full object-cover"
+            loading="eager"
           />
           <span
             className={`absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-full ${
@@ -198,21 +226,22 @@ export default function RestaurantDetail() {
         </div>
       </div>
 
-      {/* Banner de aviso cuando el restaurante no acepta pedidos */}
+      {/* Banner: restaurante en pausa */}
       {restaurant.restaurantStatus.type === 'paused' && (
         <div className="flex gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl">
           <BellOff className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-              No recibimos pedidos por el momento
+              ⏸️ Pausado temporalmente
             </p>
             <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-              Estamos saturados de pedidos. Reanudaremos la atención lo más pronto posible. ¡Gracias por tu paciencia!
+              Este restaurante no está recibiendo pedidos en este momento, pero volverá pronto. ¡Puedes explorar el menú y volver más tarde!
             </p>
           </div>
         </div>
       )}
 
+      {/* Banner: restaurante cerrado */}
       {restaurant.restaurantStatus.type === 'closed' && (
         <div className="flex gap-3 p-4 bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-2xl">
           <ClockIcon className="w-5 h-5 text-gray-500 dark:text-gray-400 flex-shrink-0 mt-0.5" />
@@ -227,44 +256,64 @@ export default function RestaurantDetail() {
         </div>
       )}
 
-      <section>
-        <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-4">
-          Productos
-        </h3>
-        {products.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500 dark:text-gray-400 text-sm">
-              No hay productos disponibles en este restaurante
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {products.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => handleProductClick(item)}
-                className="bg-white dark:bg-gray-800 rounded-2xl p-3 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col gap-2 cursor-pointer hover:shadow-md transition-shadow"
-              >
-                <div className="relative h-28 rounded-xl overflow-hidden bg-gray-100">
-                  <img
-                    src={item.image}
-                    className="w-full h-full object-cover"
-                    alt={item.name}
-                  />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-800 dark:text-white text-sm truncate">
-                    {item.name}
-                  </h4>
-                  <p className="text-sm font-bold text-amber-600 dark:text-amber-400 mt-1">
-                    ${item.price}
-                  </p>
-                </div>
+      {/* Menú */}
+      {products.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-500 dark:text-gray-400 text-sm">
+            No hay productos disponibles en este restaurante
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-8">
+          {/* Sección por categoría */}
+          {productsByCategory.map(({ category, items }) => (
+            <section key={category.id}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl leading-none">{category.icon || "🍽️"}</span>
+                <h3 className="font-bold text-base text-gray-900 dark:text-white">
+                  {category.name}
+                </h3>
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  ({items.length})
+                </span>
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {items.map((item) => (
+                  <ProductCard
+                    key={item.id}
+                    item={item}
+                    onClick={() => handleProductClick(item)}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+
+          {/* Productos sin categoría */}
+          {uncategorizedProducts.length > 0 && (
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl leading-none">🍽️</span>
+                <h3 className="font-bold text-base text-gray-900 dark:text-white">
+                  Otros
+                </h3>
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  ({uncategorizedProducts.length})
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {uncategorizedProducts.map((item) => (
+                  <ProductCard
+                    key={item.id}
+                    item={item}
+                    onClick={() => handleProductClick(item)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
 
       {selectedProduct && (
         <ProductModal
@@ -274,6 +323,39 @@ export default function RestaurantDetail() {
           restaurantStatus={restaurant.restaurantStatus.type}
         />
       )}
+    </div>
+  );
+}
+
+// Componente de tarjeta de producto — extraído para evitar repetición entre secciones
+function ProductCard({
+  item,
+  onClick,
+}: {
+  item: MappedProduct;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className="bg-white dark:bg-gray-800 rounded-2xl p-3 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col gap-2 cursor-pointer hover:shadow-md transition-shadow"
+    >
+      <div className="relative h-28 rounded-xl overflow-hidden bg-gray-100">
+        <img
+          src={item.image}
+          className="w-full h-full object-cover"
+          alt={item.name}
+          loading="lazy"
+        />
+      </div>
+      <div>
+        <h4 className="font-semibold text-gray-800 dark:text-white text-sm truncate">
+          {item.name}
+        </h4>
+        <p className="text-sm font-bold text-amber-600 dark:text-amber-400 mt-1">
+          ${item.price}
+        </p>
+      </div>
     </div>
   );
 }

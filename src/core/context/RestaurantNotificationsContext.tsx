@@ -33,7 +33,7 @@ interface RestaurantNotificationsContextType {
 const RestaurantNotificationsContext = createContext<RestaurantNotificationsContextType | undefined>(undefined);
 
 export function RestaurantNotificationsProvider({ children }: { children: React.ReactNode }) {
-  const { user, isAuthReady, role } = useAuth();
+  const { user, profileId, isAuthReady, role } = useAuth();
 
   const [businessId, setBusinessIdState] = useState<string | null>(null);
   const [businessIdLoading, setBusinessIdLoading] = useState(true);
@@ -49,7 +49,7 @@ export function RestaurantNotificationsProvider({ children }: { children: React.
     // para evitar montar/desmontar el Outlet durante el flujo de auth.
     if (!isAuthReady) return;
 
-    if (role !== "owner" || !userId) {
+    if (role !== "owner" || !userId || !profileId) {
       // Auth listo pero no es owner (o no hay sesión) — ya no hay nada que cargar
       setBusinessIdState(null);
       setBusinessIdLoading(false);
@@ -63,7 +63,8 @@ export function RestaurantNotificationsProvider({ children }: { children: React.
     resolvedForUserRef.current = userId;
     // businessIdLoading ya es true desde el estado inicial — no hace falta setear
 
-    getBusinessByOwner(userId)
+    // profileId ya resuelto por AuthContext — getBusinessByOwner no necesita consultar profiles
+    getBusinessByOwner(profileId)
       .then(business => {
         setBusinessIdState(business?.id ?? null);
       })
@@ -73,7 +74,7 @@ export function RestaurantNotificationsProvider({ children }: { children: React.
       .finally(() => {
         setBusinessIdLoading(false);
       });
-  }, [userId, isAuthReady, role]);
+  }, [userId, profileId, isAuthReady, role]);
 
   // Usar el hook de notificaciones con el businessId actual
   const {

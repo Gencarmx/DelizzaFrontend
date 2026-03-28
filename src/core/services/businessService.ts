@@ -21,32 +21,15 @@ export interface BusinessFilters {
 }
 
 /**
- * Obtiene el restaurante de un propietario específico
- * Nota: ownerId debe ser el auth.uid() del usuario (no el profile.id)
+ * Obtiene el restaurante de un propietario específico.
+ * @param profileId - El profiles.id del owner (disponible en AuthContext como profileId).
  */
-export async function getBusinessByOwner(userId: string): Promise<Business | null> {
+export async function getBusinessByOwner(profileId: string): Promise<Business | null> {
   try {
-    // Primero obtenemos el perfil del usuario para encontrar su profile.id
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', userId)
-      .single();
-
-    if (profileError) {
-      if (profileError.code === 'PGRST116') return null; // Usuario no tiene perfil
-      throw profileError;
-    }
-
-    if (!profile) {
-      return null;
-    }
-
-    // Ahora buscamos el business usando el profile.id
     const { data, error } = await supabase
       .from('businesses')
       .select('*')
-      .eq('owner_id', profile.id)
+      .eq('owner_id', profileId)
       .single();
 
     if (error) {
@@ -268,18 +251,13 @@ export async function setBusinessPaused(
 }
 
 /**
- * Activa/desactiva un restaurante
+ * Activa/desactiva un restaurante.
+ * @param businessId - ID del restaurante.
+ * @param newStatus - El nuevo estado deseado (true = activo, false = inactivo).
+ *   El UI debe calcular el estado nuevo antes de llamar para evitar un GET previo.
  */
-export async function toggleBusinessStatus(businessId: string): Promise<Business> {
+export async function toggleBusinessStatus(businessId: string, newStatus: boolean): Promise<Business> {
   try {
-    // Obtener el estado actual
-    const business = await getBusinessById(businessId);
-    if (!business) {
-      throw new Error('Restaurante no encontrado');
-    }
-
-    const newStatus = !business.active;
-
     const { data, error } = await supabase
       .from('businesses')
       .update({
@@ -413,7 +391,8 @@ export async function updateDeliverySettings(
 }
 
 /**
- * Obtiene estadísticas generales de restaurantes
+ * Obtiene estadísticas generales de restaurantes usando COUNT del servidor
+ * en lugar de traer todas las filas y contar en el cliente.
  */
 export async function getBusinessStats(): Promise<{
   total: number;
@@ -421,17 +400,16 @@ export async function getBusinessStats(): Promise<{
   inactive: number;
 }> {
   try {
-    const { data, error } = await supabase
-      .from('businesses')
-      .select('active');
+    const [{ count: total }, { count: active }] = await Promise.all([
+      supabase.from('businesses').select('*', { count: 'exact', head: true }),
+      supabase.from('businesses').select('*', { count: 'exact', head: true }).eq('active', true),
+    ]);
 
-    if (error) throw error;
-
-    const total = data.length;
-    const active = data.filter(b => b.active).length;
-    const inactive = total - active;
-
-    return { total, active, inactive };
+    return {
+      total: total ?? 0,
+      active: active ?? 0,
+      inactive: (total ?? 0) - (active ?? 0),
+    };
   } catch (error) {
     console.error('Error obteniendo estadísticas de restaurantes:', error);
     throw new Error('No se pudieron obtener las estadísticas');
@@ -441,33 +419,21 @@ export async function getBusinessStats(): Promise<{
 /**
  * Verifica si un usuario puede gestionar un restaurante.
  *
- * @param authUserId - El auth.users.id del usuario (NO el profiles.id).
- *   La función resuelve internamente el profileId correspondiente para
- *   comparar con businesses.owner_id, evitando confusión entre los dos
- *   tipos de UUID que coexisten en el schema.
+ * @param profileId - El profiles.id del usuario (disponible en AuthContext).
+ *   businesses.owner_id referencia profiles.id, por lo que se compara directamente
+ *   sin necesidad de resolver auth.users.id → profiles.id en cada llamada.
  * @param businessId - El ID del negocio a verificar.
  */
 export async function canUserManageBusiness(
-  authUserId: string,
+  profileId: string,
   businessId: string
 ): Promise<boolean> {
   try {
-    // Paso 1: resolver el profileId a partir del authUserId.
-    // businesses.owner_id referencia profiles.id, no auth.users.id.
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', authUserId)
-      .maybeSingle();
-
-    if (profileError || !profile) return false;
-
-    // Paso 2: verificar que el negocio pertenece a ese perfil.
     const { data, error } = await supabase
       .from('businesses')
       .select('owner_id')
       .eq('id', businessId)
-      .eq('owner_id', profile.id)
+      .eq('owner_id', profileId)
       .single();
 
     if (error) {

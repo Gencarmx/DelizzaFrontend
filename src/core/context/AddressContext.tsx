@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { addressService, type Address } from "@core/services/addressService";
-import { supabase } from "@core/supabase/client";
 import { useAuth } from "./AuthContext";
 
 interface AddressContextType {
@@ -14,7 +13,7 @@ interface AddressContextType {
 const AddressContext = createContext<AddressContextType | undefined>(undefined);
 
 export function AddressProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, profileId } = useAuth();
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +25,7 @@ export function AddressProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const loadAddresses = async () => {
-      if (!user) {
+      if (!user || !profileId) {
         setAddresses([]);
         setSelectedAddress(null);
         setLoading(false);
@@ -35,27 +34,18 @@ export function AddressProvider({ children }: { children: ReactNode }) {
 
       try {
         setLoading(true);
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
+        // profileId ya está resuelto por AuthContext — no es necesario re-consultar profiles
+        const userAddresses = await addressService.getAddressesByProfileId(profileId);
 
         if (cancelled) return;
 
-        if (profile) {
-          const userAddresses = await addressService.getAddressesByProfileId(profile.id);
+        setAddresses(userAddresses);
 
-          if (cancelled) return;
-
-          setAddresses(userAddresses);
-
-          const defaultAddress = userAddresses.find(addr => addr.is_default);
-          if (defaultAddress) {
-            setSelectedAddress(defaultAddress);
-          } else if (userAddresses.length > 0) {
-            setSelectedAddress(userAddresses[0]);
-          }
+        const defaultAddress = userAddresses.find(addr => addr.is_default);
+        if (defaultAddress) {
+          setSelectedAddress(defaultAddress);
+        } else if (userAddresses.length > 0) {
+          setSelectedAddress(userAddresses[0]);
         }
       } catch (error) {
         if (!cancelled) console.error("Error loading addresses:", error);
@@ -69,29 +59,22 @@ export function AddressProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, profileId]);
 
   const refreshAddresses = async () => {
     // Re-fetch directo sin flag de cancelación — se llama explícitamente por el usuario.
-    if (!user) return;
+    if (!user || !profileId) return;
     try {
       setLoading(true);
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
+      // profileId ya está resuelto por AuthContext — no es necesario re-consultar profiles
+      const userAddresses = await addressService.getAddressesByProfileId(profileId);
+      setAddresses(userAddresses);
 
-      if (profile) {
-        const userAddresses = await addressService.getAddressesByProfileId(profile.id);
-        setAddresses(userAddresses);
-
-        const defaultAddress = userAddresses.find(addr => addr.is_default);
-        if (defaultAddress) {
-          setSelectedAddress(defaultAddress);
-        } else if (userAddresses.length > 0) {
-          setSelectedAddress(userAddresses[0]);
-        }
+      const defaultAddress = userAddresses.find(addr => addr.is_default);
+      if (defaultAddress) {
+        setSelectedAddress(defaultAddress);
+      } else if (userAddresses.length > 0) {
+        setSelectedAddress(userAddresses[0]);
       }
     } catch (error) {
       console.error("Error refreshing addresses:", error);

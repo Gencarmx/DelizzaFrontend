@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, Filter, Eye, Loader2, Wifi, WifiOff, ChefHat, Package, X, CheckCircle, Phone, MapPin, User, ShoppingBag } from "lucide-react";
+import { Search, Filter, Eye, Loader2, Wifi, WifiOff, ChefHat, Package, X, CheckCircle, Phone, MapPin, User, ShoppingBag, Copy, MessageCircle } from "lucide-react";
 import DataTable from "@components/restaurant-ui/tables/DataTable";
 import StatusBadge from "@components/restaurant-ui/badges/StatusBadge";
 import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
+import { useAuth } from "@core/context/AuthContext";
 import { getRecentOrders, updateOrderStatus } from "@core/services/orderService";
 import { getBusinessById } from "@core/services/businessService";
 import { PrintButton } from "@presentation/components/printing";
@@ -56,6 +57,7 @@ interface OrderDetailData {
 }
 
 export default function Orders() {
+  const { profileId } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending");
   const [orders, setOrders] = useState<Order[]>([]);
@@ -69,6 +71,7 @@ export default function Orders() {
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<OrderDetailData | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [confirmCompleteOrder, setConfirmCompleteOrder] = useState<Order | null>(null);
+  const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
 
   // Obtener notificaciones en tiempo real y estado de conexión
   const {
@@ -118,7 +121,7 @@ export default function Orders() {
 
     try {
       setUpdatingOrders(prev => new Set(prev).add(fullId));
-      await updateOrderStatus(fullId, newStatus as any);
+      await updateOrderStatus(fullId, newStatus as any, undefined, profileId ?? undefined);
 
       setOrders(prev => prev.map(order =>
         order.fullId === fullId
@@ -257,6 +260,59 @@ export default function Orders() {
     }
   }
 
+  /** Genera el texto plano con el resumen del pedido para compartir */
+  const buildShareText = (detail: OrderDetailData): string => {
+    const lines: string[] = [
+      `🛒 Pedido #${detail.order.id}`,
+      `📅 ${detail.order.date}`,
+      ``,
+      `👤 Cliente: ${detail.customerName}`,
+      `📞 Teléfono: ${detail.customerPhone || 'No disponible'}`,
+    ];
+
+    if (detail.deliveryAddress) {
+      const addr = detail.deliveryAddress;
+      const parts = [addr.line1, addr.line2, addr.city, addr.state, addr.postalCode].filter(Boolean).join(', ');
+      lines.push(`📍 Dirección: ${parts}`);
+    }
+
+    lines.push(``, `🍽️ Productos:`);
+    detail.items.forEach(item => {
+      lines.push(`  • ${item.quantity}x ${item.productName}${item.price > 0 ? ` — $${(item.price * item.quantity).toFixed(2)}` : ''}`);
+    });
+
+    lines.push(``, `💳 Pago: ${detail.order.paymentMethod}`);
+    const deliveryLabel = detail.order.deliveryType === 'delivery'
+      ? 'Domicilio'
+      : detail.order.deliveryType === 'pickup'
+        ? 'Recoger en tienda'
+        : detail.order.deliveryType || 'No especificado';
+    lines.push(`🚚 Entrega: ${deliveryLabel}`);
+    lines.push(`💰 Total: $${detail.order.total}`);
+
+    return lines.join('\n');
+  };
+
+  const handleCopyText = async (detail: OrderDetailData) => {
+    const text = buildShareText(detail);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `Pedido #${detail.order.id}`, text });
+      } else {
+        await navigator.clipboard.writeText(text);
+        setCopiedOrderId(detail.order.id);
+        setTimeout(() => setCopiedOrderId(null), 2500);
+      }
+    } catch {
+      // fallback silencioso
+    }
+  };
+
+  const handleShareWhatsApp = (detail: OrderDetailData) => {
+    const text = encodeURIComponent(buildShareText(detail));
+    window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
+  };
+
   const openOrderDetail = async (order: Order) => {
     setLoadingDetail(true);
     setSelectedOrderDetail(null);
@@ -366,98 +422,118 @@ export default function Orders() {
       console.error('❌ Error: order.fullId es undefined para el pedido:', order);
     }
 
-    // No mostrar acciones si está completado o cancelado
+    /** Botones fijos que aparecen en todos los estados */
+    const btnView = (
+      <button
+        onClick={(e) => { e.stopPropagation(); openOrderDetail(order); }}
+        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+        title="Ver detalles"
+      >
+        <Eye className="w-4 h-4" />
+      </button>
+    );
+
+    const btnPrint = (
+      <PrintButton
+        order={order}
+        variant="icon"
+        businessName={businessInfo?.name || "Mi Restaurante"}
+        businessAddress={businessInfo?.address || "Dirección del restaurante"}
+        businessPhone={businessInfo?.phone || "Teléfono"}
+      />
+    );
+
+    const btnCancel = (
+      <button
+        onClick={() => handleStatusChange(order.fullId, order.id, 'cancelled')}
+        disabled={isUpdating}
+        className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-full text-red-500 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
+        title="Cancelar pedido"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    );
+
+    // ── Flujo secuencial ────────────────────────────────────────────────────
+    // pending   → [Ver] [En preparación] [Cancelar] [Imprimir]
+    // preparing → [Ver] [Listo para entrega] [Cancelar] [Imprimir]
+    // ready     → [Ver] [Entregado] [Cancelar] [Imprimir]
+    // completed / cancelled → [Ver] [Imprimir]
+    // ────────────────────────────────────────────────────────────────────────
+
     if (status === 'completed' || status === 'cancelled') {
       return (
         <div className="flex items-center gap-1">
-          {/* Botón: Ver detalles - primero */}
-          <button
-            onClick={(e) => { e.stopPropagation(); openOrderDetail(order); }}
-            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            title="Ver detalles"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
-          {/* Botón: Imprimir ticket */}
-          <PrintButton
-            order={order}
-            variant="icon"
-            businessName={businessInfo?.name || "Mi Restaurante"}
-            businessAddress={businessInfo?.address || "Dirección del restaurante"}
-            businessPhone={businessInfo?.phone || "Teléfono"}
-          />
+          {btnView}
+          {btnPrint}
         </div>
       );
     }
 
-    return (
-      <div className="flex items-center gap-1">
-        {/* Botón: Ver detalles - primero */}
-        <button
-          onClick={(e) => { e.stopPropagation(); openOrderDetail(order); }}
-          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-          title="Ver detalles"
-        >
-          <Eye className="w-4 h-4" />
-        </button>
-
-        {/* Botón: En preparación (ChefHat) - visible cuando está pendiente */}
-        {status === 'pending' && (
+    if (status === 'pending') {
+      return (
+        <div className="flex items-center gap-1">
+          {btnView}
           <button
             onClick={() => handleStatusChange(order.fullId, order.id, 'preparing')}
             disabled={isUpdating}
             className="p-1.5 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-full text-orange-500 hover:text-orange-600 dark:hover:text-orange-400 transition-colors disabled:opacity-50"
-            title="Marcar en preparación"
+            title="Aceptar: En preparación"
           >
             <ChefHat className="w-4 h-4" />
           </button>
-        )}
+          {btnCancel}
+          {btnPrint}
+        </div>
+      );
+    }
 
-        {/* Botón: Listo para entrega (Package) - visible cuando está pendiente o en preparación */}
-        {(status === 'pending' || status === 'preparing') && (
+    if (status === 'preparing') {
+      return (
+        <div className="flex items-center gap-1">
+          {btnView}
           <button
             onClick={() => handleStatusChange(order.fullId, order.id, 'ready')}
             disabled={isUpdating}
             className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-full text-green-500 hover:text-green-600 dark:hover:text-green-400 transition-colors disabled:opacity-50"
-            title="Marcar listo para entrega"
+            title="Listo para entrega"
           >
             <Package className="w-4 h-4" />
           </button>
-        )}
+          {btnCancel}
+          {btnPrint}
+        </div>
+      );
+    }
 
-        {/* Botón: Completado (CheckCircle) - visible cuando está listo para entrega o en preparación */}
-        {(status === 'ready' || status === 'preparing') && (
+    if (status === 'ready') {
+      return (
+        <div className="flex items-center gap-1">
+          {btnView}
           <button
             onClick={(e) => { e.stopPropagation(); setConfirmCompleteOrder(order); }}
             disabled={isUpdating}
             className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-full text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors disabled:opacity-50"
-            title="Marcar como completado"
+            title="Marcar como entregado"
           >
             <CheckCircle className="w-4 h-4" />
           </button>
-        )}
+          {btnCancel}
+          {btnPrint}
+        </div>
+      );
+    }
 
-        {/* Botón: Cancelar (X) - siempre visible para pedidos activos */}
-        <button
-          onClick={() => handleStatusChange(order.fullId, order.id, 'cancelled')}
-          disabled={isUpdating}
-          className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-full text-red-500 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
-          title="Cancelar pedido"
-        >
-          <X className="w-4 h-4" />
-        </button>
-
-        {/* Botón: Imprimir ticket */}
-        <PrintButton
-          order={order}
-          variant="icon"
-          businessName={businessInfo?.name || "Mi Restaurante"}
-          businessAddress={businessInfo?.address || "Dirección del restaurante"}
-          businessPhone={businessInfo?.phone || "Teléfono"}
-        />
+    // Fallback (in_progress u otro estado no mapeado)
+    return (
+      <div className="flex items-center gap-1">
+        {btnView}
+        {btnCancel}
+        {btnPrint}
       </div>
     );
   };
+
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
@@ -679,6 +755,26 @@ export default function Orders() {
                       <span className="text-gray-700 dark:text-gray-300">
                         {selectedOrderDetail.customerPhone || 'Número no disponible'}
                       </span>
+                    </div>
+
+                    {/* Share actions */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        onClick={() => handleCopyText(selectedOrderDetail)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+                        title="Copiar resumen del pedido"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        {copiedOrderId === selectedOrderDetail.order.id ? '¡Copiado!' : 'Copiar texto'}
+                      </button>
+                      <button
+                        onClick={() => handleShareWhatsApp(selectedOrderDetail)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800/50 transition-colors"
+                        title="Compartir por WhatsApp"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        WhatsApp
+                      </button>
                     </div>
                   </div>
 
