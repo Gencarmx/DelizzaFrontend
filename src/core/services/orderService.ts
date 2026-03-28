@@ -148,6 +148,20 @@ export async function getOrderDetails(
 }
 
 /**
+ * Resuelve el profileId (profiles.id) a partir de un valor ya conocido o
+ * lo obtiene desde la sesión activa. Garantiza el tipo de retorno string
+ * para que TypeScript no infiera string | undefined en los llamadores.
+ */
+async function resolveProfileId(profileId?: string): Promise<string> {
+  if (profileId) return profileId;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autorizado: sesión no encontrada");
+  const { data: profile } = await supabase.from("profiles").select("id").eq("user_id", user.id).maybeSingle();
+  if (!profile) throw new Error("No autorizado: perfil no encontrado");
+  return profile.id;
+}
+
+/**
  * Actualiza el estado de un pedido y notifica al cliente vía Broadcast.
  * Verifica que el usuario autenticado sea el propietario del negocio
  * asociado al pedido antes de permitir cualquier modificación.
@@ -156,6 +170,7 @@ export async function updateOrderStatus(
   orderId: string,
   status: OrderStatus,
   notes?: string,
+  profileId?: string,
 ): Promise<Order> {
   try {
     const validStatuses: OrderStatus[] = [
@@ -170,13 +185,11 @@ export async function updateOrderStatus(
       throw new Error("Estado de pedido inválido");
     }
 
-    // Verificar autorización: el usuario autenticado debe ser el dueño
-    // del negocio al que pertenece el pedido.
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("No autorizado: sesión no encontrada");
-    }
-    const authorized = await canUserManageOrder(user.id, orderId);
+    // Verificar autorización: el propietario del negocio puede gestionar el pedido.
+    // Si el llamador ya tiene profileId (profiles.id), se usa directamente para evitar
+    // la consulta extra a auth.getUser() + profiles.
+    const resolvedProfileId = await resolveProfileId(profileId);
+    const authorized = await canUserManageOrder(resolvedProfileId, orderId);
     if (!authorized) {
       throw new Error("No autorizado: no tienes permisos para gestionar este pedido");
     }
@@ -265,14 +278,11 @@ export async function updateOrderStatus(
  * Verifica que el usuario autenticado sea el propietario del negocio
  * asociado al pedido antes de permitir cualquier modificación.
  */
-export async function markOrderAsPaid(orderId: string): Promise<Order> {
+export async function markOrderAsPaid(orderId: string, profileId?: string): Promise<Order> {
   try {
     // Verificar autorización primero
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("No autorizado: sesión no encontrada");
-    }
-    const authorized = await canUserManageOrder(user.id, orderId);
+    const resolvedProfileId = await resolveProfileId(profileId);
+    const authorized = await canUserManageOrder(resolvedProfileId, orderId);
     if (!authorized) {
       throw new Error("No autorizado: no tienes permisos para gestionar este pedido");
     }
@@ -320,14 +330,12 @@ export async function markOrderAsPaid(orderId: string): Promise<Order> {
 export async function cancelOrder(
   orderId: string,
   _reason: string,
+  profileId?: string,
 ): Promise<Order> {
   try {
     // Verificar autorización primero
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("No autorizado: sesión no encontrada");
-    }
-    const authorized = await canUserManageOrder(user.id, orderId);
+    const resolvedProfileId = await resolveProfileId(profileId);
+    const authorized = await canUserManageOrder(resolvedProfileId, orderId);
     if (!authorized) {
       throw new Error("No autorizado: no tienes permisos para cancelar este pedido");
     }
@@ -516,26 +524,15 @@ export async function getOrdersByCustomer(
 }
 
 /**
- * Verifica si un usuario puede gestionar un pedido.
- * Traduce auth.users.id → profiles.id antes de comparar con businesses.owner_id,
- * siguiendo el mismo patrón que canUserManageBusiness en businessService.ts.
+ * Verifica si un perfil puede gestionar un pedido.
+ * Recibe directamente profiles.id (ya resuelto por el llamador) para evitar
+ * la consulta extra a profiles que antes se hacía aquí.
  */
 export async function canUserManageOrder(
-  userId: string,
+  profileId: string,
   orderId: string,
 ): Promise<boolean> {
   try {
-    // Paso 1: resolver profiles.id a partir de auth.users.id
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (profileError) throw profileError;
-    if (!profile) return false;
-
-    // Paso 2: verificar que el negocio del pedido pertenece a este perfil
     const { data, error } = await supabase
       .from("orders")
       .select(
@@ -545,7 +542,7 @@ export async function canUserManageOrder(
       `,
       )
       .eq("id", orderId)
-      .eq("businesses.owner_id", profile.id)
+      .eq("businesses.owner_id", profileId)
       .single();
 
     if (error) {

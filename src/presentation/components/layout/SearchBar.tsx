@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, X, Store, ShoppingBag, Loader2 } from "lucide-react";
 import { supabase } from "@core/supabase/client";
 
-interface ProductResult {
+export interface ProductResult {
   id: string;
   name: string;
   price: number;
@@ -13,7 +13,7 @@ interface ProductResult {
   type: "product";
 }
 
-interface RestaurantResult {
+export interface RestaurantResult {
   id: string;
   name: string;
   address: string;
@@ -52,20 +52,38 @@ function fuzzyScore(query: string, target: string): number {
 interface SearchBarProps {
   onProductSelect?: (product: ProductResult) => void;
   onRestaurantSelect?: (restaurant: RestaurantResult) => void;
+  /** Pre-loaded products from the parent — skips the internal Supabase fetch when provided. */
+  initialProducts?: ProductResult[];
+  /** Pre-loaded restaurants from the parent — skips the internal Supabase fetch when provided. */
+  initialRestaurants?: RestaurantResult[];
 }
 
-export function SearchBar({ onProductSelect, onRestaurantSelect }: SearchBarProps) {
+export function SearchBar({ onProductSelect, onRestaurantSelect, initialProducts, initialRestaurants }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [allProducts, setAllProducts] = useState<ProductResult[]>([]);
-  const [allRestaurants, setAllRestaurants] = useState<RestaurantResult[]>([]);
-  const [dataLoaded, setDataLoaded] = useState(false);
+  const [allProducts, setAllProducts] = useState<ProductResult[]>(initialProducts ?? []);
+  const [allRestaurants, setAllRestaurants] = useState<RestaurantResult[]>(initialRestaurants ?? []);
+  const [dataLoaded, setDataLoaded] = useState(initialProducts !== undefined && initialRestaurants !== undefined);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Sync if parent updates props after initial render (e.g. async load finishes)
   useEffect(() => {
+    if (initialProducts !== undefined) setAllProducts(initialProducts);
+  }, [initialProducts]);
+
+  useEffect(() => {
+    if (initialRestaurants !== undefined) setAllRestaurants(initialRestaurants);
+  }, [initialRestaurants]);
+
+  useEffect(() => {
+    if (initialProducts !== undefined && initialRestaurants !== undefined) {
+      setDataLoaded(true);
+      return;
+    }
+    // Fall back to internal fetch only when props are not provided
     const loadData = async () => {
       setLoading(true);
       try {
@@ -112,6 +130,7 @@ export function SearchBar({ onProductSelect, onRestaurantSelect }: SearchBarProp
       }
     };
     loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const search = useCallback(
@@ -235,7 +254,7 @@ export function SearchBar({ onProductSelect, onRestaurantSelect }: SearchBarProp
                           className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-50 dark:hover:bg-gray-700/60 transition-colors text-left"
                         >
                           <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0">
-                            <img src={rest.logo} alt={rest.name} className="w-full h-full object-cover" />
+                            <img src={rest.logo} alt={rest.name} className="w-full h-full object-cover" loading="lazy" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">
@@ -275,7 +294,7 @@ export function SearchBar({ onProductSelect, onRestaurantSelect }: SearchBarProp
                           className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-50 dark:hover:bg-gray-700/60 transition-colors text-left"
                         >
                           <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0">
-                            <img src={prod.image} alt={prod.name} className="w-full h-full object-cover" />
+                            <img src={prod.image} alt={prod.name} className="w-full h-full object-cover" loading="lazy" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">

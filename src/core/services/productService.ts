@@ -26,35 +26,45 @@ export interface ProductFilters {
   active?: boolean;
   category?: string;
   search?: string;
+  limit?: number;
+  offset?: number;
 }
 
 /**
- * Obtiene todos los productos de un restaurante
+ * Obtiene productos de un restaurante con soporte de paginación y búsqueda server-side.
+ * Retorna los productos de la página solicitada y el total de registros para el paginador.
  */
 export async function getProductsByBusiness(
   businessId: string,
   filters?: ProductFilters
-): Promise<Product[]> {
+): Promise<{ products: Product[]; total: number }> {
   try {
+    const limit = filters?.limit ?? 20;
+    const offset = filters?.offset ?? 0;
+
     let query = supabase
       .from('products')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('business_id', businessId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
-    // Aplicar filtros
     if (filters?.active !== undefined) {
       query = query.eq('active', filters.active);
     }
 
-    if (filters?.search) {
-      query = query.ilike('name', `%${filters.search}%`);
+    if (filters?.search?.trim()) {
+      query = query.ilike('name', `%${filters.search.trim()}%`);
     }
 
-    const { data, error } = await query;
+    if (filters?.category) {
+      query = query.eq('category_id', filters.category);
+    }
+
+    const { data, error, count } = await query;
 
     if (error) throw error;
-    return data || [];
+    return { products: data || [], total: count ?? 0 };
   } catch (error) {
     console.error('Error obteniendo productos:', error);
     throw new Error('No se pudieron obtener los productos');

@@ -23,7 +23,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 const addressSchema = z.object({
   label: z.string().min(1, "La etiqueta es requerida"),
   line1: z.string().min(1, "La dirección es requerida"),
-  line2: z.string().optional(),
+  line2: z.string().min(1, "La colonia / referencia es requerida para un mejor servicio de reparto"),
   city: z.string().min(1, "La ciudad es requerida"),
   state: z.string().min(1, "El estado es requerido"),
   postal_code: z.string().optional(),
@@ -436,7 +436,7 @@ export default function SavedAddresses() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Colonia / Referencia (opcional)
+                  Colonia / Referencia <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"

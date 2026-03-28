@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
-import { Plus, Search, Edit, Trash2, Copy, Loader2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Copy, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import DataTable from "@components/restaurant-ui/tables/DataTable";
 import StatusBadge from "@components/restaurant-ui/badges/StatusBadge";
 import ActionDropdown from "@components/restaurant-ui/dropdowns/ActionDropdown";
@@ -8,8 +8,7 @@ import Button from "@components/restaurant-ui/buttons/Button";
 import Input from "@components/restaurant-ui/forms/Input";
 import ConfirmModal from "@components/restaurant-ui/modals/ConfirmModal";
 import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
-import { getProductsByBusiness, createProduct } from "@core/services/productService";
-import { deleteProduct } from "@core/services/productService";
+import { getProductsByBusiness, createProduct, deleteProduct } from "@core/services/productService";
 import type { Column } from "@components/restaurant-ui/tables/DataTable";
 import type { ActionItem } from "@components/restaurant-ui/dropdowns/ActionDropdown";
 
@@ -25,28 +24,53 @@ interface Product {
   business_id: string;
 }
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
+
 export default function ProductList() {
   const navigate = useNavigate();
   // businessId viene del contexto en lugar de re-consultar getBusinessByOwner()
   const { businessId } = useRestaurantNotifications();
+
+  // — Búsqueda —
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // — Paginación —
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(20);
+  const [total, setTotal] = useState(0);
+
+  // — Datos —
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(false); // carga silenciosa al cambiar de página
   const [error, setError] = useState<string | null>(null);
+
+  // — Acciones de fila —
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
     productId: string | null;
     productName: string;
-  }>({
-    isOpen: false,
-    productId: null,
-    productName: "",
-  });
-  // IDs de productos que están siendo eliminados o duplicados (guards anti-doble-click)
+  }>({ isOpen: false, productId: null, productName: "" });
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [duplicatingIds, setDuplicatingIds] = useState<Set<string>>(new Set());
 
-  // Cargar productos usando businessId del contexto (sin re-fetch de business)
+  // refreshKey: permite forzar un re-fetch sin cambiar la página
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Bandera para distinguir primera carga de cambios de página
+  const isFirstLoad = useRef(true);
+
+  // Debounce del buscador: 400 ms. Al cambiar, vuelve a página 1.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Carga principal — se dispara por cambio de página, tamaño, búsqueda o refresh
   useEffect(() => {
     const loadProducts = async () => {
       if (!businessId) {
@@ -54,47 +78,71 @@ export default function ProductList() {
         return;
       }
 
-      try {
+      if (isFirstLoad.current) {
         setLoading(true);
-        setError(null);
+        isFirstLoad.current = false;
+      } else {
+        setFetching(true);
+      }
+      setError(null);
 
-        const productsData = await getProductsByBusiness(businessId);
-        setProducts(productsData);
-
+      try {
+        const offset = (currentPage - 1) * pageSize;
+        const { products: data, total: count } = await getProductsByBusiness(businessId, {
+          limit: pageSize,
+          offset,
+          search: debouncedSearch || undefined,
+        });
+        setProducts(data);
+        setTotal(count);
       } catch (err) {
         console.error("Error cargando productos:", err);
         setError("Error al cargar los productos. Por favor, intenta de nuevo.");
       } finally {
         setLoading(false);
+        setFetching(false);
       }
     };
 
     loadProducts();
-  }, [businessId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessId, currentPage, pageSize, debouncedSearch, refreshKey]);
 
+  // — Helpers de paginación —
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const offset = (currentPage - 1) * pageSize;
+  const rangeStart = total === 0 ? 0 : offset + 1;
+  const rangeEnd = Math.min(offset + pageSize, total);
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
+
+  // — Acciones —
   const handleEdit = (productId: string) => {
     navigate(`/restaurant/products/edit/${productId}`);
   };
 
   const handleDelete = (productId: string, productName: string) => {
-    setDeleteModal({
-      isOpen: true,
-      productId,
-      productName,
-    });
+    setDeleteModal({ isOpen: true, productId, productName });
   };
 
   const confirmDelete = async () => {
-    if (!deleteModal.productId) return;
-    // Guard: evita doble confirmación mientras la request está en vuelo
-    if (deletingId === deleteModal.productId) return;
+    if (!deleteModal.productId || deletingId === deleteModal.productId) return;
 
     const idToDelete = deleteModal.productId;
     setDeletingId(idToDelete);
     try {
       await deleteProduct(idToDelete);
-      setProducts((prev) => prev.filter((p) => p.id !== idToDelete));
       setDeleteModal({ isOpen: false, productId: null, productName: "" });
+
+      // Si era el último item de una página que no es la primera, retroceder
+      if (products.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      } else {
+        setRefreshKey(prev => prev + 1);
+      }
     } catch (err) {
       console.error("Error eliminando producto:", err);
     } finally {
@@ -104,23 +152,21 @@ export default function ProductList() {
 
   const handleDuplicate = async (productId: string) => {
     const product = products.find((p) => p.id === productId);
-    if (!product || !businessId) return;
-    // Guard: evita crear múltiples copias si el usuario hace doble clic
-    if (duplicatingIds.has(productId)) return;
+    if (!product || !businessId || duplicatingIds.has(productId)) return;
 
     setDuplicatingIds(prev => new Set(prev).add(productId));
     try {
-      const duplicatedProduct = {
+      await createProduct({
         name: `${product.name} (Copia)`,
         description: product.description || undefined,
         price: product.price,
         business_id: businessId,
         image_url: product.image_url || undefined,
         active: product.active || true,
-      };
-
-      const newProduct = await createProduct(duplicatedProduct);
-      setProducts((prev) => [...prev, newProduct]);
+      });
+      // El producto duplicado aparece primero (order by created_at desc) → ir a página 1
+      setCurrentPage(1);
+      setRefreshKey(prev => prev + 1);
     } catch (err) {
       console.error("Error duplicando producto:", err);
     } finally {
@@ -164,6 +210,7 @@ export default function ProductList() {
           src={product.image_url || "https://via.placeholder.com/48"}
           alt={product.name}
           className="w-12 h-12 rounded-lg object-cover"
+          loading="lazy"
         />
       ),
     },
@@ -222,10 +269,6 @@ export default function ProductList() {
     },
   ];
 
-  const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-
   return (
     <div className="flex flex-col gap-6 px-4 sm:px-6 lg:px-8 py-6">
       {/* Header */}
@@ -248,7 +291,7 @@ export default function ProductList() {
         </Button>
       </div>
 
-      {/* Error Message */}
+      {/* Error */}
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <div className="flex items-center gap-3">
@@ -257,14 +300,12 @@ export default function ProductList() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
-            <p className="text-red-800 dark:text-red-200 text-sm font-medium">
-              {error}
-            </p>
+            <p className="text-red-800 dark:text-red-200 text-sm font-medium">{error}</p>
           </div>
         </div>
       )}
 
-      {/* Search */}
+      {/* Búsqueda */}
       <div className="max-w-md">
         <Input
           placeholder="Buscar productos..."
@@ -274,7 +315,7 @@ export default function ProductList() {
         />
       </div>
 
-      {/* Loading State */}
+      {/* Tabla / Spinner inicial */}
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="text-center">
@@ -283,22 +324,96 @@ export default function ProductList() {
           </div>
         </div>
       ) : (
-        /* Table */
-        <div className="pb-24 sm:pb-8">
-          <DataTable
-            columns={columns}
-            data={filteredProducts}
-            keyExtractor={(product) => product.id}
-            emptyMessage="No se encontraron productos"
-          />
+        <div className="flex flex-col gap-4 pb-24 sm:pb-8">
+          {/* Tabla con overlay sutil durante cambio de página */}
+          <div className={`transition-opacity duration-150 ${fetching ? "opacity-50 pointer-events-none" : "opacity-100"}`}>
+            <DataTable
+              columns={columns}
+              data={products}
+              keyExtractor={(product) => product.id}
+              emptyMessage={
+                debouncedSearch
+                  ? `No se encontraron productos para "${debouncedSearch}"`
+                  : "No se encontraron productos"
+              }
+            />
+          </div>
+
+          {/* Paginador — solo se muestra si hay datos */}
+          {total > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+              {/* Info + selector de tamaño */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Mostrando{" "}
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {rangeStart}–{rangeEnd}
+                  </span>{" "}
+                  de{" "}
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {total}
+                  </span>{" "}
+                  {total === 1 ? "producto" : "productos"}
+                  {debouncedSearch && (
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {" "}para &ldquo;{debouncedSearch}&rdquo;
+                    </span>
+                  )}
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Por página:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                    className="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Controles de navegación */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                  disabled={currentPage === 1 || fetching}
+                  aria-label="Página anterior"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[90px] text-center select-none">
+                  {fetching ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-amber-500 mx-auto" />
+                  ) : (
+                    `Página ${currentPage} de ${totalPages}`
+                  )}
+                </span>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  disabled={currentPage >= totalPages || fetching}
+                  aria-label="Página siguiente"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Modal de confirmación de eliminación */}
       <ConfirmModal
         isOpen={deleteModal.isOpen}
         onClose={() => {
-          if (deletingId) return; // no cerrar mientras elimina
+          if (deletingId) return;
           setDeleteModal({ isOpen: false, productId: null, productName: "" });
         }}
         onConfirm={confirmDelete}
