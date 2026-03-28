@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { ChevronDown, /* Heart, Star, Clock, */ ChevronLeft, ChevronRight, Loader2, MapPin } from "lucide-react";
 import ProductModal from "@presentation/components/common/ProductModal";
-import { SearchBar } from "@presentation/components/layout/SearchBar";
+import { SearchBar, type ProductResult as SearchProductResult, type RestaurantResult as SearchRestaurantResult } from "@presentation/components/layout/SearchBar";
 import { supabase } from "@core/supabase/client";
 import { getActiveProductCategories, type ProductCategory } from "@core/services/productCategoryService";
 import { isBusinessOpenNow } from "@core/services/businessHoursService";
@@ -13,7 +13,7 @@ type BusinessHour = Database['public']['Tables']['business_hours']['Row'];
 
 type RestaurantStatus =
   | { type: 'open';   label: 'Abierto' }
-  | { type: 'paused'; label: 'No recibimos pedidos' }
+  | { type: 'paused'; label: 'Pausado por el momento' }
   | { type: 'closed'; label: 'Cerrado por el momento' };
 
 function computeRestaurantStatus(
@@ -22,7 +22,7 @@ function computeRestaurantStatus(
   hours: BusinessHour[]
 ): RestaurantStatus {
   if (!active) return { type: 'closed', label: 'Cerrado por el momento' };
-  if (isPaused) return { type: 'paused', label: 'No recibimos pedidos' };
+  if (isPaused) return { type: 'paused', label: 'Pausado por el momento' };
 
   const openNow = isBusinessOpenNow(hours);
 
@@ -30,6 +30,9 @@ function computeRestaurantStatus(
   if (openNow === false) return { type: 'closed', label: 'Cerrado por el momento' };
   return { type: 'open', label: 'Abierto' };
 }
+
+// Número máximo de productos a mostrar en el carrusel "Todos los productos"
+const PRODUCTS_CAROUSEL_LIMIT = 40;
 
 export default function Home() {
   const { selectedAddress, loading: addressLoading } = useAddress();
@@ -43,24 +46,23 @@ export default function Home() {
     description?: string;
   } | null>(null);
 
-  // const [favorites, setFavorites] = useState<any[]>([]);
   const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [categoryProducts, setCategoryProducts] = useState<any[]>([]);
+  const [categoryLoading, setCategoryLoading] = useState(false);
   const [restaurants, setRestaurants] = useState<any[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState({
-    // favorites: true,
     restaurants: true,
     categories: true,
     allProducts: true
   });
   const [error, setError] = useState<string | null>(null);
-  // const scrollRef = useRef<HTMLDivElement>(null);
   const allProductsScrollRef = useRef<HTMLDivElement>(null);
 
-  const filteredProducts = selectedCategory
-    ? allProducts.filter(product => product.category_id === selectedCategory)
-    : allProducts;
+  // Los productos mostrados en el carrusel: si hay categoría activa usa el fetch
+  // específico de esa categoría; de lo contrario usa los 40 más recientes.
+  const displayProducts = selectedCategory ? categoryProducts : allProducts;
 
   const handleProductClick = (product: {
     id: string;
@@ -86,9 +88,52 @@ export default function Home() {
     setSelectedProduct(null);
   };
 
-  const handleCategoryClick = (categoryId: string) => {
-    setSelectedCategory(prev => prev === categoryId ? null : categoryId);
+  const handleCategoryClick = async (categoryId: string) => {
+    // Deseleccionar la misma categoría: volver a todos los productos
+    if (selectedCategory === categoryId) {
+      setSelectedCategory(null);
+      setCategoryProducts([]);
+      return;
+    }
+
+    setSelectedCategory(categoryId);
+    setCategoryLoading(true);
+
+    try {
+      const { data: productsData } = await supabase
+        .from('products')
+        .select('id, name, price, description, image_url, active, business_id, category_id')
+        .eq('active', true)
+        .eq('category_id', categoryId);
+
+      if (productsData) {
+        // Usar el mapa de restaurantes ya cargado en estado: evita un round-trip extra
+        const businessMap = new Map(restaurants.map(r => [r.id, r.name]));
+        const enriched = productsData
+          .filter(p => businessMap.has(p.business_id))
+          .map(p => ({
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            description: p.description || "",
+            image: p.image_url || "https://via.placeholder.com/200",
+            restaurant: businessMap.get(p.business_id) || "Unknown",
+            restaurantId: p.business_id,
+            category_id: p.category_id,
+            rating: "4.5",
+            delivery: "$30",
+            time: "30 min",
+          }));
+        setCategoryProducts(enriched);
+      }
+    } catch (err) {
+      console.error('Error cargando productos por categoría:', err);
+      setCategoryProducts([]);
+    } finally {
+      setCategoryLoading(false);
+    }
   };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -101,7 +146,8 @@ export default function Home() {
           supabase
             .from('products')
             .select('id, name, price, description, image_url, active, business_id, category_id')
-            .eq('active', true),
+            .eq('active', true)
+            .limit(PRODUCTS_CAROUSEL_LIMIT),
           supabase
             .from('businesses')
             .select('id, name, address, active, logo_url, is_paused')
@@ -111,38 +157,17 @@ export default function Home() {
         // — Categorías —
         setCategories(categoriesData);
 
-        // — Productos —
-        if (allProductsResult.error) {
-          console.error('Error fetching all products:', allProductsResult.error);
-        } else {
-          const allProductsData = allProductsResult.data ?? [];
-          // Obtener nombres de restaurantes en un solo query usando los IDs únicos
-          const allBusinessIds = [...new Set(allProductsData.map(p => p.business_id))];
-          const { data: allBusinessesData } = await supabase
-            .from('businesses')
-            .select('id, name')
-            .in('id', allBusinessIds);
-          const allBusinessMap = new Map(allBusinessesData?.map(b => [b.id, b.name]) || []);
-          setAllProducts(allProductsData.filter((p: any) => allBusinessMap.has(p.business_id)).map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            rating: "4.5",
-            delivery: "$30",
-            time: "30 min",
-            price: p.price,
-            restaurant: allBusinessMap.get(p.business_id) || "Unknown",
-            restaurantId: p.business_id,
-            description: p.description || "",
-            image: p.image_url || "https://via.placeholder.com/200",
-            category_id: p.category_id,
-          })));
-        }
-
         // — Restaurantes con estado tricolor —
+        let businessNameMap = new Map<string, string>();
+
         if (restaurantsResult.error) {
           console.error('Error fetching restaurants:', restaurantsResult.error);
         } else {
           const restaurantList = restaurantsResult.data ?? [];
+
+          // Construir el mapa id→name que también usarán los productos.
+          // Esto elimina la query secundaria a businesses que existía antes.
+          businessNameMap = new Map(restaurantList.map(b => [b.id, b.name]));
 
           // Fetch horarios de todos los restaurantes en un solo query
           const restaurantIds = restaurantList.map(b => b.id);
@@ -174,6 +199,31 @@ export default function Home() {
           }));
         }
 
+        // — Productos (carrusel inicial) —
+        // Se usa el mapa de restaurantes ya construido: sin query extra a businesses.
+        if (allProductsResult.error) {
+          console.error('Error fetching all products:', allProductsResult.error);
+        } else {
+          const allProductsData = allProductsResult.data ?? [];
+          setAllProducts(
+            allProductsData
+              .filter(p => businessNameMap.has(p.business_id))
+              .map(p => ({
+                id: p.id,
+                name: p.name,
+                rating: "4.5",
+                delivery: "$30",
+                time: "30 min",
+                price: p.price,
+                restaurant: businessNameMap.get(p.business_id) || "Unknown",
+                restaurantId: p.business_id,
+                description: p.description || "",
+                image: p.image_url || "https://via.placeholder.com/200",
+                category_id: p.category_id,
+              }))
+          );
+        }
+
         setLoading({ restaurants: false, categories: false, allProducts: false });
       } catch (error) {
         console.error('Error general al cargar datos:', error);
@@ -184,16 +234,6 @@ export default function Home() {
 
     fetchData();
   }, []);
-
-  /*
-    const scrollLeft = () => {
-      scrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
-    };
-  
-    const scrollRight = () => {
-      scrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
-    };
-  */
 
   const scrollAllProductsLeft = () => {
     allProductsScrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
@@ -248,6 +288,24 @@ export default function Home() {
         <SearchBar
           onProductSelect={handleProductClick}
           onRestaurantSelect={(restaurant) => navigate(`/restaurant-detail/${restaurant.id}`)}
+          initialProducts={allProducts.map<SearchProductResult>(p => ({
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            image: p.image,
+            restaurant: p.restaurant,
+            restaurantId: p.restaurantId,
+            description: p.description,
+            type: "product",
+          }))}
+          initialRestaurants={restaurants.map<SearchRestaurantResult>(r => ({
+            id: r.id,
+            name: r.name,
+            address: r.address,
+            logo: r.logo,
+            status: r.status.label,
+            type: "restaurant",
+          }))}
         />
       </div>
 
@@ -289,68 +347,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* Favorites Section - Future Feature
-      <section>
-        <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-4">
-          El favorito entre los locales
-        </h3>
-        {loading.favorites ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-amber-600" />
-          </div>
-        ) : favorites.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-500 dark:text-gray-400 text-sm">
-              No hay productos disponibles en este momento
-            </p>
-          </div>
-        ) : (
-          <div className="relative">
-            <button onClick={scrollLeft} className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 p-2 rounded-full shadow-md z-10 opacity-70 hover:opacity-100">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <div ref={scrollRef} className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x hide-scrollbar">
-              {favorites.map((item, index) => (
-              <div
-                key={index}
-                onClick={() => handleProductClick(item)}
-                className="bg-white dark:bg-gray-800 rounded-2xl p-3 min-w-[200px] shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col gap-2 snap-start cursor-pointer hover:shadow-md transition-shadow"
-              >
-                <div className="relative h-32 rounded-xl overflow-hidden bg-gray-100">
-                  <img
-                    src={item.image}
-                    className="w-full h-full object-cover"
-                    alt={item.name}
-                  />
-                  <button className="absolute top-2 right-2 p-1.5 bg-white/80 backdrop-blur-sm rounded-full cursor-pointer">
-                    <Heart className="w-4 h-4 text-gray-600" />
-                  </button>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-800 dark:text-white text-sm truncate">
-                    {item.name}
-                  </h4>
-                  <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    <span className="flex items-center gap-1 text-amber-500 font-medium">
-                      <Star className="w-3 h-3 fill-current" /> {item.rating}
-                    </span>
-                    <span>Envío: {item.delivery}</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> {item.time}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-            </div>
-            <button onClick={scrollRight} className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 p-2 rounded-full shadow-md z-10 opacity-70 hover:opacity-100">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-      </section>
-      */}
-
       {/* All Products Section */}
       <section>
         <div className="flex items-center justify-between mb-4">
@@ -359,20 +355,25 @@ export default function Home() {
               ? categories.find(c => c.id === selectedCategory)?.name ?? "Todos los productos"
               : "Todos los productos"}
           </h3>
-          {selectedCategory && (
+          {selectedCategory ? (
             <button
-              onClick={() => setSelectedCategory(null)}
+              onClick={() => { setSelectedCategory(null); setCategoryProducts([]); }}
               className="text-xs text-amber-600 dark:text-amber-400 font-medium hover:underline cursor-pointer"
             >
               Ver todos
             </button>
+          ) : allProducts.length >= PRODUCTS_CAROUSEL_LIMIT && (
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              Mostrando {PRODUCTS_CAROUSEL_LIMIT} recientes
+            </span>
           )}
         </div>
-        {loading.allProducts ? (
+
+        {loading.allProducts || categoryLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-amber-600" />
           </div>
-        ) : filteredProducts.length === 0 ? (
+        ) : displayProducts.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-500 dark:text-gray-400 text-sm">
               No hay productos disponibles en esta categoría
@@ -384,7 +385,7 @@ export default function Home() {
               <ChevronLeft className="w-4 h-4" />
             </button>
             <div ref={allProductsScrollRef} className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x hide-scrollbar">
-              {filteredProducts.map((item) => (
+              {displayProducts.map((item) => (
                 <div
                   key={item.id}
                   onClick={() => handleProductClick(item)}
@@ -395,6 +396,7 @@ export default function Home() {
                       src={item.image}
                       className="w-full h-full object-cover"
                       alt={item.name}
+                      loading="lazy"
                     />
                   </div>
                   <div>
@@ -449,6 +451,7 @@ export default function Home() {
                     src={item.logo}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     alt={item.name}
+                    loading="lazy"
                   />
                   <span className={`absolute top-2 left-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                     item.status.type === 'open'
@@ -465,13 +468,7 @@ export default function Home() {
                     {item.name}
                   </h4>
                   <div className="flex items-center gap-1 mt-1">
-                    {/* Star rating and time hidden as future functions
-                    <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                    <span className="text-xs font-medium text-amber-500">4.5</span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 mx-1">·</span>
-                    <Clock className="w-3 h-3 text-gray-400" />
-                    <span className="text-xs text-gray-500 dark:text-gray-400">30 min</span>
-                    */}
+                    {/* Star rating and time hidden as future functions */}
                   </div>
                   <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 truncate">
                     {item.address}

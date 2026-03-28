@@ -48,6 +48,7 @@ export default function Favorites() {
                 src={item.image}
                 className="w-full h-full object-cover"
                 alt={item.name}
+                loading="lazy"
               />
               <button className="absolute top-2 right-2 p-1.5 bg-white/80 backdrop-blur-sm rounded-full cursor-pointer hover:bg-white transition-colors">
                 <Heart className="w-4 h-4 text-amber-400 fill-amber-400" />

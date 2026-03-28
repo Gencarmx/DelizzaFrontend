@@ -78,6 +78,7 @@ export default function Products() {
                     src={product.image_url}
                     alt={product.name}
                     className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
+                    loading="lazy"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.src = '/placeholder-product.png'; // Fallback image
@@ -102,6 +103,7 @@ export default function Products() {
                         src={product.businesses.logo_url}
                         alt={product.businesses.name}
                         className="w-6 h-6 rounded-full object-cover"
+                        loading="lazy"
                       />
                     )}
                     <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">

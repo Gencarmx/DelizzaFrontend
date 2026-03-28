@@ -131,6 +131,7 @@ export default function Cart() {
                         src={item.image}
                         alt={item.name}
                         className="w-full h-full object-cover"
+                        loading="lazy"
                       />
                     </div>
                     <div className="flex-1 flex flex-col justify-between min-w-0">

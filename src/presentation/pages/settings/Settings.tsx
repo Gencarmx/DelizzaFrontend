@@ -31,7 +31,7 @@ type SettingItem = {
 export default function Settings() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signOut, user } = useAuth();
+  const { signOut, user, profileId } = useAuth();
   const { effectiveTheme, setTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
@@ -45,8 +45,9 @@ export default function Settings() {
 
   // Cargar businessId y estado de pausa al entrar a la sección de restaurante
   useEffect(() => {
-    if (!isRestaurant || !user) return;
-    getBusinessByOwner(user.id).then(business => {
+    if (!isRestaurant || !user || !profileId) return;
+    // profileId ya resuelto por AuthContext — evita re-consultar profiles
+    getBusinessByOwner(profileId).then(business => {
       if (!business) return;
       setBusinessId(business.id);
       supabase
@@ -58,7 +59,7 @@ export default function Settings() {
           if (data) setIsPaused(data.is_paused);
         });
     });
-  }, [isRestaurant, user]);
+  }, [isRestaurant, user, profileId]);
 
   const handleTogglePause = async () => {
     if (!businessId || pauseLoading) return;

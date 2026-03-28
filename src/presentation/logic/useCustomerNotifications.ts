@@ -123,15 +123,12 @@ export function useCustomerNotifications(
       const title = "¡Tu pedido ha sido actualizado!";
       const body = `Tu pedido está ahora: ${translateStatus(order.status)}`;
 
-      if (!("Notification" in window)) {
-        onInAppNotificationRef.current?.(title, body);
-        return;
-      }
+      // Siempre mostrar el toast in-app, independientemente del permiso del navegador
+      onInAppNotificationRef.current?.(title, body);
 
-      if (Notification.permission !== "granted") {
-        onInAppNotificationRef.current?.(title, body);
-        return;
-      }
+      // Adicionalmente intentar notificación del navegador si el permiso está concedido
+      if (!("Notification" in window)) return;
+      if (Notification.permission !== "granted") return;
 
       const icon = "/favicon.svg";
       const tag = `order-update-${order.id}`;

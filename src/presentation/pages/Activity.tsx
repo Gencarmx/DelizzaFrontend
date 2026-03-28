@@ -4,17 +4,16 @@ import {
   getOrdersByCustomer,
   type OrderWithItems,
 } from "@core/services/orderService";
-import { supabase } from "@core/supabase/client";
+import { useAuth } from "@core/context/AuthContext";
 import { useCustomerNotificationsContext } from "@core/context/CustomerNotificationsContext";
 
 export default function Activity() {
+  const { profileId, user } = useAuth();
   const { registerOrderUpdateCallback } = useCustomerNotificationsContext();
 
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [profileId, setProfileId] = useState<string | null>(null);
-
 
   const reloadOrders = useCallback(
     async (pid: string) => {
@@ -25,55 +24,43 @@ export default function Activity() {
   );
 
   useEffect(() => {
-    let isSubscribed = true;
+    let cancelled = false;
 
     const fetchOrders = async () => {
+      if (!user) {
+        setError("Debes iniciar sesión para ver tu actividad");
+        setLoading(false);
+        return;
+      }
+
+      if (!profileId) {
+        setError("Perfil no encontrado");
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
 
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) {
-          setError("Debes iniciar sesión para ver tu actividad");
-          setLoading(false);
-          return;
-        }
-
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (!profile) {
-          setError("Perfil no encontrado");
-          setLoading(false);
-          return;
-        }
-
-        const ordersData = await getOrdersByCustomer(profile.id, 20);
-        if (isSubscribed) {
+        const ordersData = await getOrdersByCustomer(profileId, 20);
+        if (!cancelled) {
           setOrders(ordersData);
-          setProfileId(profile.id);
         }
       } catch (err) {
         console.error("Error cargando pedidos:", err);
-        setError("Error al cargar tu historial de pedidos");
+        if (!cancelled) setError("Error al cargar tu historial de pedidos");
       } finally {
-        if (isSubscribed) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchOrders();
 
     return () => {
-      isSubscribed = false;
+      cancelled = true;
     };
-  }, []);
+  }, [user, profileId]);
 
   useEffect(() => {
     if (!profileId) return;
