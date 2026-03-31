@@ -19,6 +19,7 @@ interface Product {
   price: number;
   image_url: string | null;
   active: boolean | null;
+  category_id: string | null;
   created_at: string | null;
   updated_at: string | null;
   business_id: string;
@@ -161,8 +162,9 @@ export default function ProductList() {
         description: product.description || undefined,
         price: product.price,
         business_id: businessId,
+        category_id: product.category_id,
         image_url: product.image_url || undefined,
-        active: product.active || true,
+        active: product.active ?? true,
       });
       // El producto duplicado aparece primero (order by created_at desc) → ir a página 1
       setCurrentPage(1);

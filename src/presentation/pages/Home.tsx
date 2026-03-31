@@ -44,6 +44,7 @@ export default function Home() {
     image: string;
     restaurant?: { id: string; name: string; };
     description?: string;
+    restaurantStatus?: 'open' | 'paused' | 'closed';
   } | null>(null);
 
   const [allProducts, setAllProducts] = useState<any[]>([]);
@@ -76,11 +77,16 @@ export default function Home() {
     const validRestaurantId = product.restaurantId && product.restaurantId !== 'unknown'
       ? product.restaurantId
       : null;
+    const restaurantInfo = validRestaurantId
+      ? restaurants.find(r => r.id === validRestaurantId)
+      : null;
+    const restaurantStatus: 'open' | 'paused' | 'closed' = restaurantInfo?.status?.type ?? 'open';
     setSelectedProduct({
       ...product,
       restaurant: validRestaurantId && product.restaurant
         ? { id: validRestaurantId, name: product.restaurant }
-        : undefined
+        : undefined,
+      restaurantStatus,
     });
   };
 
@@ -486,6 +492,7 @@ export default function Home() {
           isOpen={!!selectedProduct}
           onClose={handleCloseModal}
           product={selectedProduct}
+          restaurantStatus={selectedProduct.restaurantStatus}
         />
       )}
     </div>
