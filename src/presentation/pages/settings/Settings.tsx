@@ -10,6 +10,7 @@ import {
   LogOut,
   Clock,
   PauseCircle,
+  BellRing,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router";
 import { useState, useEffect } from "react";
@@ -169,6 +170,12 @@ export default function Settings() {
           label: "Horarios de atención",
           type: "link",
           onChange: () => navigate("/restaurant/settings/business-hours"),
+        },
+        {
+          icon: BellRing,
+          label: "Notificaciones push",
+          type: "link",
+          onChange: () => navigate("/restaurant/settings/notifications"),
         },
       ],
     },
