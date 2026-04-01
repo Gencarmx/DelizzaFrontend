@@ -152,6 +152,7 @@ export default function ProductAddonsSection({
 
   // ── Guardar ───────────────────────────────────────────────────────────────
   const handleSave = async () => {
+    if (!productId) return;
     for (const addon of addons) {
       if (!addon.name.trim()) { setError("Todos los extras deben tener un nombre."); return; }
       if (addon.price < 0)    { setError("El precio de un extra no puede ser negativo."); return; }
