@@ -7,10 +7,10 @@ export async function initOneSignal(): Promise<void> {
   initialized = true;
 
   await OneSignal.init({
-    appId: import.meta.env.VITE_ONESIGNAL_APP_ID_DEV as string,
+    appId: "a65ddd34-c16f-4e09-91fc-a39a95256fa4",
     safari_web_id: "web.onesignal.auto.166712e5-2aee-41ea-b95e-8df3d8ab1f28",
     serviceWorkerPath: 'push/onesignal/OneSignalSDKWorker.js',
-    serviceWorkerParam: { scope: '/' },
+    serviceWorkerParam: { scope: '/push/onesignal/' },
     promptOptions: {
       slidedown: {
         prompts: [
