@@ -202,6 +202,32 @@ async function createRestaurantOrder(
       })),
     });
 
+    // 5. Push notification al owner — funciona aunque el browser esté cerrado
+    try {
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('profiles!inner(user_id)')
+        .eq('id', order.restaurant.id)
+        .maybeSingle();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ownerUserId = (business as any)?.profiles?.user_id as string | undefined;
+
+      if (ownerUserId) {
+        await supabase.functions.invoke('send-push-notification', {
+          body: {
+            targetUserId: ownerUserId,
+            title: '🛵 ¡Nuevo pedido!',
+            body: `${customerProfile.full_name || 'Cliente'} — $${order.total.toFixed(2)}`,
+            url: '/restaurant/orders',
+            type: 'new_order',
+          },
+        });
+      }
+    } catch {
+      // No interrumpir el flujo del pedido si falla la push
+    }
+
     return {
       success: true,
       orderId: orderId,
