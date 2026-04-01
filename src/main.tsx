@@ -4,6 +4,9 @@ import { createBrowserRouter, RouterProvider } from "react-router";
 import { routes } from "@core/router/routes";
 import { AuthProvider, CartProvider, ThemeProvider, AddressProvider } from "@core/context";
 import "@presentation/styles/global.css";
+import { initOneSignal } from "@core/services/onesignalService";
+
+initOneSignal();
 
 // Capturar el evento antes de que React monte para no perderlo
 window.__pwaInstallPrompt = null;

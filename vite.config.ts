@@ -53,7 +53,9 @@ export default defineConfig({
 
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
+        globIgnores: ["**/OneSignalSDKWorker.js"],
         navigateFallback: "index.html",
+        navigateFallbackDenylist: [/^\/push\/onesignal\/OneSignalSDKWorker\.js/],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
@@ -68,6 +70,11 @@ export default defineConfig({
 
     }),
   ],
+  server: {
+    headers: {
+      'Service-Worker-Allowed': '/',
+    },
+  },
   resolve: {
     alias: {
       "@core": path.resolve(__dirname, "./src/core"),
