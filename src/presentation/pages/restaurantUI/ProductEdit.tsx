@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router";
 import { ChevronLeft, Upload, X } from "lucide-react";
+import ProductAddonsSection from "@presentation/components/common/ProductAddonsSection";
 import Button from "@components/restaurant-ui/buttons/Button";
 import Input from "@components/restaurant-ui/forms/Input";
 import Select from "@components/restaurant-ui/forms/Select";
@@ -45,6 +46,12 @@ export default function ProductEdit() {
   ]);
   const [generalError, setGeneralError] = useState("");
   const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!successToast) return;
+    const t = setTimeout(() => setSuccessToast(null), 1000);
+    return () => clearTimeout(t);
+  }, [successToast]);
 
   const {
     register,
@@ -384,6 +391,15 @@ export default function ProductEdit() {
             error={formErrors.description?.message}
             rows={4}
           />
+
+          {/* Extras — embebido dentro del card para mejor visibilidad */}
+          {productId && (
+            <ProductAddonsSection
+              productId={productId}
+              embedded
+              onSaved={() => setSuccessToast("Extras actualizados correctamente.")}
+            />
+          )}
         </div>
 
         {/* Actions */}
@@ -409,7 +425,7 @@ export default function ProductEdit() {
       </form>
 
       {successToast && (
-        <div className="fixed bottom-6 left-4 right-4 z-50 bg-green-600 text-white text-sm px-4 py-4 rounded-2xl shadow-xl text-center font-semibold">
+        <div className="fixed top-4 left-4 right-4 z-50 bg-green-600 text-white text-sm px-4 py-3 rounded-2xl shadow-xl text-center font-semibold pointer-events-none">
           ✓ {successToast}
         </div>
       )}

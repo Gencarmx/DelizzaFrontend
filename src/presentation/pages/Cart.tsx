@@ -139,6 +139,17 @@ export default function Cart() {
                         <h4 className="font-semibold text-gray-900 dark:text-white text-sm truncate">
                           {item.name}
                         </h4>
+                        {item.selectedAddons && item.selectedAddons.length > 0 && (
+                          <ul className="mt-0.5 space-y-0.5">
+                            {item.selectedAddons
+                              .filter(a => a.quantity > 0)
+                              .map(a => (
+                                <li key={a.addon_id} className="text-xs text-gray-500 dark:text-gray-400">
+                                  + {a.name}{a.quantity > 1 ? ` x${a.quantity}` : ''} <span className="text-amber-500">${(a.price * a.quantity).toFixed(2)}</span>
+                                </li>
+                              ))}
+                          </ul>
+                        )}
                         <p className="text-amber-500 font-bold text-sm mt-0.5">
                           ${item.price.toFixed(2)}
                         </p>

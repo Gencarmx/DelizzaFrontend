@@ -11,8 +11,12 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "apple-touch-icon.png"],
+      // Estrategia personalizada: permite manejar el evento `push` en sw.ts
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       injectRegister: "auto",
+      includeAssets: ["favicon.ico", "apple-touch-icon.png"],
 
       manifest: {
         name: "Delizza - Delivery App",
@@ -20,8 +24,8 @@ export default defineConfig({
         description: "Pide tu comida favorita con Delizza",
         theme_color: "#fbbf24",
         background_color: "#ffffff",
-        display: "standalone", // ✅ Cambiado
-        orientation: "portrait", // ✅ Agregado
+        display: "standalone",
+        orientation: "portrait",
         scope: "/",
         start_url: "/",
         icons: [
@@ -51,12 +55,10 @@ export default defineConfig({
         ],
       },
 
-      workbox: {
+      // Con injectManifest el SW controla su propio ciclo de vida (ver src/sw.ts).
+      // Solo se especifica qué archivos deben precachearse.
+      injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
-        navigateFallback: "index.html",
-        cleanupOutdatedCaches: true,
-        clientsClaim: true,
-        skipWaiting: true,
       },
 
       devOptions: {

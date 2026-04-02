@@ -50,7 +50,7 @@ const getIconForType = (type: string) => {
 export default function SavedAddresses() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { addresses, loading, selectedAddress, refreshAddresses } = useAddress();
+  const { addresses, loading, selectedAddress, setSelectedAddress, refreshAddresses } = useAddress();
   
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -92,8 +92,11 @@ export default function SavedAddresses() {
     }
   };
 
-  const handleSetDefault = async (id: string) => {
+  const handleSetDefault = async (address: Address) => {
     if (!user) return;
+
+    // Actualizar la selección en el contexto de forma inmediata
+    setSelectedAddress(address);
 
     try {
       const { data: profile } = await supabase
@@ -103,7 +106,7 @@ export default function SavedAddresses() {
         .single();
 
       if (profile) {
-        await addressService.setDefaultAddress(id, profile.id);
+        await addressService.setDefaultAddress(address.id, profile.id);
         await refreshAddresses();
       }
     } catch (error) {
@@ -328,7 +331,7 @@ export default function SavedAddresses() {
                     )}
 
                     <button
-                      onClick={() => handleSetDefault(address.id)}
+                      onClick={() => handleSetDefault(address)}
                       className="flex items-center gap-2 mt-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
                     >
                       <div

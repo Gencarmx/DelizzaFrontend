@@ -70,12 +70,19 @@ export function AddressProvider({ children }: { children: ReactNode }) {
       const userAddresses = await addressService.getAddressesByProfileId(profileId);
       setAddresses(userAddresses);
 
-      const defaultAddress = userAddresses.find(addr => addr.is_default);
-      if (defaultAddress) {
-        setSelectedAddress(defaultAddress);
-      } else if (userAddresses.length > 0) {
-        setSelectedAddress(userAddresses[0]);
-      }
+      // Preservar la dirección seleccionada si todavía existe en la lista
+      // (p.ej. después de editar o eliminar otra dirección).
+      // Solo cambiamos la selección si la dirección actual fue eliminada.
+      setSelectedAddress(prev => {
+        const stillExists = prev && userAddresses.some(addr => addr.id === prev.id);
+        if (stillExists) {
+          // Actualizar los datos de la dirección seleccionada por si fue editada
+          return userAddresses.find(addr => addr.id === prev!.id) ?? prev;
+        }
+        // La dirección seleccionada ya no existe: usar la predeterminada o la primera
+        const defaultAddress = userAddresses.find(addr => addr.is_default);
+        return defaultAddress ?? (userAddresses.length > 0 ? userAddresses[0] : null);
+      });
     } catch (error) {
       console.error("Error refreshing addresses:", error);
     } finally {

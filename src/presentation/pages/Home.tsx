@@ -42,8 +42,10 @@ export default function Home() {
     name: string;
     price: number;
     image: string;
+    has_addons?: boolean;
     restaurant?: { id: string; name: string; };
     description?: string;
+    restaurantStatus?: 'open' | 'paused' | 'closed';
   } | null>(null);
 
   const [allProducts, setAllProducts] = useState<any[]>([]);
@@ -69,6 +71,7 @@ export default function Home() {
     name: string;
     price: number;
     image: string;
+    has_addons?: boolean;
     restaurant?: string;
     restaurantId?: string;
     description?: string;
@@ -76,11 +79,21 @@ export default function Home() {
     const validRestaurantId = product.restaurantId && product.restaurantId !== 'unknown'
       ? product.restaurantId
       : null;
+    const restaurantInfo = validRestaurantId
+      ? restaurants.find(r => r.id === validRestaurantId)
+      : null;
+    const restaurantStatus: 'open' | 'paused' | 'closed' = restaurantInfo?.status?.type ?? 'open';
     setSelectedProduct({
-      ...product,
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.image,
+      description: product.description,
+      has_addons: product.has_addons,
       restaurant: validRestaurantId && product.restaurant
         ? { id: validRestaurantId, name: product.restaurant }
-        : undefined
+        : undefined,
+      restaurantStatus,
     });
   };
 
@@ -102,7 +115,7 @@ export default function Home() {
     try {
       const { data: productsData } = await supabase
         .from('products')
-        .select('id, name, price, description, image_url, active, business_id, category_id')
+        .select('id, name, price, description, image_url, active, business_id, category_id, has_addons')
         .eq('active', true)
         .eq('category_id', categoryId);
 
@@ -120,6 +133,7 @@ export default function Home() {
             restaurant: businessMap.get(p.business_id) || "Unknown",
             restaurantId: p.business_id,
             category_id: p.category_id,
+            has_addons: p.has_addons ?? false,
             rating: "4.5",
             delivery: "$30",
             time: "30 min",
@@ -145,7 +159,7 @@ export default function Home() {
           getActiveProductCategories(),
           supabase
             .from('products')
-            .select('id, name, price, description, image_url, active, business_id, category_id')
+            .select('id, name, price, description, image_url, active, business_id, category_id, has_addons')
             .eq('active', true)
             .limit(PRODUCTS_CAROUSEL_LIMIT),
           supabase
@@ -220,6 +234,7 @@ export default function Home() {
                 description: p.description || "",
                 image: p.image_url || "https://via.placeholder.com/200",
                 category_id: p.category_id,
+                has_addons: (p as any).has_addons ?? false,
               }))
           );
         }
@@ -486,6 +501,7 @@ export default function Home() {
           isOpen={!!selectedProduct}
           onClose={handleCloseModal}
           product={selectedProduct}
+          restaurantStatus={selectedProduct.restaurantStatus}
         />
       )}
     </div>

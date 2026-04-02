@@ -2,10 +2,19 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useAuth } from "@core/context/AuthContext";
 import { useCartSync } from "@core/hooks/useCartSync";
+import type { SelectedAddon } from "@core/supabase/types";
+
+export type { SelectedAddon };
 
 export interface CartItem {
+  /** ID del carrito: productId simple si no hay extras, compuesto si hay. */
   id: string;
+  /** UUID real del producto en Supabase. Usar en checkout para product_id. */
+  productId?: string;
   name: string;
+  /** Precio base sin extras. Opcional para items legacy en localStorage. */
+  basePrice?: number;
+  /** Precio unitario total = basePrice + sum(addons). Usado para subtotales. */
   price: number;
   quantity: number;
   image: string;
@@ -13,6 +22,7 @@ export interface CartItem {
     id: string;
     name: string;
   };
+  selectedAddons?: SelectedAddon[];
 }
 
 export interface DeliveryOption {

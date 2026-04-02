@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Bell, Package, CheckCircle2, XCircle, Clock, ChevronLeft, Loader2 } from "lucide-react";
+import { Bell, BellOff, BellRing, Package, CheckCircle2, XCircle, Clock, ChevronLeft, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { supabase } from "@core/supabase/client";
 import { getOrdersByCustomer, type OrderWithItems } from "@core/services/orderService";
+import { usePushNotifications } from "@core/hooks/usePushNotifications";
 
 function getStatusConfig(status: string | null) {
   switch (status) {
@@ -35,6 +36,83 @@ function getRelativeTime(dateString: string): string {
   if (diffHours < 24) return `Hace ${diffHours} hora${diffHours > 1 ? "s" : ""}`;
   if (diffDays === 1) return "Ayer";
   return `Hace ${diffDays} días`;
+}
+
+function PushNotificationsCard() {
+  const {
+    isSupported,
+    permissionState,
+    isSubscribed,
+    isLoading,
+    subscribe,
+    unsubscribe,
+  } = usePushNotifications();
+
+  if (!isSupported) return null;
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700 mb-4">
+      <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
+        Notificaciones push
+      </h3>
+
+      {permissionState === "denied" ? (
+        <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+          <BellOff className="w-5 h-5 flex-shrink-0" />
+          <p>
+            Notificaciones bloqueadas. Para activarlas ve a la configuración del
+            navegador y permite las notificaciones para esta página.
+          </p>
+        </div>
+      ) : permissionState === "granted" && isSubscribed ? (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-full">
+              <Bell className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                Activadas
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Recibirás alertas aunque el browser esté cerrado
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={unsubscribe}
+            disabled={isLoading}
+            className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 font-medium transition-colors"
+          >
+            {isLoading ? "..." : "Desactivar"}
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-amber-100 dark:bg-amber-900/30 p-2 rounded-full">
+              <BellRing className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                No activadas
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Entérate del estado de tu pedido aunque cierres el browser
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={subscribe}
+            disabled={isLoading}
+            className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-xs font-medium transition-colors"
+          >
+            {isLoading ? "..." : "Activar"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function Notifications() {
@@ -87,15 +165,18 @@ export default function Notifications() {
   return (
     <div className="flex flex-col pt-2 pb-24">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4 bg-white sticky top-0 z-10 py-2">
+      <div className="flex items-center gap-3 mb-4 bg-white dark:bg-gray-900 sticky top-0 z-10 py-2">
         <button
           onClick={() => navigate(-1)}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
         >
-          <ChevronLeft className="w-5 h-5 text-gray-700" />
+          <ChevronLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
         </button>
-        <h2 className="font-bold text-lg text-gray-900">Notificaciones</h2>
+        <h2 className="font-bold text-lg text-gray-900 dark:text-white">Notificaciones</h2>
       </div>
+
+      {/* Tarjeta de configuración de push */}
+      <PushNotificationsCard />
 
       {loading && (
         <div className="flex justify-center py-12">
@@ -121,7 +202,7 @@ export default function Notifications() {
             return (
               <div
                 key={order.id}
-                className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 flex gap-4"
+                className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700 flex gap-4"
               >
                 <div className={`w-12 h-12 ${iconBg} rounded-full flex items-center justify-center flex-shrink-0`}>
                   <Icon className={`w-6 h-6 ${iconColor}`} strokeWidth={2} />
@@ -129,16 +210,16 @@ export default function Notifications() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <h3 className="font-semibold text-gray-900 text-sm">{title}</h3>
+                    <h3 className="font-semibold text-gray-900 dark:text-white text-sm">{title}</h3>
                   </div>
-                  <p className="text-sm text-gray-600 mb-1 line-clamp-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-1 line-clamp-2">
                     {businessName} — {itemsText}
                   </p>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-400">
                       {order.created_at ? getRelativeTime(order.created_at) : ""}
                     </span>
-                    <span className="text-xs font-medium text-gray-700">
+                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                       ${(order.total || 0).toFixed(2)}
                     </span>
                   </div>
@@ -151,10 +232,10 @@ export default function Notifications() {
 
       {!loading && !error && orders.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 px-4">
-          <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+          <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
             <Bell className="w-10 h-10 text-gray-400" strokeWidth={1.5} />
           </div>
-          <h3 className="font-semibold text-gray-900 text-lg mb-2">
+          <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-2">
             No hay notificaciones
           </h3>
           <p className="text-sm text-gray-500 text-center">
