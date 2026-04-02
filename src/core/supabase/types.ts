@@ -484,6 +484,53 @@ export type Database = {
         }
         Relationships: []
       }
+      product_addons: {
+        Row: {
+          id: string
+          product_id: string
+          category_name: string
+          name: string
+          price: number
+          max_quantity: number
+          sort_order: number
+          active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          category_name: string
+          name: string
+          price?: number
+          max_quantity?: number
+          sort_order?: number
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          category_name?: string
+          name?: string
+          price?: number
+          max_quantity?: number
+          sort_order?: number
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_addons_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           active: boolean | null
@@ -491,6 +538,7 @@ export type Database = {
           category_id: string | null
           created_at: string | null
           description: string | null
+          has_addons: boolean
           id: string
           image_url: string | null
           name: string
@@ -504,6 +552,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string | null
           description?: string | null
+          has_addons?: boolean
           id?: string
           image_url?: string | null
           name: string
@@ -517,6 +566,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string | null
           description?: string | null
+          has_addons?: boolean
           id?: string
           image_url?: string | null
           name?: string
@@ -579,6 +629,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_product_addons_grouped: {
+        Args: { p_product_id: string }
+        Returns: Json
+      }
+      get_products_addons: {
+        Args: { p_product_ids: string[] }
+        Returns: { product_id: string; addons: Json }[]
+      }
+      upsert_product_addons: {
+        Args: { p_product_id: string; p_addons: Json }
+        Returns: void
+      }
       get_top_businesses_with_products: {
         Args: {
           p_current_time: string
@@ -726,3 +788,38 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
+// ─── Tipos de dominio: Sistema de Extras ─────────────────────────────────────
+
+export interface ProductAddon {
+  id: string;
+  product_id: string;
+  category_name: string;
+  name: string;
+  price: number;
+  max_quantity: number;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AddonItem {
+  id: string;
+  name: string;
+  price: number;
+  max_quantity: number;
+  sort_order: number;
+}
+
+export interface AddonGroup {
+  category: string;
+  addons: AddonItem[];
+}
+
+export interface SelectedAddon {
+  addon_id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}

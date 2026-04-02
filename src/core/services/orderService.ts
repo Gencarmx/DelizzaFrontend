@@ -263,6 +263,41 @@ export async function updateOrderStatus(
       }
     }
 
+    // Push notification al cliente — funciona aunque el browser esté cerrado
+    if (updatedOrder.customer_id) {
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .eq("id", updatedOrder.customer_id)
+          .maybeSingle();
+
+        if (profile?.user_id) {
+          const statusMessages: Record<string, string> = {
+            confirmed: "Tu pedido fue confirmado ✅",
+            preparing: "Tu pedido está en preparación 👨‍🍳",
+            ready:     "Tu pedido está listo 🎉",
+            completed: "Tu pedido fue entregado 🛵",
+            cancelled: "Tu pedido fue cancelado ❌",
+          };
+
+          const body = statusMessages[status] ?? `Estado actualizado: ${status}`;
+
+          await supabase.functions.invoke("send-push-notification", {
+            body: {
+              targetUserId: profile.user_id,
+              title: "📦 Actualización de tu pedido",
+              body,
+              url: "/activity",
+              type: "order_update",
+            },
+          });
+        }
+      } catch {
+        // No interrumpir si falla la push
+      }
+    }
+
     return updatedOrder;
   } catch (error) {
     console.error("Error actualizando estado del pedido:", error);

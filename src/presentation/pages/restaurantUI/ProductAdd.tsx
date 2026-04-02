@@ -5,12 +5,14 @@ import Button from "@components/restaurant-ui/buttons/Button";
 import Input from "@components/restaurant-ui/forms/Input";
 import Select from "@components/restaurant-ui/forms/Select";
 import Textarea from "@components/restaurant-ui/forms/Textarea";
+import ProductAddonsSection, { type AddonDraftPayload } from "@presentation/components/common/ProductAddonsSection";
 import { useAuth } from "@core/context/AuthContext";
 import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
 import {
   createProduct,
   uploadProductImage,
 } from "@core/services/productService";
+import { upsertProductAddons } from "@core/services/addonService";
 import { getActiveProductCategories } from "@core/services/productCategoryService";
 import type { SelectOption } from "@components/restaurant-ui/forms/Select";
 import { useForm } from "react-hook-form";
@@ -41,6 +43,7 @@ export default function ProductAdd() {
     { value: "", label: "Selecciona una categoría" },
   ]);
   const [generalError, setGeneralError] = useState("");
+  const [draftAddons, setDraftAddons] = useState<AddonDraftPayload[]>([]);
 
   const {
     register,
@@ -135,7 +138,12 @@ export default function ProductAdd() {
         stock: data.stock || 0,
       };
 
-      await createProduct(productData);
+      const created = await createProduct(productData);
+
+      // Guardar extras configurados durante la creación
+      if (draftAddons.length > 0) {
+        await upsertProductAddons(created.id, draftAddons);
+      }
 
       // Redirigir a la lista de productos
       navigate("/restaurant/products");
@@ -289,6 +297,12 @@ export default function ProductAdd() {
             {...register("description")}
             error={formErrors.description?.message}
             rows={4}
+          />
+
+          {/* Extras — modo draft: se guardan al crear el producto */}
+          <ProductAddonsSection
+            embedded
+            onChange={setDraftAddons}
           />
         </div>
 

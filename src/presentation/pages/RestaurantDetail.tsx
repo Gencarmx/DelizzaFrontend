@@ -37,6 +37,7 @@ interface MappedProduct {
   image: string;
   restaurantId: string;
   category_id: string | null;
+  has_addons: boolean;
 }
 
 export default function RestaurantDetail() {
@@ -60,6 +61,7 @@ export default function RestaurantDetail() {
     name: string;
     price: number;
     image: string;
+    has_addons?: boolean;
     restaurant?: { id: string; name: string };
     description?: string;
   } | null>(null);
@@ -84,7 +86,7 @@ export default function RestaurantDetail() {
           getActiveProductCategories(),
           supabase
             .from("products")
-            .select("id, name, price, description, image_url, active, business_id, category_id")
+            .select("id, name, price, description, image_url, active, business_id, category_id, has_addons")
             .eq("business_id", restaurantId)
             .eq("active", true),
         ]);
@@ -124,6 +126,7 @@ export default function RestaurantDetail() {
             image: p.image_url || "https://via.placeholder.com/200",
             restaurantId: p.business_id,
             category_id: p.category_id ?? null,
+            has_addons: p.has_addons ?? false,
           }));
           setProducts(mapped);
         } else {
@@ -141,7 +144,12 @@ export default function RestaurantDetail() {
 
   const handleProductClick = (product: MappedProduct) => {
     setSelectedProduct({
-      ...product,
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.image,
+      description: product.description,
+      has_addons: product.has_addons,
       restaurant: restaurant
         ? { id: restaurant.id, name: restaurant.name }
         : undefined,

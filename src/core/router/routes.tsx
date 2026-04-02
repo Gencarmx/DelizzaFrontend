@@ -27,6 +27,7 @@ import {
   ProductAdd,
   ProductEdit,
   Orders,
+  RestaurantNotifications,
 } from "@presentation/pages/restaurantUI";
 import AdminDashboard from "@presentation/pages/adminProfileUI/AdminDashboard";
 import AdminBillingDashboard from "@presentation/pages/adminProfileUI/adminBillingDashboard";
@@ -192,6 +193,10 @@ export const routes: RouteObject[] = [
       {
         path: "settings/business-info",
         element: <BusinessInfo />,
+      },
+      {
+        path: "settings/notifications",
+        element: <RestaurantNotifications />,
       },
     ],
   },

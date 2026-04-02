@@ -53,7 +53,12 @@ interface OrderDetailData {
     recipientName?: string;
     recipientPhone?: string;
   } | null;
-  items: { quantity: number; productName: string; price: number }[];
+  items: {
+    quantity: number;
+    productName: string;
+    price: number;
+    addons?: { name: string; price: number; quantity: number }[];
+  }[];
 }
 
 export default function Orders() {
@@ -279,6 +284,9 @@ export default function Orders() {
     lines.push(``, `🍽️ Productos:`);
     detail.items.forEach(item => {
       lines.push(`  • ${item.quantity}x ${item.productName}${item.price > 0 ? ` — $${(item.price * item.quantity).toFixed(2)}` : ''}`);
+      item.addons?.forEach(addon => {
+        lines.push(`    + ${addon.quantity > 1 ? `${addon.quantity}x ` : ''}${addon.name}${addon.price > 0 ? ` (+$${(addon.price * addon.quantity).toFixed(2)})` : ''}`);
+      });
     });
 
     lines.push(``, `💳 Pago: ${detail.order.paymentMethod}`);
@@ -385,6 +393,7 @@ export default function Orders() {
         quantity: item.quantity || 1,
         productName: item.product_name || 'Producto',
         price: item.price || 0,
+        addons: Array.isArray(item.addons) && item.addons.length > 0 ? item.addons : undefined,
       }));
 
       const enrichedOrder: Order = {
@@ -832,19 +841,39 @@ export default function Orders() {
                     </h3>
                     <div className="flex flex-col gap-2">
                       {selectedOrderDetail.items.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full text-xs font-semibold">
-                              {item.quantity}x
-                            </span>
-                            <span className="text-gray-700 dark:text-gray-300 text-sm">
-                              {item.productName}
-                            </span>
+                        <div key={index} className="flex flex-col gap-1">
+                          {/* Producto */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full text-xs font-semibold">
+                                {item.quantity}x
+                              </span>
+                              <span className="text-gray-700 dark:text-gray-300 text-sm font-medium">
+                                {item.productName}
+                              </span>
+                            </div>
+                            {item.price > 0 && (
+                              <span className="text-gray-600 dark:text-gray-400 text-sm font-medium">
+                                ${(item.price * item.quantity).toFixed(2)}
+                              </span>
+                            )}
                           </div>
-                          {item.price > 0 && (
-                            <span className="text-gray-600 dark:text-gray-400 text-sm font-medium">
-                              ${(item.price * item.quantity).toFixed(2)}
-                            </span>
+                          {/* Extras del producto */}
+                          {item.addons && item.addons.length > 0 && (
+                            <div className="ml-8 flex flex-col gap-0.5">
+                              {item.addons.map((addon, i) => (
+                                <div key={i} className="flex items-center justify-between">
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {addon.quantity > 1 ? `${addon.quantity}x ` : '+ '}{addon.name}
+                                  </span>
+                                  {addon.price > 0 && (
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                                      +${(addon.price * addon.quantity).toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
                       ))}

@@ -148,10 +148,17 @@ async function createRestaurantOrder(
     // El stored procedure create_order_with_items hace BEGIN/COMMIT en PostgreSQL,
     // eliminando la condición de carrera del rollback manual previo.
     const orderItems = order.items.map(item => ({
-      product_id: item.id,
+      // Usar productId (UUID real) si existe; item.id puede ser un composite key
+      product_id: item.productId ?? item.id,
       product_name: item.name,
       price: item.price,
       quantity: item.quantity,
+      // Detalles de extras para tickets de cocina (columna addons en order_items)
+      addons: item.selectedAddons && item.selectedAddons.length > 0
+        ? item.selectedAddons
+            .filter(a => a.quantity > 0)
+            .map(a => ({ name: a.name, price: a.price, quantity: a.quantity }))
+        : null,
     }));
 
     const { data: rpcData, error: rpcError } = await supabase.rpc(
@@ -186,8 +193,40 @@ async function createRestaurantOrder(
         product_name: item.name,
         quantity: item.quantity,
         price: item.price,
+        addons: item.selectedAddons && item.selectedAddons.length > 0
+          ? item.selectedAddons
+              .filter(a => a.quantity > 0)
+              .map(a => `${a.name}${a.quantity > 1 ? ` x${a.quantity}` : ''}`)
+              .join(', ')
+          : undefined,
       })),
     });
+
+    // 5. Push notification al owner — funciona aunque el browser esté cerrado
+    try {
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('profiles!inner(user_id)')
+        .eq('id', order.restaurant.id)
+        .maybeSingle();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ownerUserId = (business as any)?.profiles?.user_id as string | undefined;
+
+      if (ownerUserId) {
+        await supabase.functions.invoke('send-push-notification', {
+          body: {
+            targetUserId: ownerUserId,
+            title: '🛵 ¡Nuevo pedido!',
+            body: `${customerProfile.full_name || 'Cliente'} — $${order.total.toFixed(2)}`,
+            url: '/restaurant/orders',
+            type: 'new_order',
+          },
+        });
+      }
+    } catch {
+      // No interrumpir el flujo del pedido si falla la push
+    }
 
     return {
       success: true,
@@ -235,7 +274,7 @@ export async function notifyRestaurant(orderId: string, orderData?: {
   customer_name: string;
   total: number;
   delivery_type: string;
-  order_items: Array<{ product_name: string; quantity: number; price: number }>;
+  order_items: Array<{ product_name: string; quantity: number; price: number; addons?: string }>;
   created_at?: string;
 }): Promise<void> {
   if (!orderData) return;

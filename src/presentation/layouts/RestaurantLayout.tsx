@@ -3,6 +3,7 @@ import { Loader2, Bell, X, Bike } from "lucide-react";
 import { RestaurantBottomNav } from "@presentation/components/layout/RestaurantBottomNav";
 import { RestaurantNotificationsProvider, useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
 import { AndroidInstallButton } from "@presentation/components/common/AndroidInstallButton";
+import { NotificationPermissionBanner } from "@presentation/components/common/NotificationPermissionBanner";
 import { useState, useEffect } from "react";
 
 // Componente interno que maneja la lógica
@@ -90,6 +91,8 @@ function RestaurantLayoutContent() {
           </div>
         </div>
       )}
+
+      <NotificationPermissionBanner />
 
       <header className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 px-4 py-4 flex items-center justify-between">
         <button
