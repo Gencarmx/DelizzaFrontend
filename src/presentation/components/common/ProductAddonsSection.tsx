@@ -227,58 +227,61 @@ export default function ProductAddonsSection({
           {/* Extras */}
           <div className="divide-y divide-gray-100 dark:divide-gray-700">
             {items.map(addon => (
-              <div key={addon.tempId} className="flex items-center gap-2 px-4 py-2.5">
-                {/* Nombre */}
+              <div key={addon.tempId} className="flex flex-col gap-2 px-4 py-3">
+                {/* Fila 1: Nombre del extra */}
                 <input
                   type="text"
                   value={addon.name}
                   onChange={e => updateAddon(addon.tempId, "name", e.target.value)}
                   placeholder="Nombre del extra"
-                  className="flex-1 min-w-0 px-3 py-1.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
                 />
-                {/* Precio */}
-                <div className="relative w-24 flex-shrink-0">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.5}
-                    value={addon.price}
-                    onChange={e => updateAddon(addon.tempId, "price", parseFloat(e.target.value) || 0)}
-                    className="w-full pl-6 pr-2 py-1.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
-                  />
+                {/* Fila 2: Precio · Cantidad · Activo · Eliminar */}
+                <div className="flex items-center gap-2">
+                  {/* Precio */}
+                  <div className="relative flex-1">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      value={addon.price}
+                      onChange={e => updateAddon(addon.tempId, "price", parseFloat(e.target.value) || 0)}
+                      className="w-full pl-6 pr-2 py-1.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                    />
+                  </div>
+                  {/* Máx cantidad */}
+                  <select
+                    value={addon.max_quantity}
+                    onChange={e => updateAddon(addon.tempId, "max_quantity", parseInt(e.target.value))}
+                    className="w-20 flex-shrink-0 px-2 py-1.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                    title="Cantidad máxima por pedido"
+                  >
+                    {[1, 2, 3, 5, 10].map(n => <option key={n} value={n}>x{n}</option>)}
+                  </select>
+                  {/* Toggle activo */}
+                  <button
+                    type="button"
+                    onClick={() => updateAddon(addon.tempId, "active", !addon.active)}
+                    className={`w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center transition-colors text-xs font-bold ${
+                      addon.active
+                        ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                        : "bg-red-100 dark:bg-red-900/30 text-red-500 dark:text-red-400"
+                    }`}
+                    title={addon.active ? "Activo — clic para desactivar" : "Inactivo — clic para activar"}
+                  >
+                    {addon.active ? "On" : "Off"}
+                  </button>
+                  {/* Eliminar extra */}
+                  <button
+                    type="button"
+                    onClick={() => removeAddon(addon.tempId)}
+                    className="w-9 h-9 flex-shrink-0 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors text-red-500"
+                    title="Eliminar extra"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-                {/* Máx cantidad */}
-                <select
-                  value={addon.max_quantity}
-                  onChange={e => updateAddon(addon.tempId, "max_quantity", parseInt(e.target.value))}
-                  className="w-16 flex-shrink-0 px-2 py-1.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
-                  title="Cantidad máxima por pedido"
-                >
-                  {[1, 2, 3, 5, 10].map(n => <option key={n} value={n}>x{n}</option>)}
-                </select>
-                {/* Toggle activo */}
-                <button
-                  type="button"
-                  onClick={() => updateAddon(addon.tempId, "active", !addon.active)}
-                  className={`w-8 h-8 flex-shrink-0 rounded-lg flex items-center justify-center transition-colors text-xs font-bold ${
-                    addon.active
-                      ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-400"
-                  }`}
-                  title={addon.active ? "Activo — clic para desactivar" : "Inactivo — clic para activar"}
-                >
-                  {addon.active ? "✓" : "✗"}
-                </button>
-                {/* Eliminar extra */}
-                <button
-                  type="button"
-                  onClick={() => removeAddon(addon.tempId)}
-                  className="w-8 h-8 flex-shrink-0 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors text-red-500"
-                  title="Eliminar extra"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
               </div>
             ))}
           </div>
@@ -299,7 +302,7 @@ export default function ProductAddonsSection({
 
       {/* Nueva categoría */}
       {showNewCategory ? (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2">
           <input
             type="text"
             value={newCategoryName}
@@ -310,12 +313,14 @@ export default function ProductAddonsSection({
             }}
             placeholder="Nombre de la categoría (ej: Proteínas)"
             autoFocus
-            className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-amber-400 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-amber-400 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
           />
-          <Button type="button" variant="primary" size="sm" onClick={addNewCategory}>Agregar</Button>
-          <Button type="button" variant="secondary" size="sm" onClick={() => { setShowNewCategory(false); setNewCategoryName(""); }}>
-            Cancelar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="primary" size="sm" onClick={addNewCategory} className="flex-1">Agregar</Button>
+            <Button type="button" variant="secondary" size="sm" onClick={() => { setShowNewCategory(false); setNewCategoryName(""); }} className="flex-1">
+              Cancelar
+            </Button>
+          </div>
         </div>
       ) : (
         <button
@@ -331,7 +336,7 @@ export default function ProductAddonsSection({
       {/* Leyenda */}
       {groups.size > 0 && (
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          Columnas: Nombre · Precio · Máx. por pedido · Activo
+          Fila inferior: Precio · Máx. por pedido · Activo/Inactivo · Eliminar
         </p>
       )}
 

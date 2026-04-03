@@ -1,153 +1,301 @@
-import { useLoaderData, Link } from "react-router";
-import { useAuth } from "@core/context/AuthContext";
-import type { Product } from "@core/router/loaders/productsLoader";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useLocation } from "react-router";
+import { ChevronLeft, ChevronRight, Search, Loader2, X } from "lucide-react";
+import { supabase } from "@core/supabase/client";
+import { getActiveProductCategories, type ProductCategory } from "@core/services/productCategoryService";
+import ProductModal from "@presentation/components/common/ProductModal";
+
+interface ProductItem {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  image: string;
+  restaurant: string;
+  restaurantId: string;
+  has_addons: boolean;
+}
+
+const PAGE_SIZE = 10;
 
 export default function Products() {
-  // useLoaderData obtiene los datos del loader
-  const products = useLoaderData() as Product[];
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const initialCategory = (location.state as { categoryId?: string } | null)?.categoryId ?? null;
 
-  // Determinar el contexto de visualización
-  // Nota: Ahora usamos el sistema de colaboradores, no solo owners
-  const isAuthenticated = !!user;
-  // Los colaboradores pueden ver productos de sus negocios asignados
-  // Esta información vendrá del loader que filtra automáticamente
+  // ── Estado ────────────────────────────────────────────────────────────────
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [products, setProducts] = useState<ProductItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [selectedProduct, setSelectedProduct] = useState<{
+    id: string;
+    name: string;
+    price: number;
+    image: string;
+    description?: string;
+    has_addons?: boolean;
+    restaurant?: { id: string; name: string };
+  } | null>(null);
 
-  // Si no hay productos, mostrar mensaje general
-  // El loader ya maneja el filtrado automático basado en colaboradores
-  if (!products || products.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto px-4">
-          <div className="w-24 h-24 mx-auto mb-6 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            No hay productos disponibles
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Actualmente no se han registrado productos en la plataforma. Los restaurantes pueden agregar sus productos desde el panel de administración.
-          </p>
-          <div className="space-y-3">
-            <Link
-              to="/"
-              className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-            >
-              Ir al inicio
-            </Link>
-            {!isAuthenticated && (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                ¿Eres propietario de un restaurante?{" "}
-                <Link to="/register-owner" className="text-blue-600 hover:text-blue-700 font-medium">
-                  Regístrate aquí
-                </Link>
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const isFirstRender = useRef(true);
+
+  // ── Debounce búsqueda ────────────────────────────────────────────────────
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // ── Reset página al cambiar categoría ────────────────────────────────────
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    setCurrentPage(1);
+  }, [selectedCategory]);
+
+  // ── Cargar categorías ────────────────────────────────────────────────────
+  useEffect(() => {
+    getActiveProductCategories()
+      .then(setCategories)
+      .finally(() => setLoadingCategories(false));
+  }, []);
+
+  // ── Cargar productos ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoadingProducts(true);
+      try {
+        const offset = (currentPage - 1) * PAGE_SIZE;
+
+        let query = supabase
+          .from("products")
+          .select(
+            "id, name, price, description, image_url, business_id, has_addons, businesses:business_id(id, name, active)",
+            { count: "exact" }
+          )
+          .eq("active", true)
+          .order("created_at", { ascending: false })
+          .range(offset, offset + PAGE_SIZE - 1);
+
+        if (selectedCategory) {
+          query = query.eq("category_id", selectedCategory);
+        }
+        if (debouncedSearch.trim()) {
+          query = query.ilike("name", `%${debouncedSearch.trim()}%`);
+        }
+
+        const { data, count, error } = await query;
+        if (error) throw error;
+
+        // Filtrar sólo productos de negocios activos
+        const filtered = (data ?? []).filter(
+          (p: any) => p.businesses?.active !== false
+        );
+
+        setProducts(
+          filtered.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            description: p.description ?? "",
+            image: p.image_url ?? "https://via.placeholder.com/200",
+            restaurant: p.businesses?.name ?? "Restaurante",
+            restaurantId: p.business_id,
+            has_addons: p.has_addons ?? false,
+          }))
+        );
+        setTotal(count ?? 0);
+      } catch (err) {
+        console.error("Error cargando productos:", err);
+        setProducts([]);
+        setTotal(0);
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+
+    fetchProducts();
+  }, [currentPage, debouncedSearch, selectedCategory]);
+
+  // ── Paginación ────────────────────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const rangeStart = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, total);
+
+  const handleCategoryClick = (id: string) => {
+    setSelectedCategory(prev => (prev === id ? null : id));
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Productos Disponibles
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Descubre deliciosos productos de nuestros restaurantes asociados
-          </p>
+    <div className="flex flex-col pt-2 pb-24 gap-5">
+      {/* Header */}
+      <div className="flex items-center gap-3 bg-white dark:bg-gray-800 sticky top-0 z-10 py-2">
+        <button
+          onClick={() => navigate(-1)}
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5 text-gray-700 dark:text-gray-200" />
+        </button>
+        <h2 className="font-bold text-lg text-gray-900 dark:text-white">
+          Todos los productos
+        </h2>
+        {total > 0 && !loadingProducts && (
+          <span className="ml-auto text-sm text-gray-500 dark:text-gray-400">
+            {total} {total === 1 ? "producto" : "productos"}
+          </span>
+        )}
+      </div>
+
+      {/* Buscador */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Buscar productos..."
+          className="w-full pl-9 pr-9 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Categorías */}
+      {loadingCategories ? (
+        <div className="flex justify-center py-2">
+          <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
         </div>
-
-        {/* Grid de productos */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {products.map((product) => (
-            <div
-              key={product.id}
-              className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
+      ) : categories.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1 -mx-4 px-4 snap-x">
+          {categories.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => handleCategoryClick(cat.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold flex-shrink-0 snap-start border transition-colors ${
+                selectedCategory === cat.id
+                  ? "bg-amber-400 border-amber-400 text-white"
+                  : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+              }`}
             >
-              {/* Imagen del producto */}
-              <div className="aspect-square bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
-                {product.image_url ? (
-                  <img
-                    src={product.image_url}
-                    alt={product.name}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
-                    loading="lazy"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = '/placeholder-product.png'; // Fallback image
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-
-              {/* Información del producto */}
-              <div className="p-4">
-                {/* Restaurante */}
-                {product.businesses && (
-                  <div className="flex items-center space-x-2 mb-2">
-                    {product.businesses.logo_url && (
-                      <img
-                        src={product.businesses.logo_url}
-                        alt={product.businesses.name}
-                        className="w-6 h-6 rounded-full object-cover"
-                        loading="lazy"
-                      />
-                    )}
-                    <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                      {product.businesses.name}
-                    </span>
-                  </div>
-                )}
-
-                {/* Nombre del producto */}
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-2">
-                  {product.name}
-                </h3>
-
-                {/* Descripción */}
-                {product.description && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
-                    {product.description}
-                  </p>
-                )}
-
-                {/* Precio */}
-                <div className="flex items-center justify-between">
-                  <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                    ${product.price.toFixed(2)}
-                  </span>
-                  <button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors">
-                    Ver detalles
-                  </button>
-                </div>
-              </div>
-            </div>
+              <span>{cat.icon ?? "🍽️"}</span>
+              {cat.name}
+            </button>
           ))}
         </div>
+      )}
 
-        {/* Footer con navegación */}
-        <div className="mt-12 text-center">
-          <Link
-            to="/"
-            className="inline-block bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-          >
-            Volver al inicio
-          </Link>
+      {/* Resultados */}
+      {loadingProducts ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <Loader2 className="w-7 h-7 animate-spin text-amber-500" />
+          <p className="text-sm text-gray-500 dark:text-gray-400">Cargando productos...</p>
         </div>
-      </div>
+      ) : products.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-2 text-center">
+          <span className="text-4xl">🍽️</span>
+          <p className="font-semibold text-gray-800 dark:text-white">
+            {debouncedSearch
+              ? `Sin resultados para "${debouncedSearch}"`
+              : selectedCategory
+              ? "Sin productos en esta categoría"
+              : "No hay productos disponibles"}
+          </p>
+          {(debouncedSearch || selectedCategory) && (
+            <button
+              onClick={() => { setSearchQuery(""); setSelectedCategory(null); }}
+              className="text-sm text-amber-500 hover:underline mt-1"
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {products.map(product => (
+              <div
+                key={product.id}
+                onClick={() => setSelectedProduct({
+                  ...product,
+                  restaurant: { id: product.restaurantId, name: product.restaurant },
+                })}
+                className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700 cursor-pointer hover:shadow-md transition-shadow group"
+              >
+                <div className="relative h-32 bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="p-3 flex flex-col gap-1">
+                  <h4 className="font-semibold text-gray-900 dark:text-white text-sm leading-tight line-clamp-2">
+                    {product.name}
+                  </h4>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                    {product.restaurant}
+                  </p>
+                  <p className="text-sm font-bold text-amber-500 mt-0.5">
+                    ${product.price.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Paginador */}
+          <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 px-4 py-3">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {rangeStart}–{rangeEnd} de {total}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => p - 1)}
+                disabled={currentPage === 1 || loadingProducts}
+                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+              </button>
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 min-w-[80px] text-center">
+                {loadingProducts
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500 mx-auto" />
+                  : `Pág. ${currentPage} de ${totalPages}`
+                }
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={currentPage >= totalPages || loadingProducts}
+                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Modal de producto */}
+      {selectedProduct && (
+        <ProductModal
+          isOpen
+          onClose={() => setSelectedProduct(null)}
+          product={selectedProduct}
+        />
+      )}
     </div>
   );
 }
