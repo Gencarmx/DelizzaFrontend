@@ -228,7 +228,10 @@ export default function Products() {
             {products.map(product => (
               <div
                 key={product.id}
-                onClick={() => setSelectedProduct(product)}
+                onClick={() => setSelectedProduct({
+                  ...product,
+                  restaurant: { id: product.restaurantId, name: product.restaurant },
+                })}
                 className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700 cursor-pointer hover:shadow-md transition-shadow group"
               >
                 <div className="relative h-32 bg-gray-100 dark:bg-gray-700 overflow-hidden">
@@ -290,12 +293,7 @@ export default function Products() {
         <ProductModal
           isOpen
           onClose={() => setSelectedProduct(null)}
-          product={{
-            ...selectedProduct,
-            restaurant: selectedProduct.restaurant
-              ? { id: selectedProduct.restaurantId, name: selectedProduct.restaurant }
-              : undefined,
-          }}
+          product={selectedProduct}
         />
       )}
     </div>

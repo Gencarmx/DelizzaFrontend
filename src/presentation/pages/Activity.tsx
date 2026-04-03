@@ -19,16 +19,6 @@ export default function Activity() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPage = useCallback(
-    async (pid: string, page: number) => {
-      const offset = (page - 1) * PAGE_SIZE;
-      const result = await getOrdersByCustomer(pid, PAGE_SIZE, offset);
-      setOrders(result.orders);
-      setTotal(result.total);
-    },
-    [],
-  );
-
   const reloadOrders = useCallback(
     async (pid: string) => {
       const result = await getOrdersByCustomer(pid, PAGE_SIZE, (currentPage - 1) * PAGE_SIZE);
