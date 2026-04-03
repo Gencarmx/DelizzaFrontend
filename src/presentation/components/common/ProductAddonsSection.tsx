@@ -266,11 +266,11 @@ export default function ProductAddonsSection({
                     className={`w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center transition-colors text-xs font-bold ${
                       addon.active
                         ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
-                        : "bg-gray-100 dark:bg-gray-700 text-gray-400"
+                        : "bg-red-100 dark:bg-red-900/30 text-red-500 dark:text-red-400"
                     }`}
                     title={addon.active ? "Activo — clic para desactivar" : "Inactivo — clic para activar"}
                   >
-                    {addon.active ? "✓" : "✗"}
+                    {addon.active ? "On" : "Off"}
                   </button>
                   {/* Eliminar extra */}
                   <button
