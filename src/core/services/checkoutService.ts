@@ -158,7 +158,7 @@ async function createRestaurantOrder(
         ? item.selectedAddons
             .filter(a => a.quantity > 0)
             .map(a => ({ name: a.name, price: a.price, quantity: a.quantity }))
-        : null,
+        : [],
     }));
 
     const { data: rpcData, error: rpcError } = await supabase.rpc(
