@@ -524,14 +524,15 @@ export async function getOrdersByStatus(
 }
 
 /**
- * Obtiene los pedidos del usuario actual (cliente)
+ * Obtiene los pedidos del usuario actual (cliente) con soporte de paginación.
  */
 export async function getOrdersByCustomer(
   customerId: string,
-  limit: number = 20,
-): Promise<OrderWithItems[]> {
+  limit: number = 5,
+  offset: number = 0,
+): Promise<{ orders: OrderWithItems[]; total: number }> {
   try {
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from("orders")
       .select(
         `
@@ -541,17 +542,21 @@ export async function getOrdersByCustomer(
           name
         )
       `,
+        { count: "exact" },
       )
       .eq("customer_id", customerId)
       .order("created_at", { ascending: false })
-      .limit(limit);
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
 
-    return (data || []).map((order) => ({
-      ...order,
-      business_name: order.businesses?.name,
-    })) as OrderWithItems[];
+    return {
+      orders: (data || []).map((order) => ({
+        ...order,
+        business_name: order.businesses?.name,
+      })) as OrderWithItems[],
+      total: count ?? 0,
+    };
   } catch (error) {
     console.error("Error obteniendo pedidos del cliente:", error);
     throw new Error("No se pudieron obtener tus pedidos");

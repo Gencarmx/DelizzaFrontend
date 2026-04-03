@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
-import { ChevronDown, /* Heart, Star, Clock, */ ChevronLeft, ChevronRight, Loader2, MapPin } from "lucide-react";
+import { ChevronDown, /* Heart, Star, Clock, */ ChevronLeft, ChevronRight, Loader2, MapPin, ChevronUp } from "lucide-react";
 import ProductModal from "@presentation/components/common/ProductModal";
 import { SearchBar, type ProductResult as SearchProductResult, type RestaurantResult as SearchRestaurantResult } from "@presentation/components/layout/SearchBar";
 import { supabase } from "@core/supabase/client";
@@ -32,7 +32,7 @@ function computeRestaurantStatus(
 }
 
 // Número máximo de productos a mostrar en el carrusel "Todos los productos"
-const PRODUCTS_CAROUSEL_LIMIT = 40;
+const PRODUCTS_CAROUSEL_LIMIT = 20;
 
 export default function Home() {
   const { selectedAddress, loading: addressLoading } = useAddress();
@@ -61,6 +61,10 @@ export default function Home() {
   });
   const [error, setError] = useState<string | null>(null);
   const allProductsScrollRef = useRef<HTMLDivElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   // Los productos mostrados en el carrusel: si hay categoría activa usa el fetch
   // específico de esa categoría; de lo contrario usa los 40 más recientes.
@@ -165,7 +169,8 @@ export default function Home() {
           supabase
             .from('businesses')
             .select('id, name, address, active, logo_url, is_paused')
-            .eq('active', true),
+            .eq('active', true)
+            .limit(10),
         ]);
 
         // — Categorías —
@@ -200,17 +205,23 @@ export default function Home() {
             hoursMap.set(hour.business_id, existing);
           }
 
-          setRestaurants(restaurantList.map(b => {
-            const hours = hoursMap.get(b.id) ?? [];
-            const restaurantStatus = computeRestaurantStatus(b.active, b.is_paused, hours);
-            return {
-              id: b.id,
-              name: b.name,
-              address: b.address || "Dirección no disponible",
-              status: restaurantStatus,
-              logo: b.logo_url || "https://via.placeholder.com/200",
-            };
-          }));
+          const STATUS_ORDER: Record<RestaurantStatus['type'], number> = { open: 0, paused: 1, closed: 2 };
+
+          setRestaurants(
+            restaurantList
+              .map(b => {
+                const hours = hoursMap.get(b.id) ?? [];
+                const restaurantStatus = computeRestaurantStatus(b.active, b.is_paused, hours);
+                return {
+                  id: b.id,
+                  name: b.name,
+                  address: b.address || "Dirección no disponible",
+                  status: restaurantStatus,
+                  logo: b.logo_url || "https://via.placeholder.com/200",
+                };
+              })
+              .sort((a, b) => STATUS_ORDER[a.status.type as RestaurantStatus['type']] - STATUS_ORDER[b.status.type as RestaurantStatus['type']])
+          );
         }
 
         // — Productos (carrusel inicial) —
@@ -250,6 +261,21 @@ export default function Home() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const scroller = document.querySelector("main");
+    if (!scroller) return;
+
+    const onScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = scroller;
+      setShowScrollTop(scrollTop > 200);
+      setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 200);
+    };
+
+    onScroll();
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => scroller.removeEventListener("scroll", onScroll);
+  }, []);
+
   const scrollAllProductsLeft = () => {
     allProductsScrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' });
   };
@@ -270,6 +296,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-6 pt-2">
+      <div ref={topRef} />
       {/* Error Message */}
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mx-4">
@@ -371,16 +398,27 @@ export default function Home() {
               : "Todos los productos"}
           </h3>
           {selectedCategory ? (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setSelectedCategory(null); setCategoryProducts([]); }}
+                className="text-xs text-gray-400 dark:text-gray-500 hover:underline cursor-pointer"
+              >
+                Ver todos
+              </button>
+              <button
+                onClick={() => navigate('/products', { state: { categoryId: selectedCategory } })}
+                className="text-xs text-amber-600 dark:text-amber-400 font-semibold hover:underline cursor-pointer"
+              >
+                Ver más →
+              </button>
+            </div>
+          ) : (
             <button
-              onClick={() => { setSelectedCategory(null); setCategoryProducts([]); }}
-              className="text-xs text-amber-600 dark:text-amber-400 font-medium hover:underline cursor-pointer"
+              onClick={() => navigate('/products')}
+              className="text-xs text-amber-600 dark:text-amber-400 font-semibold hover:underline cursor-pointer"
             >
-              Ver todos
+              Ver más →
             </button>
-          ) : allProducts.length >= PRODUCTS_CAROUSEL_LIMIT && (
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              Mostrando {PRODUCTS_CAROUSEL_LIMIT} recientes
-            </span>
           )}
         </div>
 
@@ -439,8 +477,11 @@ export default function Home() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-lg text-gray-900 dark:text-white">Restaurantes</h3>
-          <button className="text-amber-400 text-sm font-medium hover:text-amber-500 cursor-pointer">
-            Ver mas
+          <button
+            onClick={() => navigate('/restaurants')}
+            className="text-xs text-amber-600 dark:text-amber-400 font-semibold hover:underline cursor-pointer"
+          >
+            Ver más →
           </button>
         </div>
         {loading.restaurants ? (
@@ -494,6 +535,30 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      <div ref={bottomRef} />
+
+      {/* Floating scroll buttons */}
+      <div className="fixed right-4 bottom-24 z-40 flex flex-col gap-2">
+        {showScrollTop && (
+          <button
+            onClick={() => topRef.current?.scrollIntoView({ behavior: "smooth" })}
+            className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500 transition-colors"
+            title="Ir al inicio"
+          >
+            <ChevronUp className="w-5 h-5" />
+          </button>
+        )}
+        {showScrollBottom && (
+          <button
+            onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+            className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500 transition-colors"
+            title="Ir al final"
+          >
+            <ChevronDown className="w-5 h-5" />
+          </button>
+        )}
+      </div>
 
       {/* Product Modal */}
       {selectedProduct && (

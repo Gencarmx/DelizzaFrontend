@@ -330,6 +330,25 @@ export default function Register() {
           >
             {loading ? "Creando cuenta..." : "Crear cuenta"}
           </button>
+
+          {/* Legal acceptance note */}
+          <p className="text-xs text-gray-400 text-center leading-relaxed">
+            Al crear tu cuenta aceptas nuestros{" "}
+            <Link
+              to="/terms"
+              className="text-amber-500 hover:text-amber-600 underline underline-offset-2 transition-colors"
+            >
+              Términos y Condiciones
+            </Link>{" "}
+            y nuestras{" "}
+            <Link
+              to="/privacy"
+              className="text-amber-500 hover:text-amber-600 underline underline-offset-2 transition-colors"
+            >
+              Políticas de Privacidad
+            </Link>
+            .
+          </p>
         </form>
 
         {/* Restaurant Registration Button */}
@@ -396,13 +415,30 @@ export default function Register() {
         </div>
 
         {/* Sign In Link */}
-        <div className="text-center mt-8 mb-8">
+        <div className="text-center mt-8 mb-4">
           <span className="text-gray-600">¿Ya tienes una cuenta? </span>
           <Link
             to="/login"
             className="text-amber-500 hover:text-amber-600 font-semibold transition-colors"
           >
             Inicia sesión
+          </Link>
+        </div>
+
+        {/* Legal Links */}
+        <div className="text-center mb-8 flex items-center justify-center gap-1 flex-wrap">
+          <Link
+            to="/terms"
+            className="text-xs text-gray-400 hover:text-amber-500 transition-colors underline underline-offset-2"
+          >
+            Términos y Condiciones
+          </Link>
+          <span className="text-xs text-gray-300">·</span>
+          <Link
+            to="/privacy"
+            className="text-xs text-gray-400 hover:text-amber-500 transition-colors underline underline-offset-2"
+          >
+            Políticas de Privacidad
           </Link>
         </div>
       </div>

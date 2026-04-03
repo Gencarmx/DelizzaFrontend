@@ -149,28 +149,40 @@ export default function ProductModal({ isOpen, onClose, product, restaurantStatu
 
   return (
     <>
-      {/* Overlay */}
+      {/* Overlay + posicionador responsive:
+          mobile  → bottom sheet (items-end, ancho completo)
+          desktop → diálogo centrado (items-center, max-w-lg)  */}
       <div
-        className="fixed inset-0 bg-black/50 z-50 transition-opacity"
+        className="fixed inset-0 z-[60] bg-black/50 flex items-end sm:items-center justify-center sm:p-6"
         onClick={onClose}
-      />
-
+      >
       {/* Modal */}
-      <div className="fixed inset-x-0 bottom-0 z-50 bg-white dark:bg-gray-800 rounded-t-3xl shadow-2xl animate-slide-up max-h-[90vh] overflow-y-auto pb-32">
+      <div
+        className="relative w-full sm:max-w-lg bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 bg-white dark:bg-gray-700 rounded-full shadow-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors z-10"
+          className="absolute top-4 right-4 p-2 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm rounded-full shadow-md hover:bg-white dark:hover:bg-gray-600 transition-colors z-10"
         >
           <X className="w-5 h-5 text-gray-700 dark:text-gray-200" />
         </button>
 
-        {/* Product Image */}
-        <div className="relative h-64 w-full bg-gray-100 dark:bg-gray-700">
+        {/* Product Image — fondo difuminado + imagen completa sin recorte */}
+        <div className="relative h-64 w-full overflow-hidden bg-gray-900">
+          {/* Backdrop difuminado: toma los colores de la imagen */}
+          <img
+            src={product.image}
+            alt=""
+            aria-hidden
+            className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-50 pointer-events-none select-none"
+          />
+          {/* Imagen principal sin recorte */}
           <img
             src={product.image}
             alt={product.name}
-            className="w-full h-full object-cover"
+            className="relative w-full h-full object-contain drop-shadow-xl"
           />
         </div>
 
@@ -184,14 +196,16 @@ export default function ProductModal({ isOpen, onClose, product, restaurantStatu
                   onClose();
                   navigate(`/restaurant-detail/${product.restaurant!.id}`);
                 }}
-                className="text-sm text-amber-500 dark:text-amber-400 font-medium hover:underline text-left w-fit"
+                className="self-start text-xs font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2.5 py-1 rounded-full hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors"
               >
                 {product.restaurant.name}
               </button>
             )}
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{product.name}</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight">
+              {product.name}
+            </h2>
             {product.description && (
-              <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
+              <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">
                 {product.description}
               </p>
             )}
@@ -199,10 +213,10 @@ export default function ProductModal({ isOpen, onClose, product, restaurantStatu
               <span className="text-3xl font-bold text-gray-900 dark:text-white">
                 ${unitPrice.toFixed(2)}
               </span>
-              <span className="text-sm text-gray-500 dark:text-gray-400">MXN</span>
+              <span className="text-sm text-gray-400 dark:text-gray-500">MXN</span>
               {addonsTotal > 0 && (
-                <span className="text-sm text-amber-500 font-medium">
-                  (base ${product.price.toFixed(2)} + extras ${addonsTotal.toFixed(2)})
+                <span className="text-xs text-amber-500 font-medium bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full">
+                  base ${product.price.toFixed(2)} + extras ${addonsTotal.toFixed(2)}
                 </span>
               )}
             </div>
@@ -315,68 +329,74 @@ export default function ProductModal({ isOpen, onClose, product, restaurantStatu
           <div className="h-px bg-gray-200 dark:bg-gray-700" />
 
           {/* Cantidad del producto */}
-          <div className="flex flex-col gap-3">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Cantidad</h3>
-            <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-2xl p-4">
+          <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/60 rounded-2xl px-5 py-3">
+            <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Cantidad</span>
+            <div className="flex items-center gap-4">
               <button
                 onClick={handleDecrease}
                 disabled={quantity <= 1}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
                   quantity <= 1
                     ? "bg-gray-200 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed"
                     : "bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-500 shadow-sm"
                 }`}
               >
-                <Minus className="w-5 h-5" strokeWidth={2.5} />
+                <Minus className="w-4 h-4" strokeWidth={2.5} />
               </button>
-              <span className="text-2xl font-bold text-gray-900 dark:text-white min-w-[3rem] text-center">
+              <span className="text-xl font-bold text-gray-900 dark:text-white w-6 text-center">
                 {quantity}
               </span>
               <button
                 onClick={handleIncrease}
-                className="w-10 h-10 rounded-full bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-500 shadow-sm flex items-center justify-center transition-all"
+                className="w-9 h-9 rounded-full bg-amber-400 hover:bg-amber-500 text-white shadow-sm flex items-center justify-center transition-all"
               >
-                <Plus className="w-5 h-5" strokeWidth={2.5} />
+                <Plus className="w-4 h-4" strokeWidth={2.5} />
               </button>
             </div>
           </div>
 
-          {/* Botones — fijos sobre el BottomNav */}
-          <div className="fixed bottom-16 left-0 right-0 px-6 py-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 z-[60] flex gap-3">
-            {/* Total visible cuando hay extras seleccionados */}
+          {/* Botones — sticky al fondo del scroll del modal */}
+          <div className="sticky bottom-0 left-0 right-0 px-4 py-3 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-t border-gray-100 dark:border-gray-700 mt-2">
+            {/* Total */}
             {(addonsTotal > 0 || quantity > 1) && (
-              <div className="absolute -top-9 left-6 text-xs text-gray-500 dark:text-gray-400">
-                Total: <span className="font-bold text-gray-900 dark:text-white">${totalPrice.toFixed(2)}</span>
+              <div className="flex justify-between items-center mb-2 px-1">
+                <span className="text-xs text-gray-500 dark:text-gray-400">Total del pedido</span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  ${totalPrice.toFixed(2)} MXN
+                </span>
               </div>
             )}
-            <button
-              onClick={handleAddToCart}
-              disabled={!canOrder}
-              className={`flex-1 font-bold py-4 px-4 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2 ${
-                canOrder
-                  ? "bg-amber-400 hover:bg-amber-500 text-white"
-                  : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-50"
-              }`}
-            >
-              <ShoppingCart className="w-5 h-5" strokeWidth={2.5} />
-              <span className="text-sm">
-                {canOrder ? "Agregar" : "No disponible"}
-              </span>
-            </button>
-            <button
-              onClick={handleOrderNow}
-              disabled={!canOrder}
-              className={`flex-1 font-bold py-4 px-4 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2 ${
-                canOrder
-                  ? "bg-gray-900 hover:bg-gray-700 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900"
-                  : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-50"
-              }`}
-            >
-              <Zap className="w-5 h-5" strokeWidth={2.5} />
-              <span className="text-sm">Pedir ahora</span>
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleAddToCart}
+                disabled={!canOrder}
+                className={`flex-1 font-bold py-3.5 px-4 rounded-2xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
+                  canOrder
+                    ? "bg-amber-400 hover:bg-amber-500 text-white shadow-md hover:shadow-lg"
+                    : "bg-gray-200 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                <ShoppingCart className="w-4 h-4" strokeWidth={2.5} />
+                <span className="text-sm">
+                  {canOrder ? "Agregar al carrito" : "No disponible"}
+                </span>
+              </button>
+              <button
+                onClick={handleOrderNow}
+                disabled={!canOrder}
+                className={`font-bold py-3.5 px-4 rounded-2xl transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 ${
+                  canOrder
+                    ? "bg-gray-900 hover:bg-gray-700 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 shadow-md hover:shadow-lg"
+                    : "bg-gray-200 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                <Zap className="w-4 h-4" strokeWidth={2.5} />
+                <span className="text-sm whitespace-nowrap">Pedir ya</span>
+              </button>
+            </div>
           </div>
         </div>
+      </div>
       </div>
 
       <style>{`

@@ -133,13 +133,15 @@ export default function Settings() {
       items: [
         {
           icon: Shield,
-          label: "Privacidad",
+          label: "Políticas de privacidad",
           type: "link",
+          onChange: () => navigate("/privacy"),
         },
         {
           icon: FileText,
           label: "Términos y condiciones",
           type: "link",
+          onChange: () => navigate("/terms"),
         },
       ],
     },
@@ -188,6 +190,23 @@ export default function Settings() {
           type: "toggle",
           value: darkMode,
           onChange: handleDarkModeToggle,
+        },
+      ],
+    },
+    {
+      title: "Legal",
+      items: [
+        {
+          icon: Shield,
+          label: "Políticas de privacidad",
+          type: "link",
+          onChange: () => navigate("/restaurant/privacy"),
+        },
+        {
+          icon: FileText,
+          label: "Términos y condiciones",
+          type: "link",
+          onChange: () => navigate("/restaurant/terms"),
         },
       ],
     },

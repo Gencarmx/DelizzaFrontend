@@ -148,37 +148,31 @@ export default function EditProfile() {
         )}
 
         {/* Phone Field */}
-        <div
-          className={`bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border ${
-            formErrors.phone
-              ? "border-red-300"
-              : "border-gray-100 dark:border-gray-700"
-          }`}
-        >
-          <label className="flex items-center gap-3">
-            <Phone className="w-5 h-5 text-gray-400" strokeWidth={1.5} />
-            <div className="flex-1 w-full">
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                Teléfono <span className="text-red-400">*</span>
-              </div>
-              <input
-                type="tel"
-                inputMode="tel"
-                {...register("phone")}
-                className="w-full text-sm font-medium text-gray-900 dark:text-white bg-transparent border-none outline-none focus:ring-0 p-0"
-                placeholder="+52 999 123 4567"
-              />
-            </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Número de teléfono <span className="text-red-500">*</span>
           </label>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 ml-8">
-            Formato: +código de país + número · Ej: +52 999 123 4567 · +1 555 234 5678
+          <div className="relative">
+            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" strokeWidth={1.5} />
+            <input
+              id="phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              {...register("phone")}
+              placeholder="+52 999 123 4567"
+              className={`w-full pl-10 pr-4 py-3.5 bg-gray-50 dark:bg-gray-700 border rounded-xl text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all ${
+                formErrors.phone ? "border-red-300" : "border-gray-200 dark:border-gray-600"
+              }`}
+            />
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Incluye el código de tu país · Ej: +52 (México), +1 (USA), +34 (España)
           </p>
+          {formErrors.phone && (
+            <p className="text-sm text-red-500">{formErrors.phone.message}</p>
+          )}
         </div>
-        {formErrors.phone && (
-          <p className="text-sm text-red-500 ml-4">
-            {formErrors.phone.message}
-          </p>
-        )}
 
         {/* Birthdate Field
         <div

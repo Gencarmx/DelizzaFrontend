@@ -11,6 +11,7 @@ import { useAddress } from "@core/context/AddressContext";
 import { processMultiRestaurantCheckout } from "@core/services/checkoutService";
 import { getDeliverySettings } from "@core/services/businessService";
 import type { DeliverySettings } from "@core/services/businessService";
+import { supabase } from "@core/supabase/client";
 
 export interface EnrichedOrder extends CartOrder {
   deliveryType: "pickup" | "delivery";
@@ -35,6 +36,22 @@ export function useCartLogic() {
   const [restaurantSettings, setRestaurantSettings] = useState<Record<string, DeliverySettings>>({});
   const [deliveryTypeByRestaurant, setDeliveryTypeByRestaurant] = useState<Record<string, "pickup" | "delivery">>({});
   const [showFeeDialog, setShowFeeDialog] = useState(false);
+  const [hasPhone, setHasPhone] = useState<boolean | null>(null);
+
+  // ── Check if user has a phone number registered ───────────────────────────
+  useEffect(() => {
+    const checkPhone = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setHasPhone(false); return; }
+      const { data } = await supabase
+        .from("profiles")
+        .select("phone_number")
+        .eq("user_id", user.id)
+        .single();
+      setHasPhone(!!data?.phone_number);
+    };
+    checkPhone();
+  }, []);
 
   // ── Fetch delivery settings for every restaurant in the cart ─────────────
   useEffect(() => {
@@ -198,6 +215,7 @@ export function useCartLogic() {
 
   const handleCheckout = () => {
     if (isProcessing) return;
+    if (!hasPhone) return;
 
     if (anyDelivery && !selectedAddress) {
       alert("Por favor selecciona una dirección de entrega antes de continuar.");
@@ -216,6 +234,7 @@ export function useCartLogic() {
     // Cart data
     items,
     isProcessing,
+    hasPhone,
 
     // Per-restaurant enriched orders
     enrichedOrders,

@@ -5,7 +5,7 @@ import RestaurantLayout from "@presentation/layouts/RestaurantLayout";
 import Home from "@presentation/pages/Home";
 import About from "@presentation/pages/About";
 import Products from "@presentation/pages/Products";
-import { productsLoader } from "@core/router/loaders/productsLoader";
+import Restaurants from "@presentation/pages/Restaurants";
 import NotFound from "@presentation/pages/NotFound";
 // import Favorites from "@presentation/pages/Favorites";
 import Activity from "@presentation/pages/Activity";
@@ -31,8 +31,17 @@ import {
 } from "@presentation/pages/restaurantUI";
 import AdminDashboard from "@presentation/pages/adminProfileUI/AdminDashboard";
 import AdminBillingDashboard from "@presentation/pages/adminProfileUI/adminBillingDashboard";
+import { TermsAndConditions, PrivacyPolicy } from "@presentation/pages/legal";
 
 export const routes: RouteObject[] = [
+  {
+    path: "/terms",
+    element: <TermsAndConditions />,
+  },
+  {
+    path: "/privacy",
+    element: <PrivacyPolicy />,
+  },
   {
     path: "/login",
     element: <Login />,
@@ -122,11 +131,22 @@ export const routes: RouteObject[] = [
       {
         path: "products",
         element: <Products />,
-        loader: productsLoader,
+      },
+      {
+        path: "restaurants",
+        element: <Restaurants />,
       },
       {
         path: "restaurant-detail/:restaurantId",
         element: <RestaurantDetail />,
+      },
+      {
+        path: "terms",
+        element: <TermsAndConditions />,
+      },
+      {
+        path: "privacy",
+        element: <PrivacyPolicy />,
       },
       {
         path: "*",
@@ -197,6 +217,14 @@ export const routes: RouteObject[] = [
       {
         path: "settings/notifications",
         element: <RestaurantNotifications />,
+      },
+      {
+        path: "terms",
+        element: <TermsAndConditions />,
+      },
+      {
+        path: "privacy",
+        element: <PrivacyPolicy />,
       },
     ],
   },
