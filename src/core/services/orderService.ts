@@ -524,15 +524,16 @@ export async function getOrdersByStatus(
 }
 
 /**
- * Obtiene los pedidos del usuario actual (cliente) con soporte de paginación.
+ * Obtiene los pedidos del usuario actual (cliente) con soporte de paginación y filtro por estado.
  */
 export async function getOrdersByCustomer(
   customerId: string,
   limit: number = 5,
   offset: number = 0,
+  status?: OrderStatus | null,
 ): Promise<{ orders: OrderWithItems[]; total: number }> {
   try {
-    const { data, error, count } = await supabase
+    let query = supabase
       .from("orders")
       .select(
         `
@@ -547,6 +548,12 @@ export async function getOrdersByCustomer(
       .eq("customer_id", customerId)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data, error, count } = await query;
 
     if (error) throw error;
 

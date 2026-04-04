@@ -20,7 +20,8 @@
       "Bash(find /c/laragon/www/GENCAR/Delizza/DelizzaFrontend -maxdepth 1 -type f -name .*)",
       "Bash(bun add:*)",
       "Bash(xargs grep:*)",
-      "Bash(xargs wc:*)"
+      "Bash(xargs wc:*)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")"
     ]
   }
 }
