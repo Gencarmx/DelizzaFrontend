@@ -225,16 +225,10 @@ export default function Home() {
         setCategories(categoriesData);
 
         // — Restaurantes con estado tricolor —
-        let businessNameMap = new Map<string, string>();
-
         if (restaurantsResult.error) {
           console.error('Error fetching restaurants:', restaurantsResult.error);
         } else {
           const restaurantList = restaurantsResult.data ?? [];
-
-          // Construir el mapa id→name que también usarán los productos.
-          // Esto elimina la query secundaria a businesses que existía antes.
-          businessNameMap = new Map(restaurantList.map(b => [b.id, b.name]));
 
           // Fetch horarios de todos los restaurantes en un solo query
           const restaurantIds = restaurantList.map(b => b.id);
