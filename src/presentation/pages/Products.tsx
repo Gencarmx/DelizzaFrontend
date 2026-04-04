@@ -14,6 +14,7 @@ interface ProductItem {
   restaurant: string;
   restaurantId: string;
   has_addons: boolean;
+  restaurantIsPaused: boolean;
 }
 
 const PAGE_SIZE = 10;
@@ -41,6 +42,7 @@ export default function Products() {
     description?: string;
     has_addons?: boolean;
     restaurant?: { id: string; name: string };
+    restaurantStatus?: 'open' | 'paused' | 'closed';
   } | null>(null);
 
   const isFirstRender = useRef(true);
@@ -77,10 +79,11 @@ export default function Products() {
         let query = supabase
           .from("products")
           .select(
-            "id, name, price, description, image_url, business_id, has_addons, businesses:business_id(id, name, active)",
+            "id, name, price, description, image_url, business_id, has_addons, businesses:business_id!inner(id, name, active, is_paused)",
             { count: "exact" }
           )
           .eq("active", true)
+          .eq("businesses.active", true)
           .order("created_at", { ascending: false })
           .range(offset, offset + PAGE_SIZE - 1);
 
@@ -94,13 +97,8 @@ export default function Products() {
         const { data, count, error } = await query;
         if (error) throw error;
 
-        // Filtrar sólo productos de negocios activos
-        const filtered = (data ?? []).filter(
-          (p: any) => p.businesses?.active !== false
-        );
-
         setProducts(
-          filtered.map((p: any) => ({
+          (data ?? []).map((p: any) => ({
             id: p.id,
             name: p.name,
             price: p.price,
@@ -109,6 +107,7 @@ export default function Products() {
             restaurant: p.businesses?.name ?? "Restaurante",
             restaurantId: p.business_id,
             has_addons: p.has_addons ?? false,
+            restaurantIsPaused: p.businesses?.is_paused ?? false,
           }))
         );
         setTotal(count ?? 0);
@@ -231,6 +230,7 @@ export default function Products() {
                 onClick={() => setSelectedProduct({
                   ...product,
                   restaurant: { id: product.restaurantId, name: product.restaurant },
+                  restaurantStatus: product.restaurantIsPaused ? 'paused' : 'open',
                 })}
                 className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700 cursor-pointer hover:shadow-md transition-shadow group"
               >
@@ -294,6 +294,7 @@ export default function Products() {
           isOpen
           onClose={() => setSelectedProduct(null)}
           product={selectedProduct}
+          restaurantStatus={selectedProduct.restaurantStatus}
         />
       )}
     </div>

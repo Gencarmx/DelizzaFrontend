@@ -1,13 +1,31 @@
 import { useState, useEffect, useCallback } from "react";
-import { CheckCircle2, Clock, XCircle, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, Loader2, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import {
   getOrdersByCustomer,
   type OrderWithItems,
+  type OrderStatus,
 } from "@core/services/orderService";
 import { useAuth } from "@core/context/AuthContext";
 import { useCustomerNotificationsContext } from "@core/context/CustomerNotificationsContext";
 
 const PAGE_SIZE = 5;
+
+type FilterStatus = OrderStatus | null;
+
+interface StatusFilterOption {
+  value: FilterStatus;
+  label: string;
+}
+
+const STATUS_FILTERS: StatusFilterOption[] = [
+  { value: "completed",  label: "Entregado" },
+  { value: null,         label: "Todos" },
+  { value: "pending",    label: "Pendiente" },
+  { value: "confirmed",  label: "Confirmado" },
+  { value: "preparing",  label: "Preparando" },
+  { value: "ready",      label: "Listo" },
+  { value: "cancelled",  label: "Cancelado" },
+];
 
 export default function Activity() {
   const { profileId, user } = useAuth();
@@ -16,16 +34,17 @@ export default function Activity() {
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedStatus, setSelectedStatus] = useState<FilterStatus>("completed");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const reloadOrders = useCallback(
     async (pid: string) => {
-      const result = await getOrdersByCustomer(pid, PAGE_SIZE, (currentPage - 1) * PAGE_SIZE);
+      const result = await getOrdersByCustomer(pid, PAGE_SIZE, (currentPage - 1) * PAGE_SIZE, selectedStatus);
       setOrders(result.orders);
       setTotal(result.total);
     },
-    [currentPage],
+    [currentPage, selectedStatus],
   );
 
   useEffect(() => {
@@ -46,7 +65,7 @@ export default function Activity() {
       try {
         setLoading(true);
         setError(null);
-        const result = await getOrdersByCustomer(profileId, PAGE_SIZE, (currentPage - 1) * PAGE_SIZE);
+        const result = await getOrdersByCustomer(profileId, PAGE_SIZE, (currentPage - 1) * PAGE_SIZE, selectedStatus);
         if (!cancelled) {
           setOrders(result.orders);
           setTotal(result.total);
@@ -61,7 +80,7 @@ export default function Activity() {
 
     load();
     return () => { cancelled = true; };
-  }, [user, profileId, currentPage]);
+  }, [user, profileId, currentPage, selectedStatus]);
 
   useEffect(() => {
     if (!profileId) return;
@@ -74,6 +93,11 @@ export default function Activity() {
       registerOrderUpdateCallback(null);
     };
   }, [profileId, registerOrderUpdateCallback, reloadOrders]);
+
+  const handleStatusChange = (status: FilterStatus) => {
+    setSelectedStatus(status);
+    setCurrentPage(1);
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -115,11 +139,31 @@ export default function Activity() {
   const rangeStart = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const rangeEnd = Math.min(currentPage * PAGE_SIZE, total);
 
+  const emptyMessage = selectedStatus
+    ? `No tienes pedidos con estado "${getStatusConfig(selectedStatus).label.toLowerCase()}".`
+    : "No tienes pedidos recientes. ¡Haz tu primera orden!";
+
   return (
     <div className="flex flex-col pt-2 pb-24 gap-4">
       <h2 className="font-bold text-lg text-gray-900 dark:text-white bg-white dark:bg-gray-800 sticky top-0 z-10 py-2">
         Actividad
       </h2>
+
+      {/* Filtro de estado */}
+      <div className="relative w-fit">
+        <select
+          value={selectedStatus ?? ""}
+          onChange={e => handleStatusChange((e.target.value || null) as FilterStatus)}
+          className="appearance-none w-48 pl-3 pr-8 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent cursor-pointer transition-colors"
+        >
+          {STATUS_FILTERS.map(({ value, label }) => (
+            <option key={value ?? "all"} value={value ?? ""}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-12">
@@ -131,11 +175,15 @@ export default function Activity() {
         </div>
       ) : orders.length === 0 ? (
         <div className="text-center py-12 px-6">
-          <p className="text-gray-500 dark:text-gray-400 text-sm">
-            {total === 0
-              ? "No tienes pedidos recientes. ¡Haz tu primera orden!"
-              : "No hay pedidos en esta página."}
-          </p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">{emptyMessage}</p>
+          {selectedStatus && (
+            <button
+              onClick={() => handleStatusChange(null)}
+              className="text-sm text-amber-500 hover:underline mt-2"
+            >
+              Ver todos los pedidos
+            </button>
+          )}
         </div>
       ) : (
         <>
