@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Download,
   DownloadCloud,
+  Package,
   LogOut,
 } from "lucide-react";
 
@@ -190,6 +191,7 @@ function AdminBottomNav() {
   const navItems = [
     { icon: Building2, label: "Restaurantes", path: "/admin" },
     { icon: Receipt, label: "Comisiones", path: "/admin/billing" },
+    { icon: Package, label: "Pedidos", path: "/admin/orders" },
   ];
 
   return (
@@ -694,7 +696,7 @@ export default function AdminBillingDashboard() {
 
         {/* Header */}
         <header className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-4 pt-10 pb-4 sticky top-0 z-40 shadow-sm">
-          <div className="flex items-center justify-between max-w-2xl mx-auto">
+          <div className="flex items-center justify-between max-w-2xl sm:max-w-5xl mx-auto">
             {/* Branding */}
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center text-white font-black text-xl select-none">
@@ -758,7 +760,7 @@ export default function AdminBillingDashboard() {
           </div>
         </header>
 
-        <div className="max-w-2xl mx-auto px-4 py-5 flex flex-col gap-5">
+        <div className="max-w-2xl sm:max-w-5xl mx-auto px-4 py-5 flex flex-col gap-5">
 
           {/* ── Period Status Card ──────────────────────────────────────── */}
           <div
