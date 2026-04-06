@@ -31,6 +31,7 @@ import {
 } from "@presentation/pages/restaurantUI";
 import AdminDashboard from "@presentation/pages/adminProfileUI/AdminDashboard";
 import AdminBillingDashboard from "@presentation/pages/adminProfileUI/adminBillingDashboard";
+import AdminBillingHistory from "@presentation/pages/adminProfileUI/adminBillingHistory";
 import AdminOrdersDashboard from "@presentation/pages/adminProfileUI/AdminOrdersDashboard";
 import { TermsAndConditions, PrivacyPolicy } from "@presentation/pages/legal";
 
@@ -168,6 +169,14 @@ export const routes: RouteObject[] = [
     element: (
       <ProtectedRoute allowedRoles={["admin"]}>
         <AdminBillingDashboard />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/admin/billing/history",
+    element: (
+      <ProtectedRoute allowedRoles={["admin"]}>
+        <AdminBillingHistory />
       </ProtectedRoute>
     ),
   },

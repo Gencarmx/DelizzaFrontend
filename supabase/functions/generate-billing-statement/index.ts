@@ -32,16 +32,14 @@ async function handleRequest(req: Request) {
       return Response.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const userClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const token = authHeader.replace("Bearer ", "");
+    const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    const { data: { user }, error: authError } = await serviceClient.auth.getUser(token);
     if (authError || !user) {
+      console.error("Auth error:", authError?.message);
       return Response.json({ error: "No autorizado" }, { status: 401 });
     }
-
-    const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const { data: profile } = await serviceClient
       .from("profiles")
@@ -164,6 +162,18 @@ async function handleRequest(req: Request) {
       .summary-row.total { font-size: 18px; font-weight: 900; color: #e63946; border-top: 2px solid #e63946; margin-top: 8px; padding-top: 12px; }
       .legal { background: #f5f5f5; border-left: 4px solid #999; padding: 16px; font-size: 12px; color: #555; line-height: 1.6; }
       .legal strong { color: #1a1a1a; }
+      @media print {
+        @page { size: A4; margin: 20mm 15mm; }
+        body { padding: 0; font-size: 12px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .header { border-bottom: 3px solid #e63946 !important; }
+        thead tr { background: #1a1a1a !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        tbody tr:nth-child(even) { background: #f9f9f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .summary { background: #fff8f8 !important; border: 2px solid #e63946 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .summary-row.total { color: #e63946 !important; }
+        .legal { background: #f5f5f5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        table { page-break-inside: auto; }
+        tr { page-break-inside: avoid; }
+      }
     </style>
   </head>
   <body>
@@ -234,7 +244,7 @@ async function handleRequest(req: Request) {
     const { error: uploadError } = await serviceClient.storage
       .from("billing-statements")
       .upload(fileName, new TextEncoder().encode(html), {
-        contentType: "text/html; charset=utf-8",
+        contentType: "text/html",
         upsert: true,
       });
 
@@ -247,38 +257,77 @@ async function handleRequest(req: Request) {
       .from("billing-statements")
       .createSignedUrl(fileName, 60 * 60 * 24 * 7);
 
-    // ── Upsert billing_statements ─────────────────────────────────────────────────
+    // ── Guardar billing_statement (SELECT → UPDATE o INSERT) ─────────────────────
+    // Evitamos upsert con onConflict porque PostgREST interpreta el nombre del
+    // constraint como columna en ciertas versiones, generando el error
+    // 'column "unique_statement_per_period_business" does not exist'.
     const now = new Date().toISOString();
-    const { data: statement, error: stmtError } = await serviceClient
+    const pdfUrlValue = signedUrl?.signedUrl ?? null;
+
+    const { data: existing } = await serviceClient
       .from("billing_statements")
-      .upsert(
-        {
+      .select("id")
+      .eq("billing_period_id", billing_period_id)
+      .eq("business_id", business_id)
+      .maybeSingle();
+
+    let statementId: string;
+
+    if (existing?.id) {
+      // ── UPDATE ────────────────────────────────────────────────────────────────
+      const { data: updated, error: updateError } = await serviceClient
+        .from("billing_statements")
+        .update({
+          total_orders: totalOrders,
+          total_commission: totalCommission,
+          status: "issued",
+          pdf_url: pdfUrlValue,
+          issued_at: now,
+          updated_at: now,
+        })
+        .eq("id", existing.id)
+        .select("id")
+        .single();
+
+      if (updateError) {
+        console.error("Error al actualizar statement:", updateError);
+        return Response.json({ error: `Error al actualizar statement: ${updateError.message}` }, { status: 500 });
+      }
+      statementId = updated.id;
+    } else {
+      // ── INSERT ────────────────────────────────────────────────────────────────
+      const { data: inserted, error: insertError } = await serviceClient
+        .from("billing_statements")
+        .insert({
           billing_period_id,
           business_id,
           total_orders: totalOrders,
           total_commission: totalCommission,
           status: "issued",
-          pdf_url: signedUrl?.signedUrl ?? null,
+          pdf_url: pdfUrlValue,
           issued_at: now,
           updated_at: now,
-        },
-        { onConflict: "billing_period_id,business_id" }
-      )
-      .select("id")
-      .single();
+        })
+        .select("id")
+        .single();
 
-    if (stmtError) {
-      return Response.json({ error: `Error al guardar statement: ${stmtError.message}` }, { status: 500 });
+      if (insertError) {
+        console.error("Error al insertar statement:", insertError);
+        return Response.json({ error: `Error al insertar statement: ${insertError.message}` }, { status: 500 });
+      }
+      statementId = inserted.id;
     }
+
+    console.log("Statement guardado exitosamente:", statementId);
 
     return Response.json({
       success: true,
-      statement_id: statement.id,
+      statement_id: statementId,
       folio,
       business_name: business.name,
       total_orders: totalOrders,
       total_commission: totalCommission,
-      document_url: signedUrl?.signedUrl ?? null,
+      document_url: pdfUrlValue,
     });
 
 }

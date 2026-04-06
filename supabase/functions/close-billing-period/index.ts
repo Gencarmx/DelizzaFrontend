@@ -32,16 +32,14 @@ async function handleRequest(req: Request) {
       return Response.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const userClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const token = authHeader.replace("Bearer ", "");
+    const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    const { data: { user }, error: authError } = await serviceClient.auth.getUser(token);
     if (authError || !user) {
+      console.error("Auth error:", authError?.message);
       return Response.json({ error: "No autorizado" }, { status: 401 });
     }
-
-    const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const { data: profile } = await serviceClient
       .from("profiles")
@@ -122,10 +120,13 @@ async function handleRequest(req: Request) {
     // ── Generar estado de cuenta por cada negocio ────────────────────────────────
     const functionUrl = `${SUPABASE_URL}/functions/v1/generate-billing-statement`;
 
+    console.log(`Iniciando generación de estados de cuenta para ${businessIds.length} negocios`);
+
     const statementResults = [];
     const chunkSize = 5;
     for (let i = 0; i < businessIds.length; i += chunkSize) {
       const chunk = businessIds.slice(i, i + chunkSize);
+      console.log(`Procesando chunk ${Math.floor(i/chunkSize) + 1}:`, chunk);
       const chunkResults = await Promise.all(
         chunk.map(async (businessId) => {
           try {

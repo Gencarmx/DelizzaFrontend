@@ -26,6 +26,7 @@ import {
   DownloadCloud,
   Package,
   LogOut,
+  History,
 } from "lucide-react";
 
 // ─── Storage helpers ───────────────────────────────────────────────────────────
@@ -262,6 +263,10 @@ export default function AdminBillingDashboard() {
 
   // Descarga individual: businessId → true mientras descarga
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  // Ver documento (regenera URL antes de abrir)
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  // Regenerar documento
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   // Descarga masiva
   const [bulkDownload, setBulkDownload] = useState<{
     active: boolean;
@@ -284,19 +289,35 @@ export default function AdminBillingDashboard() {
     setTimeout(() => setToast(null), 4000);
   }, []);
 
-  // ── Fetch open billing period ──────────────────────────────────────────────
+  // ── Fetch open billing period (fallback al último cerrado) ────────────────
   const fetchActivePeriod = useCallback(async () => {
     setLoadingPeriod(true);
     setError(null);
     try {
-      const { data, error: err } = await supabase
+      const { data: openPeriod, error: err } = await supabase
         .from("billing_periods")
         .select("id, period_start, period_end, status, closed_at, created_at")
         .eq("status", "open")
         .maybeSingle();
 
       if (err) throw err;
-      setActivePeriod(data ?? null);
+
+      if (openPeriod) {
+        setActivePeriod(openPeriod);
+      } else {
+        // Sin quincena abierta: mostrar el último periodo cerrado para poder
+        // regenerar documentos faltantes o revisar el historial reciente.
+        const { data: closedPeriod, error: closedErr } = await supabase
+          .from("billing_periods")
+          .select("id, period_start, period_end, status, closed_at, created_at")
+          .eq("status", "closed")
+          .order("closed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (closedErr) throw closedErr;
+        setActivePeriod(closedPeriod ?? null);
+      }
     } catch (e: unknown) {
       setError((e as Error)?.message ?? "Error al cargar el periodo activo.");
     } finally {
@@ -490,6 +511,54 @@ export default function AdminBillingDashboard() {
     }
   };
 
+  // ── Regenerar documento para un negocio ───────────────────────────────────
+  const handleRegenerate = useCallback(
+    async (row: CommissionRow) => {
+      if (!activePeriod) return;
+      setRegeneratingId(row.business_id);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("Sin sesión activa.");
+
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+        const res = await fetch(
+          `${supabaseUrl}/functions/v1/generate-billing-statement`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              billing_period_id: activePeriod.id,
+              business_id: row.business_id,
+            }),
+          }
+        );
+
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error ?? "Error al regenerar documento.");
+
+        setCommissions((prev) =>
+          prev.map((c) =>
+            c.business_id === row.business_id
+              ? { ...c, pdf_url: result.document_url ?? c.pdf_url }
+              : c
+          )
+        );
+        showToast(`Documento regenerado: ${row.business_name}`, "success");
+      } catch (e: unknown) {
+        showToast(
+          (e as Error)?.message ?? "Error al regenerar el documento.",
+          "error"
+        );
+      } finally {
+        setRegeneratingId(null);
+      }
+    },
+    [activePeriod, showToast]
+  );
+
   // ── Mark statement as paid ─────────────────────────────────────────────────
   const markAsPaid = async (statementId: string, businessId: string) => {
     try {
@@ -513,6 +582,30 @@ export default function AdminBillingDashboard() {
       );
     }
   };
+
+  // ── Ver documento (URL fresca) ─────────────────────────────────────────────
+  const handleViewOne = useCallback(
+    async (row: CommissionRow) => {
+      if (!row.pdf_url) return;
+      setViewingId(row.business_id);
+      try {
+        const path = extractStoragePath(row.pdf_url);
+        let url = row.pdf_url;
+        if (path) {
+          const { data } = await supabase.storage
+            .from("billing-statements")
+            .createSignedUrl(path, 300);
+          if (data?.signedUrl) url = data.signedUrl;
+        }
+        window.open(url, "_blank", "noopener,noreferrer");
+      } catch {
+        showToast("Error al abrir el documento.", "error");
+      } finally {
+        setViewingId(null);
+      }
+    },
+    [showToast]
+  );
 
   // ── Descarga individual ────────────────────────────────────────────────────
   const handleDownloadOne = useCallback(
@@ -735,24 +828,28 @@ export default function AdminBillingDashboard() {
               {!loadingPeriod && (
                 <button
                   onClick={() =>
-                    setConfirmAction({ type: activePeriod ? "close" : "open" })
+                    setConfirmAction({
+                      type: activePeriod?.status === "open" ? "close" : "open",
+                    })
                   }
                   disabled={actionLoading}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-lg ${
-                    activePeriod
+                    activePeriod?.status === "open"
                       ? "bg-red-600 hover:bg-red-700 text-white shadow-red-200 dark:shadow-red-900/30"
                       : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200 dark:shadow-emerald-900/30"
                   }`}
                 >
                   {actionLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : activePeriod ? (
+                  ) : activePeriod?.status === "open" ? (
                     <Lock className="w-4 h-4" />
                   ) : (
                     <LockOpen className="w-4 h-4" />
                   )}
                   <span className="hidden xs:inline">
-                    {activePeriod ? "Cerrar quincena" : "Abrir quincena"}
+                    {activePeriod?.status === "open"
+                      ? "Cerrar quincena"
+                      : "Abrir quincena"}
                   </span>
                 </button>
               )}
@@ -765,8 +862,10 @@ export default function AdminBillingDashboard() {
           {/* ── Period Status Card ──────────────────────────────────────── */}
           <div
             className={`rounded-2xl border p-4 transition-colors ${
-              activePeriod
+              activePeriod?.status === "open"
                 ? "bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800"
+                : activePeriod?.status === "closed"
+                ? "bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800"
                 : "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
             }`}
           >
@@ -774,15 +873,19 @@ export default function AdminBillingDashboard() {
               <div className="flex items-center gap-3">
                 <div
                   className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    activePeriod
+                    activePeriod?.status === "open"
                       ? "bg-emerald-100 dark:bg-emerald-900/30"
+                      : activePeriod?.status === "closed"
+                      ? "bg-amber-100 dark:bg-amber-900/30"
                       : "bg-gray-200 dark:bg-gray-700"
                   }`}
                 >
                   <Calendar
                     className={`w-5 h-5 ${
-                      activePeriod
+                      activePeriod?.status === "open"
                         ? "text-emerald-600 dark:text-emerald-400"
+                        : activePeriod?.status === "closed"
+                        ? "text-amber-600 dark:text-amber-400"
                         : "text-gray-500 dark:text-gray-400"
                     }`}
                   />
@@ -795,7 +898,7 @@ export default function AdminBillingDashboard() {
                         Verificando periodo...
                       </span>
                     </div>
-                  ) : activePeriod ? (
+                  ) : activePeriod?.status === "open" ? (
                     <>
                       <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 leading-tight">
                         Quincena activa
@@ -806,6 +909,18 @@ export default function AdminBillingDashboard() {
                       <p className="text-[11px] text-emerald-500/80 dark:text-emerald-600 mt-0.5">
                         {formatDate(activePeriod.period_start)} →{" "}
                         {formatDate(activePeriod.period_end)}
+                      </p>
+                    </>
+                  ) : activePeriod?.status === "closed" ? (
+                    <>
+                      <p className="text-sm font-semibold text-amber-700 dark:text-amber-400 leading-tight">
+                        Último periodo cerrado
+                      </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5 font-medium">
+                        {getPeriodLabel(activePeriod)}
+                      </p>
+                      <p className="text-[11px] text-amber-500/80 dark:text-amber-600 mt-0.5">
+                        Cerrado el {formatDate(activePeriod.closed_at!)}
                       </p>
                     </>
                   ) : (
@@ -892,6 +1007,14 @@ export default function AdminBillingDashboard() {
                       {pendingCount} pendiente{pendingCount > 1 ? "s" : ""}
                     </span>
                   )}
+                  {/* Historial */}
+                  <Link
+                    to="/admin/billing/history"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    Historial
+                  </Link>
                   {/* Botón descargar todos */}
                   {!loadingCommissions && commissions.some((c) => c.pdf_url) && (
                     <button
@@ -1007,18 +1130,21 @@ export default function AdminBillingDashboard() {
                             </div>
                           )}
                           <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-                            {row.pdf_url && (
+                            {row.pdf_url ? (
                               <>
                                 {/* Ver en browser */}
-                                <a
-                                  href={row.pdf_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 text-xs font-medium border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                                <button
+                                  onClick={() => handleViewOne(row)}
+                                  disabled={viewingId === row.business_id}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 text-xs font-medium border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  <ExternalLink className="w-3 h-3" />
+                                  {viewingId === row.business_id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <ExternalLink className="w-3 h-3" />
+                                  )}
                                   Ver
-                                </a>
+                                </button>
                                 {/* Descargar */}
                                 <button
                                   onClick={() => handleDownloadOne(row)}
@@ -1033,7 +1159,20 @@ export default function AdminBillingDashboard() {
                                   Descargar
                                 </button>
                               </>
-                            )}
+                            ) : row.statement_id ? (
+                              <button
+                                onClick={() => handleRegenerate(row)}
+                                disabled={regeneratingId === row.business_id}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-xs font-medium border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {regeneratingId === row.business_id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="w-3 h-3" />
+                                )}
+                                Regenerar
+                              </button>
+                            ) : null}
                             {row.statement_id &&
                               row.statement_status === "issued" && (
                                 <button
@@ -1078,19 +1217,22 @@ export default function AdminBillingDashboard() {
                           <StatementBadge status={row.statement_status} />
                         </div>
 
-                        {/* Documento: Ver + Descargar */}
+                        {/* Documento: Ver + Descargar / Regenerar */}
                         <div className="w-28 flex items-center gap-1.5 justify-center">
                           {row.pdf_url ? (
                             <>
-                              <a
-                                href={row.pdf_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="Ver estado de cuenta en el navegador"
-                                className="p-2 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-blue-200 dark:border-blue-800 transition-colors"
+                              <button
+                                onClick={() => handleViewOne(row)}
+                                disabled={viewingId === row.business_id}
+                                title="Ver estado de cuenta"
+                                className="p-2 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-blue-200 dark:border-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                <ExternalLink className="w-4 h-4" />
-                              </a>
+                                {viewingId === row.business_id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <ExternalLink className="w-4 h-4" />
+                                )}
+                              </button>
                               <button
                                 onClick={() => handleDownloadOne(row)}
                                 disabled={downloadingId === row.business_id || !!bulkDownload}
@@ -1104,6 +1246,19 @@ export default function AdminBillingDashboard() {
                                 )}
                               </button>
                             </>
+                          ) : row.statement_id ? (
+                            <button
+                              onClick={() => handleRegenerate(row)}
+                              disabled={regeneratingId === row.business_id}
+                              title="Regenerar documento"
+                              className="p-2 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 border border-amber-200 dark:border-amber-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {regeneratingId === row.business_id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-4 h-4" />
+                              )}
+                            </button>
                           ) : (
                             <span className="text-xs text-gray-400 italic">—</span>
                           )}
@@ -1156,7 +1311,7 @@ export default function AdminBillingDashboard() {
           )}
 
           {/* ── No active period CTA ──────────────────────────────────── */}
-          {!loadingPeriod && !activePeriod && (
+          {!loadingPeriod && activePeriod?.status !== "open" && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm px-5 py-10 flex flex-col items-center gap-4 text-center">
               <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                 <LayoutDashboard className="w-8 h-8 text-gray-400" />
