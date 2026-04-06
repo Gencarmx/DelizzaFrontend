@@ -1,248 +1,262 @@
 import { useEffect, useState } from "react";
-import { Bell, BellOff, BellRing, Package, CheckCircle2, XCircle, Clock, ChevronLeft, Loader2 } from "lucide-react";
+import { Bell, BellOff, BellRing, Monitor, Smartphone, Loader2, Trash2, ChevronLeft } from "lucide-react";
 import { useNavigate } from "react-router";
-import { supabase } from "@core/supabase/client";
-import { getOrdersByCustomer, type OrderWithItems } from "@core/services/orderService";
 import { usePushNotifications } from "@core/hooks/usePushNotifications";
+import { supabase } from "@core/supabase/client";
 
-function getStatusConfig(status: string | null) {
-  switch (status) {
-    case "completed":
-      return { icon: CheckCircle2, iconBg: "bg-green-100", iconColor: "text-green-600", title: "Pedido entregado", label: "Entregado" };
-    case "cancelled":
-      return { icon: XCircle, iconBg: "bg-red-100", iconColor: "text-red-600", title: "Pedido cancelado", label: "Cancelado" };
-    case "confirmed":
-      return { icon: CheckCircle2, iconBg: "bg-blue-100", iconColor: "text-blue-600", title: "Pedido confirmado", label: "Confirmado" };
-    case "preparing":
-      return { icon: Package, iconBg: "bg-amber-100", iconColor: "text-amber-600", title: "Pedido en preparación", label: "Preparando" };
-    case "ready":
-      return { icon: Package, iconBg: "bg-green-100", iconColor: "text-green-600", title: "Pedido listo", label: "Listo para recoger" };
-    case "pending":
-    default:
-      return { icon: Clock, iconBg: "bg-gray-100", iconColor: "text-gray-500", title: "Pedido recibido", label: "Pendiente" };
+interface PushDevice {
+  id: string;
+  endpoint: string;
+  user_agent: string | null;
+  created_at: string;
+}
+
+function getDeviceLabel(userAgent: string | null): { label: string; icon: typeof Monitor } {
+  if (!userAgent) return { label: "Dispositivo desconocido", icon: Monitor };
+  const ua = userAgent.toLowerCase();
+  if (ua.includes("android") || ua.includes("iphone") || ua.includes("ipad") || ua.includes("mobile")) {
+    return { icon: Smartphone, label: "Dispositivo móvil" };
   }
+  return { icon: Monitor, label: "Computadora" };
+}
+
+function getBrowserName(userAgent: string | null): string {
+  if (!userAgent) return "";
+  if (userAgent.includes("Edg/")) return "Microsoft Edge";
+  if (userAgent.includes("Chrome/")) return "Google Chrome";
+  if (userAgent.includes("Firefox/")) return "Mozilla Firefox";
+  if (userAgent.includes("Safari/") && !userAgent.includes("Chrome")) return "Safari";
+  return "Navegador";
 }
 
 function getRelativeTime(dateString: string): string {
-  const now = new Date();
-  const date = new Date(dateString);
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = Date.now() - new Date(dateString).getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
-
-  if (diffMins < 1) return "Ahora";
+  if (diffMins < 1) return "Ahora mismo";
   if (diffMins < 60) return `Hace ${diffMins} min`;
   if (diffHours < 24) return `Hace ${diffHours} hora${diffHours > 1 ? "s" : ""}`;
   if (diffDays === 1) return "Ayer";
   return `Hace ${diffDays} días`;
 }
 
-function PushNotificationsCard() {
-  const {
-    isSupported,
-    permissionState,
-    isSubscribed,
-    isLoading,
-    subscribe,
-    unsubscribe,
-  } = usePushNotifications();
-
-  if (!isSupported) return null;
-
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700 mb-4">
-      <h3 className="font-semibold text-gray-900 dark:text-white text-sm mb-3">
-        Notificaciones push
-      </h3>
-
-      {permissionState === "denied" ? (
-        <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-          <BellOff className="w-5 h-5 flex-shrink-0" />
-          <p>
-            Notificaciones bloqueadas. Para activarlas ve a la configuración del
-            navegador y permite las notificaciones para esta página.
-          </p>
-        </div>
-      ) : permissionState === "granted" && isSubscribed ? (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-full">
-              <Bell className="w-5 h-5 text-green-600 dark:text-green-400" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                Activadas
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Recibirás alertas aunque el browser esté cerrado
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={unsubscribe}
-            disabled={isLoading}
-            className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 font-medium transition-colors"
-          >
-            {isLoading ? "..." : "Desactivar"}
-          </button>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-amber-100 dark:bg-amber-900/30 p-2 rounded-full">
-              <BellRing className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                No activadas
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Entérate del estado de tu pedido aunque cierres el browser
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={subscribe}
-            disabled={isLoading}
-            className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-xs font-medium transition-colors"
-          >
-            {isLoading ? "..." : "Activar"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function Notifications() {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<OrderWithItems[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { isSupported, permissionState, isSubscribed, isLoading, subscribe, unsubscribe } =
+    usePushNotifications();
 
-  useEffect(() => {
-    let cancelled = false;
+  const [devices, setDevices] = useState<PushDevice[]>([]);
+  const [loadingDevices, setLoadingDevices] = useState(true);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
-    const fetchNotifications = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  const loadDevices = async () => {
+    try {
+      setLoadingDevices(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          setError("Debes iniciar sesión para ver tus notificaciones");
-          return;
-        }
+      const { data } = await supabase
+        .from("push_subscriptions")
+        .select("id, endpoint, user_agent, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("user_id", user.id)
-          .maybeSingle();
+      setDevices(data ?? []);
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
 
-        if (!profile) {
-          setError("Perfil no encontrado");
-          return;
-        }
+  useEffect(() => { loadDevices(); }, []);
 
-        const ordersData = await getOrdersByCustomer(profile.id, 30);
-        if (!cancelled) {
-          setOrders(ordersData);
-        }
-      } catch (err) {
-        console.error("Error cargando notificaciones:", err);
-        if (!cancelled) setError("Error al cargar las notificaciones");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
+  const handleSubscribe = async () => {
+    await subscribe();
+    await loadDevices();
+  };
 
-    fetchNotifications();
-    return () => { cancelled = true; };
-  }, []);
+  const handleUnsubscribe = async () => {
+    await unsubscribe();
+    await loadDevices();
+  };
+
+  const removeDevice = async (deviceId: string, endpoint: string) => {
+    setRemovingId(deviceId);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub?.endpoint === endpoint) await sub.unsubscribe();
+
+      await supabase.from("push_subscriptions").delete().eq("id", deviceId);
+      setDevices(prev => prev.filter(d => d.id !== deviceId));
+    } finally {
+      setRemovingId(null);
+    }
+  };
 
   return (
-    <div className="flex flex-col pt-2 pb-24">
+    <div className="flex flex-col pt-2 pb-24 gap-6">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4 bg-white dark:bg-gray-900 sticky top-0 z-10 py-2">
+      <div className="flex items-center gap-3 bg-white dark:bg-gray-800 sticky top-0 z-10 py-2">
         <button
           onClick={() => navigate(-1)}
           className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
         >
           <ChevronLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
         </button>
-        <h2 className="font-bold text-lg text-gray-900 dark:text-white">Notificaciones</h2>
-      </div>
-
-      {/* Tarjeta de configuración de push */}
-      <PushNotificationsCard />
-
-      {loading && (
-        <div className="flex justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
-        </div>
-      )}
-
-      {error && !loading && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mx-1">
-          <p className="text-red-700 text-sm">{error}</p>
-        </div>
-      )}
-
-      {!loading && !error && orders.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {orders.map((order) => {
-            const { icon: Icon, iconBg, iconColor, title } = getStatusConfig(order.status);
-            const businessName = order.business_name || (order as any).businesses?.name || "Restaurante";
-            const itemsText = order.order_items?.length > 0
-              ? order.order_items.map(i => `${i.quantity}x ${i.product_name || "Producto"}`).join(", ")
-              : "Sin items";
-
-            return (
-              <div
-                key={order.id}
-                className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700 flex gap-4"
-              >
-                <div className={`w-12 h-12 ${iconBg} rounded-full flex items-center justify-center flex-shrink-0`}>
-                  <Icon className={`w-6 h-6 ${iconColor}`} strokeWidth={2} />
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <h3 className="font-semibold text-gray-900 dark:text-white text-sm">{title}</h3>
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-1 line-clamp-2">
-                    {businessName} — {itemsText}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400">
-                      {order.created_at ? getRelativeTime(order.created_at) : ""}
-                    </span>
-                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                      ${(order.total || 0).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {!loading && !error && orders.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 px-4">
-          <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
-            <Bell className="w-10 h-10 text-gray-400" strokeWidth={1.5} />
-          </div>
-          <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-2">
-            No hay notificaciones
-          </h3>
-          <p className="text-sm text-gray-500 text-center">
-            Cuando tengas nuevas notificaciones aparecerán aquí
+        <div>
+          <h2 className="font-bold text-lg text-gray-900 dark:text-white">
+            Notificaciones push
+          </h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Recibe alertas del estado de tus pedidos
           </p>
         </div>
-      )}
+      </div>
+
+      {/* Estado en este dispositivo */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700">
+        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">
+          Estado en este dispositivo
+        </h3>
+
+        {!isSupported ? (
+          <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+            <BellOff className="w-5 h-5 flex-shrink-0" />
+            <p className="text-sm">
+              Tu navegador no soporta notificaciones push. Prueba con Chrome o Firefox.
+            </p>
+          </div>
+        ) : permissionState === "denied" ? (
+          <div className="flex items-start gap-3">
+            <div className="bg-red-100 dark:bg-red-900/30 p-2 rounded-full mt-0.5">
+              <BellOff className="w-5 h-5 text-red-500 dark:text-red-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                Notificaciones bloqueadas
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                Ve a la configuración del navegador → Permisos del sitio → Notificaciones → Permitir.
+              </p>
+            </div>
+          </div>
+        ) : permissionState === "granted" && isSubscribed ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-full">
+                <Bell className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  Activas en este dispositivo
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Recibirás alertas del estado de tus pedidos
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleUnsubscribe}
+              disabled={isLoading}
+              className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 font-medium transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+              {isLoading ? "..." : "Desactivar"}
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-amber-100 dark:bg-amber-900/30 p-2 rounded-full">
+                <BellRing className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  No activadas
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  No recibirás alertas aunque cierres el browser
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleSubscribe}
+              disabled={isLoading}
+              className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+            >
+              {isLoading ? "..." : "Activar"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Dispositivos suscritos */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            Dispositivos suscritos
+          </h3>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+            Recibirás notificaciones en cada uno de estos dispositivos
+          </p>
+        </div>
+
+        {loadingDevices ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+          </div>
+        ) : devices.length === 0 ? (
+          <div className="flex flex-col items-center py-10 px-4 text-center">
+            <BellOff className="w-10 h-10 text-gray-300 dark:text-gray-600 mb-3" />
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Ningún dispositivo suscrito
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              Activa las notificaciones en este u otros dispositivos
+            </p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-gray-100 dark:divide-gray-700">
+            {devices.map(device => {
+              const { label, icon: DeviceIcon } = getDeviceLabel(device.user_agent);
+              const browser = getBrowserName(device.user_agent);
+              return (
+                <li key={device.id} className="flex items-center gap-4 px-5 py-4">
+                  <div className="bg-gray-100 dark:bg-gray-700 p-2.5 rounded-xl flex-shrink-0">
+                    <DeviceIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {label}{browser ? ` · ${browser}` : ""}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                      Suscrito {getRelativeTime(device.created_at)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => removeDevice(device.id, device.endpoint)}
+                    disabled={removingId === device.id}
+                    className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors text-gray-400 hover:text-red-500 flex-shrink-0 disabled:opacity-50"
+                    title="Eliminar este dispositivo"
+                  >
+                    {removingId === device.id
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <Trash2 className="w-4 h-4" />
+                    }
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-2xl p-4">
+        <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+          <span className="font-semibold">¿Cómo funciona?</span> Al activar las notificaciones en un dispositivo, este queda registrado. Cuando el estado de tu pedido cambie recibirás una alerta en todos los dispositivos suscritos, incluso si el navegador está completamente cerrado.
+        </p>
+      </div>
     </div>
   );
 }

@@ -75,7 +75,7 @@ export default function Orders() {
   } | null>(null);
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<OrderDetailData | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [confirmCompleteOrder, setConfirmCompleteOrder] = useState<Order | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ order: Order; newStatus: string } | null>(null);
   const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
 
   // Obtener notificaciones en tiempo real y estado de conexión
@@ -454,7 +454,7 @@ export default function Orders() {
 
     const btnCancel = (
       <button
-        onClick={() => handleStatusChange(order.fullId, order.id, 'cancelled')}
+        onClick={() => setPendingAction({ order, newStatus: 'cancelled' })}
         disabled={isUpdating}
         className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-full text-red-500 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
         title="Cancelar pedido"
@@ -484,7 +484,7 @@ export default function Orders() {
         <div className="flex items-center gap-1">
           {btnView}
           <button
-            onClick={() => handleStatusChange(order.fullId, order.id, 'preparing')}
+            onClick={() => setPendingAction({ order, newStatus: 'preparing' })}
             disabled={isUpdating}
             className="p-1.5 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-full text-orange-500 hover:text-orange-600 dark:hover:text-orange-400 transition-colors disabled:opacity-50"
             title="Aceptar: En preparación"
@@ -502,7 +502,7 @@ export default function Orders() {
         <div className="flex items-center gap-1">
           {btnView}
           <button
-            onClick={() => handleStatusChange(order.fullId, order.id, 'ready')}
+            onClick={() => setPendingAction({ order, newStatus: 'ready' })}
             disabled={isUpdating}
             className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-full text-green-500 hover:text-green-600 dark:hover:text-green-400 transition-colors disabled:opacity-50"
             title="Listo para entrega"
@@ -520,7 +520,7 @@ export default function Orders() {
         <div className="flex items-center gap-1">
           {btnView}
           <button
-            onClick={(e) => { e.stopPropagation(); setConfirmCompleteOrder(order); }}
+            onClick={(e) => { e.stopPropagation(); setPendingAction({ order, newStatus: 'completed' }); }}
             disabled={isUpdating}
             className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-full text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors disabled:opacity-50"
             title="Marcar como entregado"
@@ -908,104 +908,102 @@ export default function Orders() {
         </div>
       )}
 
-      {/* Confirm Complete Modal */}
-      {confirmCompleteOrder && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 dark:bg-black/70"
-          onClick={() => setConfirmCompleteOrder(null)}
-        >
+      {/* Confirm Action Modal — compacto, aplica a todos los cambios de estado */}
+      {pendingAction && (() => {
+        const { order, newStatus } = pendingAction;
+        const cfg: Record<string, { label: string; accent: string; btnClass: string; iconEl: React.ReactNode }> = {
+          preparing: {
+            label: '¿Iniciar preparación?',
+            accent: 'bg-orange-100 dark:bg-orange-900/30',
+            btnClass: 'bg-orange-500 hover:bg-orange-600',
+            iconEl: <ChefHat className="w-4 h-4 text-orange-600 dark:text-orange-400" />,
+          },
+          ready: {
+            label: '¿Listo para entrega?',
+            accent: 'bg-green-100 dark:bg-green-900/30',
+            btnClass: 'bg-green-600 hover:bg-green-700',
+            iconEl: <Package className="w-4 h-4 text-green-600 dark:text-green-400" />,
+          },
+          completed: {
+            label: '¿Marcar como entregado?',
+            accent: 'bg-blue-100 dark:bg-blue-900/30',
+            btnClass: 'bg-blue-600 hover:bg-blue-700',
+            iconEl: <CheckCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />,
+          },
+          cancelled: {
+            label: '¿Cancelar este pedido?',
+            accent: 'bg-red-100 dark:bg-red-900/30',
+            btnClass: 'bg-red-500 hover:bg-red-600',
+            iconEl: <X className="w-4 h-4 text-red-600 dark:text-red-400" />,
+          },
+        };
+        const { label, accent, btnClass, iconEl } = cfg[newStatus] ?? cfg.completed;
+        const isUpdating = updatingOrders.has(order.fullId);
+
+        return (
           <div
-            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+            onClick={() => setPendingAction(null)}
           >
-            <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700">
+            <div
+              className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-xs p-5 flex flex-col gap-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Encabezado */}
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-                  <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${accent}`}>
+                  {iconEl}
                 </div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                  Completar pedido
-                </h2>
-              </div>
-              <button
-                onClick={() => setConfirmCompleteOrder(null)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 flex flex-col gap-4">
-              <p className="text-gray-600 dark:text-gray-400 text-sm">
-                ¿Estás seguro de que deseas marcar el pedido{' '}
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  #{confirmCompleteOrder.id}
-                </span>{' '}
-                de{' '}
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  {confirmCompleteOrder.customer}
-                </span>{' '}
-                como completado?
-              </p>
-
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 flex items-center justify-between">
-                <span className="text-sm text-gray-500 dark:text-gray-400">Total del pedido</span>
-                <span className="font-bold text-gray-900 dark:text-white">
-                  ${confirmCompleteOrder.total}
-                </span>
+                <div className="min-w-0">
+                  <p className="font-bold text-gray-900 dark:text-white text-sm leading-tight">{label}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    #{order.id} · {order.customer}
+                  </p>
+                </div>
               </div>
 
-              <div className={`rounded-xl p-3 flex items-center justify-between ${
-                confirmCompleteOrder.deliveryType === 'delivery'
-                  ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800'
-                  : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-              }`}>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Comisión Delizza
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {confirmCompleteOrder.deliveryType === 'delivery'
-                      ? 'Pedido a domicilio'
-                      : 'Pedido para recoger'}
-                  </span>
-                </div>
-                <span className={`font-bold text-lg ${
-                  confirmCompleteOrder.deliveryType === 'delivery'
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : 'text-blue-600 dark:text-blue-400'
+              {/* Info extra solo para "completado" */}
+              {newStatus === 'completed' && (
+                <div className={`rounded-xl px-3 py-2 flex items-center justify-between text-sm border ${
+                  order.deliveryType === 'delivery'
+                    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                    : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
                 }`}>
-                  ${confirmCompleteOrder.deliveryType === 'delivery' ? '18.00' : '10.00'}
-                </span>
-              </div>
+                  <span className="text-gray-600 dark:text-gray-300">
+                    Comisión ({order.deliveryType === 'delivery' ? 'domicilio' : 'recoger'})
+                  </span>
+                  <span className="font-bold text-gray-900 dark:text-white">
+                    ${order.deliveryType === 'delivery' ? '18.00' : '10.00'}
+                  </span>
+                </div>
+              )}
 
-              <div className="flex gap-3 pt-1">
+              {/* Botones */}
+              <div className="flex gap-2">
                 <button
-                  onClick={() => setConfirmCompleteOrder(null)}
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  onClick={() => setPendingAction(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
-                  Cancelar
+                  No
                 </button>
                 <button
                   onClick={() => {
-                    handleStatusChange(confirmCompleteOrder.fullId, confirmCompleteOrder.id, 'completed');
-                    setConfirmCompleteOrder(null);
+                    handleStatusChange(order.fullId, order.id, newStatus);
+                    setPendingAction(null);
                   }}
-                  disabled={updatingOrders.has(confirmCompleteOrder.fullId)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  disabled={isUpdating}
+                  className={`flex-1 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 ${btnClass}`}
                 >
-                  {updatingOrders.has(confirmCompleteOrder.fullId) ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle className="w-4 h-4" />
-                  )}
-                  Confirmar
+                  {isUpdating
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : 'Sí'
+                  }
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );

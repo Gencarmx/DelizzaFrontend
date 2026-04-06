@@ -36,6 +36,9 @@ export default function ProductList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
+  // — Filtro de estado —
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("active");
+
   // — Paginación —
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(20);
@@ -71,6 +74,11 @@ export default function ProductList() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Al cambiar el filtro de estado vuelve a página 1.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter]);
+
   // Carga principal — se dispara por cambio de página, tamaño, búsqueda o refresh
   useEffect(() => {
     const loadProducts = async () => {
@@ -93,6 +101,7 @@ export default function ProductList() {
           limit: pageSize,
           offset,
           search: debouncedSearch || undefined,
+          active: statusFilter === "all" ? undefined : statusFilter === "active",
         });
         setProducts(data);
         setTotal(count);
@@ -107,7 +116,7 @@ export default function ProductList() {
 
     loadProducts();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessId, currentPage, pageSize, debouncedSearch, refreshKey]);
+  }, [businessId, currentPage, pageSize, debouncedSearch, statusFilter, refreshKey]);
 
   // — Helpers de paginación —
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -239,11 +248,18 @@ export default function ProductList() {
       key: "description",
       header: "Descripción",
       width: "200px",
-      render: (product) => (
-        <span className="text-gray-600 dark:text-gray-400 text-sm">
-          {product.description || "Sin descripción"}
-        </span>
-      ),
+      render: (product) => {
+        const text = product.description || "Sin descripción";
+        const truncated = text.length > 80 ? text.slice(0, 80).trimEnd() + "…" : text;
+        return (
+          <span
+            className="text-gray-600 dark:text-gray-400 text-sm"
+            title={product.description ?? undefined}
+          >
+            {truncated}
+          </span>
+        );
+      },
     },
     {
       key: "price",
@@ -307,14 +323,42 @@ export default function ProductList() {
         </div>
       )}
 
-      {/* Búsqueda */}
-      <div className="max-w-md">
-        <Input
-          placeholder="Buscar productos..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          icon={<Search className="w-5 h-5" />}
-        />
+      {/* Búsqueda + Filtros */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1 max-w-md">
+          <Input
+            placeholder="Buscar productos..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            icon={<Search className="w-5 h-5" />}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          {(
+            [
+              { value: "all",      label: "Todos" },
+              { value: "active",   label: "Activos" },
+              { value: "inactive", label: "Inactivos" },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setStatusFilter(opt.value)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors border ${
+                statusFilter === opt.value
+                  ? opt.value === "inactive"
+                    ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700"
+                    : opt.value === "active"
+                    ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700"
+                    : "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"
+                  : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Tabla / Spinner inicial */}
@@ -336,6 +380,10 @@ export default function ProductList() {
               emptyMessage={
                 debouncedSearch
                   ? `No se encontraron productos para "${debouncedSearch}"`
+                  : statusFilter === "active"
+                  ? "No hay productos activos"
+                  : statusFilter === "inactive"
+                  ? "No hay productos inactivos"
                   : "No se encontraron productos"
               }
             />

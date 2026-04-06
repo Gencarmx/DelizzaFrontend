@@ -126,7 +126,7 @@ export default function Dashboard() {
         setMetrics([
           {
             title: "Ventas del día",
-            value: `$${businessMetrics.completed_orders_today * businessMetrics.average_order_value || 0}`,
+            value: `$${(businessMetrics.completed_orders_today * businessMetrics.average_order_value || 0).toFixed(2)}`,
             icon: <DollarSign className="w-6 h-6 text-amber-600" />,
             trend: { value: 0, isPositive: true },
             subtitle: "Hoy",

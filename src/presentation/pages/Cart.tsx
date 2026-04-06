@@ -9,6 +9,7 @@ import {
   Info,
   X,
   ShoppingBag,
+  PhoneOff,
 } from "lucide-react";
 import { useCartLogic } from "@presentation/logic/CartLogic";
 
@@ -16,6 +17,7 @@ export default function Cart() {
   const {
     items,
     isProcessing,
+    hasPhone,
     enrichedOrders,
     grandTotal,
     totalServiceFees,
@@ -347,11 +349,34 @@ export default function Cart() {
         </div>
       </div>
 
+      {/* ── No phone warning ─────────────────────────────────────────────── */}
+      {hasPhone === false && (
+        <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-600 rounded-2xl p-5 mb-4 flex items-start gap-4">
+          <div className="w-10 h-10 bg-red-100 dark:bg-red-800/50 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+            <PhoneOff className="w-5 h-5 text-red-500 dark:text-red-400" />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-bold text-red-800 dark:text-red-200 text-base mb-1">
+              Número de teléfono requerido
+            </h4>
+            <p className="text-red-700 dark:text-red-300 text-sm leading-relaxed">
+              Necesitas registrar un número de celular en tu perfil para poder realizar pedidos. Lo utilizamos para coordinar la entrega o el retiro de tu pedido.
+            </p>
+            <button
+              onClick={() => navigate("/edit-profile")}
+              className="mt-3 bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-colors"
+            >
+              Agregar número de teléfono
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Checkout button ───────────────────────────────────────────────── */}
       <button
         onClick={handleCheckout}
-        disabled={isProcessing}
-        className="w-full bg-amber-400 hover:bg-amber-500 disabled:bg-amber-300 text-white font-bold py-4 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2"
+        disabled={isProcessing || hasPhone === false}
+        className="w-full bg-amber-400 hover:bg-amber-500 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:text-gray-500 dark:disabled:text-gray-400 text-white font-bold py-4 rounded-2xl transition-all shadow-lg hover:shadow-xl active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none flex items-center justify-center gap-2"
       >
         {isProcessing ? (
           <>

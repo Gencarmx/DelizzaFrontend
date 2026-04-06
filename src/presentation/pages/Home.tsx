@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
-import { ChevronDown, /* Heart, Star, Clock, */ ChevronLeft, ChevronRight, Loader2, MapPin } from "lucide-react";
+import { ChevronDown, /* Heart, Star, Clock, */ ChevronLeft, ChevronRight, Loader2, MapPin, ChevronUp } from "lucide-react";
 import ProductModal from "@presentation/components/common/ProductModal";
 import { SearchBar, type ProductResult as SearchProductResult, type RestaurantResult as SearchRestaurantResult } from "@presentation/components/layout/SearchBar";
 import { supabase } from "@core/supabase/client";
@@ -32,7 +32,52 @@ function computeRestaurantStatus(
 }
 
 // Número máximo de productos a mostrar en el carrusel "Todos los productos"
-const PRODUCTS_CAROUSEL_LIMIT = 40;
+const PRODUCTS_CAROUSEL_LIMIT = 20;
+// Pool de productos a traer antes de diversificar (debe ser mayor que PRODUCTS_CAROUSEL_LIMIT)
+const PRODUCTS_FETCH_POOL = 80;
+
+/**
+ * Recibe un array de productos y devuelve hasta `maxCount` elementos
+ * distribuidos equitativamente entre restaurantes, en orden aleatorio.
+ * Algoritmo: agrupa por restaurante → mezcla grupos → round-robin.
+ */
+function diversifyByRestaurant<T extends { restaurantId: string }>(
+  items: T[],
+  maxCount: number,
+): T[] {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const bucket = groups.get(item.restaurantId) ?? [];
+    bucket.push(item);
+    groups.set(item.restaurantId, bucket);
+  }
+
+  // Mezcla Fisher-Yates dentro de cada grupo
+  for (const bucket of groups.values()) {
+    for (let i = bucket.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [bucket[i], bucket[j]] = [bucket[j], bucket[i]];
+    }
+  }
+
+  // Mezcla el orden de los restaurantes
+  const queues = Array.from(groups.values());
+  for (let i = queues.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [queues[i], queues[j]] = [queues[j], queues[i]];
+  }
+
+  // Round-robin: toma uno de cada restaurante hasta completar maxCount
+  const result: T[] = [];
+  let i = 0;
+  while (result.length < maxCount) {
+    const active = queues.filter(q => q.length > 0);
+    if (active.length === 0) break;
+    result.push(active[i % active.length].shift()!);
+    i++;
+  }
+  return result;
+}
 
 export default function Home() {
   const { selectedAddress, loading: addressLoading } = useAddress();
@@ -61,6 +106,10 @@ export default function Home() {
   });
   const [error, setError] = useState<string | null>(null);
   const allProductsScrollRef = useRef<HTMLDivElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   // Los productos mostrados en el carrusel: si hay categoría activa usa el fetch
   // específico de esa categoría; de lo contrario usa los 40 más recientes.
@@ -75,6 +124,7 @@ export default function Home() {
     restaurant?: string;
     restaurantId?: string;
     description?: string;
+    restaurantIsPaused?: boolean;
   }) => {
     const validRestaurantId = product.restaurantId && product.restaurantId !== 'unknown'
       ? product.restaurantId
@@ -82,7 +132,10 @@ export default function Home() {
     const restaurantInfo = validRestaurantId
       ? restaurants.find(r => r.id === validRestaurantId)
       : null;
-    const restaurantStatus: 'open' | 'paused' | 'closed' = restaurantInfo?.status?.type ?? 'open';
+    // Usar el estado del restaurante del state local (incluye horarios) o caer
+    // en is_paused del join cuando el restaurante no está entre los primeros 10.
+    const restaurantStatus: 'open' | 'paused' | 'closed' =
+      restaurantInfo?.status?.type ?? (product.restaurantIsPaused ? 'paused' : 'open');
     setSelectedProduct({
       id: product.id,
       name: product.name,
@@ -115,25 +168,24 @@ export default function Home() {
     try {
       const { data: productsData } = await supabase
         .from('products')
-        .select('id, name, price, description, image_url, active, business_id, category_id, has_addons')
+        .select('id, name, price, description, image_url, active, business_id, category_id, has_addons, businesses:business_id!inner(id, name, active, is_paused)')
         .eq('active', true)
+        .eq('businesses.active', true)
         .eq('category_id', categoryId);
 
       if (productsData) {
-        // Usar el mapa de restaurantes ya cargado en estado: evita un round-trip extra
-        const businessMap = new Map(restaurants.map(r => [r.id, r.name]));
-        const enriched = productsData
-          .filter(p => businessMap.has(p.business_id))
+        const enriched = (productsData as any[])
           .map(p => ({
             id: p.id,
             name: p.name,
             price: p.price,
             description: p.description || "",
             image: p.image_url || "https://via.placeholder.com/200",
-            restaurant: businessMap.get(p.business_id) || "Unknown",
+            restaurant: p.businesses?.name || "Unknown",
             restaurantId: p.business_id,
             category_id: p.category_id,
             has_addons: p.has_addons ?? false,
+            restaurantIsPaused: p.businesses?.is_paused ?? false,
             rating: "4.5",
             delivery: "$30",
             time: "30 min",
@@ -159,9 +211,10 @@ export default function Home() {
           getActiveProductCategories(),
           supabase
             .from('products')
-            .select('id, name, price, description, image_url, active, business_id, category_id, has_addons')
+            .select('id, name, price, description, image_url, active, business_id, category_id, has_addons, businesses:business_id!inner(id, name, active, is_paused)')
             .eq('active', true)
-            .limit(PRODUCTS_CAROUSEL_LIMIT),
+            .eq('businesses.active', true)
+            .limit(PRODUCTS_FETCH_POOL),
           supabase
             .from('businesses')
             .select('id, name, address, active, logo_url, is_paused')
@@ -172,16 +225,10 @@ export default function Home() {
         setCategories(categoriesData);
 
         // — Restaurantes con estado tricolor —
-        let businessNameMap = new Map<string, string>();
-
         if (restaurantsResult.error) {
           console.error('Error fetching restaurants:', restaurantsResult.error);
         } else {
           const restaurantList = restaurantsResult.data ?? [];
-
-          // Construir el mapa id→name que también usarán los productos.
-          // Esto elimina la query secundaria a businesses que existía antes.
-          businessNameMap = new Map(restaurantList.map(b => [b.id, b.name]));
 
           // Fetch horarios de todos los restaurantes en un solo query
           const restaurantIds = restaurantList.map(b => b.id);
@@ -200,17 +247,24 @@ export default function Home() {
             hoursMap.set(hour.business_id, existing);
           }
 
-          setRestaurants(restaurantList.map(b => {
-            const hours = hoursMap.get(b.id) ?? [];
-            const restaurantStatus = computeRestaurantStatus(b.active, b.is_paused, hours);
-            return {
-              id: b.id,
-              name: b.name,
-              address: b.address || "Dirección no disponible",
-              status: restaurantStatus,
-              logo: b.logo_url || "https://via.placeholder.com/200",
-            };
-          }));
+          const STATUS_ORDER: Record<RestaurantStatus['type'], number> = { open: 0, paused: 1, closed: 2 };
+
+          setRestaurants(
+            restaurantList
+              .map(b => {
+                const hours = hoursMap.get(b.id) ?? [];
+                const restaurantStatus = computeRestaurantStatus(b.active, b.is_paused, hours);
+                return {
+                  id: b.id,
+                  name: b.name,
+                  address: b.address || "Dirección no disponible",
+                  status: restaurantStatus,
+                  logo: b.logo_url || "https://via.placeholder.com/200",
+                };
+              })
+              .sort((a, b) => STATUS_ORDER[a.status.type as RestaurantStatus['type']] - STATUS_ORDER[b.status.type as RestaurantStatus['type']])
+              .slice(0, 10)
+          );
         }
 
         // — Productos (carrusel inicial) —
@@ -218,25 +272,30 @@ export default function Home() {
         if (allProductsResult.error) {
           console.error('Error fetching all products:', allProductsResult.error);
         } else {
-          const allProductsData = allProductsResult.data ?? [];
-          setAllProducts(
-            allProductsData
-              .filter(p => businessNameMap.has(p.business_id))
-              .map(p => ({
-                id: p.id,
-                name: p.name,
-                rating: "4.5",
-                delivery: "$30",
-                time: "30 min",
-                price: p.price,
-                restaurant: businessNameMap.get(p.business_id) || "Unknown",
-                restaurantId: p.business_id,
-                description: p.description || "",
-                image: p.image_url || "https://via.placeholder.com/200",
-                category_id: p.category_id,
-                has_addons: (p as any).has_addons ?? false,
-              }))
-          );
+          const allProductsData = (allProductsResult.data ?? []) as any[];
+          const mapped = allProductsData.map(p => ({
+            id: p.id,
+            name: p.name,
+            rating: "4.5",
+            delivery: "$30",
+            time: "30 min",
+            price: p.price,
+            restaurant: p.businesses?.name || "Unknown",
+            restaurantId: p.business_id,
+            description: p.description || "",
+            image: p.image_url || "https://via.placeholder.com/200",
+            category_id: p.category_id,
+            has_addons: p.has_addons ?? false,
+            restaurantIsPaused: p.businesses?.is_paused ?? false,
+          }));
+          // Priorizar productos de restaurantes no pausados; los pausados solo
+          // llenan el espacio que quede después de agotar los abiertos.
+          const notPaused = mapped.filter(p => !p.restaurantIsPaused);
+          const paused    = mapped.filter(p => p.restaurantIsPaused);
+          const fromOpen  = diversifyByRestaurant(notPaused, PRODUCTS_CAROUSEL_LIMIT);
+          const remaining = PRODUCTS_CAROUSEL_LIMIT - fromOpen.length;
+          const fromPaused = remaining > 0 ? diversifyByRestaurant(paused, remaining) : [];
+          setAllProducts([...fromOpen, ...fromPaused]);
         }
 
         setLoading({ restaurants: false, categories: false, allProducts: false });
@@ -248,6 +307,21 @@ export default function Home() {
     };
 
     fetchData();
+  }, []);
+
+  useEffect(() => {
+    const scroller = document.querySelector("main");
+    if (!scroller) return;
+
+    const onScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = scroller;
+      setShowScrollTop(scrollTop > 200);
+      setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 200);
+    };
+
+    onScroll();
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => scroller.removeEventListener("scroll", onScroll);
   }, []);
 
   const scrollAllProductsLeft = () => {
@@ -270,6 +344,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-6 pt-2">
+      <div ref={topRef} />
       {/* Error Message */}
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mx-4">
@@ -371,16 +446,27 @@ export default function Home() {
               : "Todos los productos"}
           </h3>
           {selectedCategory ? (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setSelectedCategory(null); setCategoryProducts([]); }}
+                className="text-xs text-gray-400 dark:text-gray-500 hover:underline cursor-pointer"
+              >
+                Ver todos
+              </button>
+              <button
+                onClick={() => navigate('/products', { state: { categoryId: selectedCategory } })}
+                className="text-xs text-amber-600 dark:text-amber-400 font-semibold hover:underline cursor-pointer"
+              >
+                Ver más →
+              </button>
+            </div>
+          ) : (
             <button
-              onClick={() => { setSelectedCategory(null); setCategoryProducts([]); }}
-              className="text-xs text-amber-600 dark:text-amber-400 font-medium hover:underline cursor-pointer"
+              onClick={() => navigate('/products')}
+              className="text-xs text-amber-600 dark:text-amber-400 font-semibold hover:underline cursor-pointer"
             >
-              Ver todos
+              Ver más →
             </button>
-          ) : allProducts.length >= PRODUCTS_CAROUSEL_LIMIT && (
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              Mostrando {PRODUCTS_CAROUSEL_LIMIT} recientes
-            </span>
           )}
         </div>
 
@@ -439,8 +525,11 @@ export default function Home() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-lg text-gray-900 dark:text-white">Restaurantes</h3>
-          <button className="text-amber-400 text-sm font-medium hover:text-amber-500 cursor-pointer">
-            Ver mas
+          <button
+            onClick={() => navigate('/restaurants')}
+            className="text-xs text-amber-600 dark:text-amber-400 font-semibold hover:underline cursor-pointer"
+          >
+            Ver más →
           </button>
         </div>
         {loading.restaurants ? (
@@ -494,6 +583,30 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      <div ref={bottomRef} />
+
+      {/* Floating scroll buttons */}
+      <div className="fixed right-4 bottom-24 z-40 flex flex-col gap-2">
+        {showScrollTop && (
+          <button
+            onClick={() => topRef.current?.scrollIntoView({ behavior: "smooth" })}
+            className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500 transition-colors"
+            title="Ir al inicio"
+          >
+            <ChevronUp className="w-5 h-5" />
+          </button>
+        )}
+        {showScrollBottom && (
+          <button
+            onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+            className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500 transition-colors"
+            title="Ir al final"
+          >
+            <ChevronDown className="w-5 h-5" />
+          </button>
+        )}
+      </div>
 
       {/* Product Modal */}
       {selectedProduct && (
