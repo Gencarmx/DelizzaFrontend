@@ -31,6 +31,7 @@ import {
 } from "@presentation/pages/restaurantUI";
 import AdminDashboard from "@presentation/pages/adminProfileUI/AdminDashboard";
 import AdminBillingDashboard from "@presentation/pages/adminProfileUI/adminBillingDashboard";
+import AdminOrdersDashboard from "@presentation/pages/adminProfileUI/AdminOrdersDashboard";
 
 export const routes: RouteObject[] = [
   {
@@ -147,6 +148,14 @@ export const routes: RouteObject[] = [
     element: (
       <ProtectedRoute allowedRoles={["admin"]}>
         <AdminBillingDashboard />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/admin/orders",
+    element: (
+      <ProtectedRoute allowedRoles={["admin"]}>
+        <AdminOrdersDashboard />
       </ProtectedRoute>
     ),
   },
