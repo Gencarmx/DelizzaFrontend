@@ -116,7 +116,6 @@ function PaginationBar({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  itemCount,
   totalCount,
 }: {
   current: number;
@@ -124,7 +123,6 @@ function PaginationBar({
   pageSize: 5 | 10;
   onPageChange: (p: number) => void;
   onPageSizeChange: (s: 5 | 10) => void;
-  itemCount: number;
   totalCount: number;
 }) {
   const from = (current - 1) * pageSize + 1;
@@ -564,7 +562,6 @@ export default function AdminOrdersDashboard() {
                   pageSize={bizPageSize}
                   onPageChange={setBizCurrentPage}
                   onPageSizeChange={setBizPageSize}
-                  itemCount={paginatedBusinesses.length}
                   totalCount={filteredBusinesses.length}
                 />
               </div>
@@ -758,7 +755,6 @@ export default function AdminOrdersDashboard() {
                   pageSize={orderPageSize}
                   onPageChange={setOrderCurrentPage}
                   onPageSizeChange={setOrderPageSize}
-                  itemCount={paginatedOrders.length}
                   totalCount={orders.length}
                 />
               </div>
