@@ -16,8 +16,14 @@ import {
   XCircle,
   Building2,
   Receipt,
+  Package,
   LogOut,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
 } from "lucide-react";
+
+type StatusFilter = "all" | "active" | "inactive";
 
 function AdminBottomNav() {
   const location = useLocation();
@@ -26,6 +32,7 @@ function AdminBottomNav() {
   const navItems = [
     { icon: Building2, label: "Restaurantes", path: "/admin" },
     { icon: Receipt, label: "Comisiones", path: "/admin/billing" },
+    { icon: Package, label: "Pedidos", path: "/admin/orders" },
   ];
 
   return (
@@ -64,15 +71,15 @@ interface BusinessRow {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  // Usar el signOut del contexto en lugar de supabase.auth.signOut() directamente.
-  // La llamada directa omite el reset de estado de AuthContext, dejando la app
-  // en un estado parcialmente autenticado hasta el próximo ciclo de renderizado.
   const { signOut } = useAuth();
   const [businesses, setBusinesses] = useState<BusinessRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [pageSize, setPageSize] = useState<5 | 10>(5);
+  const [currentPage, setCurrentPage] = useState(1);
   const [confirmModal, setConfirmModal] = useState<{
     id: string;
     name: string;
@@ -88,8 +95,6 @@ export default function AdminDashboard() {
     navigate("/login");
   };
 
-  // Ref para el timer del toast. Se limpia en unmount para evitar llamar
-  // setToast en un componente ya desmontado si el admin navega antes de 3.5s.
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -108,7 +113,7 @@ export default function AdminDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from("businesses")
         .select(`
           id,
@@ -121,6 +126,11 @@ export default function AdminDashboard() {
           )
         `)
         .order("name", { ascending: true });
+
+      if (statusFilter === "active") query = query.eq("active", true);
+      else if (statusFilter === "inactive") query = query.eq("active", false);
+
+      const { data, error: fetchError } = await query;
 
       if (fetchError) throw fetchError;
 
@@ -138,11 +148,16 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [statusFilter]);
 
   useEffect(() => {
     fetchBusinesses();
   }, [fetchBusinesses]);
+
+  // Resetear a la primera página cuando cambia búsqueda, filtro o tamaño de página
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, pageSize]);
 
   const handleToggleRequest = (b: BusinessRow) => {
     setConfirmModal({ id: b.id, name: b.name, currentState: b.active });
@@ -178,6 +193,7 @@ export default function AdminDashboard() {
     }
   };
 
+  // Filtrado por búsqueda (el filtro de estado ya se aplica en BD)
   const filtered = businesses.filter((b) => {
     const q = search.toLowerCase();
     return (
@@ -188,12 +204,21 @@ export default function AdminDashboard() {
     );
   });
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+
   const activeCount = businesses.filter((b) => b.active).length;
   const inactiveCount = businesses.length - activeCount;
 
+  const statusFilterLabels: Record<StatusFilter, string> = {
+    all: "Todos",
+    active: "Activos",
+    inactive: "Inactivos",
+  };
+
   return (
     <>
-      {/* Bottom nav */}
       <AdminBottomNav />
 
       {/* Toast */}
@@ -316,7 +341,7 @@ export default function AdminDashboard() {
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
               <Store className="w-3.5 h-3.5" />
-              Total registrados
+              {statusFilter === "all" ? "Total registrados" : statusFilterLabels[statusFilter]}
             </div>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm">
@@ -339,16 +364,64 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar por restaurante, propietario o teléfono..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 dark:focus:ring-amber-500 transition-shadow"
-          />
+        {/* Search + Filtros */}
+        <div className="flex flex-col gap-3">
+          {/* Barra de búsqueda */}
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar por restaurante, propietario o teléfono..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 dark:focus:ring-amber-500 transition-shadow"
+            />
+          </div>
+
+          {/* Fila de filtros */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            {/* Filtro de estado */}
+            <div className="flex items-center gap-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-1">
+              <Filter className="w-3.5 h-3.5 text-gray-400 ml-2 flex-shrink-0" />
+              {(["all", "active", "inactive"] as StatusFilter[]).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setStatusFilter(f)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    statusFilter === f
+                      ? f === "all"
+                        ? "bg-amber-500 text-white shadow-sm"
+                        : f === "active"
+                        ? "bg-emerald-500 text-white shadow-sm"
+                        : "bg-red-500 text-white shadow-sm"
+                      : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  {statusFilterLabels[f]}
+                </button>
+              ))}
+            </div>
+
+            {/* Selector de tamaño de página */}
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <span className="whitespace-nowrap">Por página:</span>
+              <div className="flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-1">
+                {([5, 10] as (5 | 10)[]).map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => setPageSize(size)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      pageSize === size
+                        ? "bg-amber-500 text-white shadow-sm"
+                        : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Error state */}
@@ -389,7 +462,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {Array.from({ length: 5 }).map((_, i) => (
+                  {Array.from({ length: pageSize }).map((_, i) => (
                     <tr key={i} className="border-b border-gray-50 dark:border-gray-700/50 last:border-0">
                       {Array.from({ length: 5 }).map((_, j) => (
                         <td key={j} className="px-5 py-4">
@@ -438,7 +511,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.length === 0 ? (
+                  {paginated.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-5 py-12 text-center">
                         <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
@@ -446,13 +519,15 @@ export default function AdminDashboard() {
                           <p className="text-sm font-medium">
                             {search
                               ? "No se encontraron resultados para tu búsqueda."
+                              : statusFilter !== "all"
+                              ? `No hay restaurantes ${statusFilter === "active" ? "activos" : "inactivos"}.`
                               : "No hay restaurantes registrados."}
                           </p>
                         </div>
                       </td>
                     </tr>
                   ) : (
-                    filtered.map((business) => (
+                    paginated.map((business) => (
                       <tr
                         key={business.id}
                         className="border-b border-gray-50 dark:border-gray-700/50 last:border-0 hover:bg-gray-50/80 dark:hover:bg-gray-700/30 transition-colors"
@@ -577,20 +652,54 @@ export default function AdminDashboard() {
               </table>
             </div>
 
-            {/* Footer count */}
+            {/* Footer: conteo + paginación */}
             {filtered.length > 0 && (
-              <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
+              <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 flex items-center justify-between gap-4 flex-wrap">
                 <p className="text-xs text-gray-400 dark:text-gray-500">
                   Mostrando{" "}
                   <span className="font-semibold text-gray-600 dark:text-gray-300">
-                    {filtered.length}
+                    {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filtered.length)}
                   </span>{" "}
                   de{" "}
                   <span className="font-semibold text-gray-600 dark:text-gray-300">
-                    {businesses.length}
+                    {filtered.length}
                   </span>{" "}
                   restaurantes
                 </p>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={safePage === 1}
+                      className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-7 h-7 rounded-lg text-xs font-semibold transition-all ${
+                          page === safePage
+                            ? "bg-amber-500 text-white shadow-sm"
+                            : "text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={safePage === totalPages}
+                      className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
