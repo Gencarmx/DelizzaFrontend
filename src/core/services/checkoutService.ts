@@ -32,11 +32,15 @@ export interface CheckoutData {
 export interface OrderResult {
   success: boolean;
   orderId?: string;
+  /** ID corto legible (8 chars en mayúsculas) — mostrado al cliente para referencia de pago */
+  shortId?: string;
   restaurantName: string;
   /** ID del restaurante — se usa para limpiar el carrito por restaurante.
    *  Más confiable que buscar por nombre (dos restaurantes podrían tener el mismo). */
   restaurantId: string;
   total: number;
+  paymentMethod?: string;
+  mercadoPagoLink?: string | null;
   error?: string;
 }
 
@@ -55,7 +59,8 @@ function isValidUUID(id: string): boolean {
 export async function processMultiRestaurantCheckout(
   orders: CartOrder[],
   checkoutData: CheckoutData,
-  deliveryTypeByRestaurant?: Record<string, 'pickup' | 'delivery'>
+  deliveryTypeByRestaurant?: Record<string, 'pickup' | 'delivery'>,
+  paymentInfoByRestaurant?: Record<string, { method: string; mercadoPagoLink: string | null }>
 ): Promise<OrderResult[]> {
   const results: OrderResult[] = [];
 
@@ -84,9 +89,12 @@ export async function processMultiRestaurantCheckout(
         continue;
       }
 
-      // Usar el tipo de entrega específico del restaurante si está disponible
+      // Usar el tipo de entrega y el método de pago específico del restaurante
       const orderDeliveryType =
         deliveryTypeByRestaurant?.[order.restaurant.id] ?? checkoutData.deliveryOption.type;
+      const paymentInfo = paymentInfoByRestaurant?.[order.restaurant.id];
+      const orderPaymentMethod = paymentInfo?.method ?? checkoutData.paymentMethod ?? 'cash';
+      const orderMercadoPagoLink = paymentInfo?.mercadoPagoLink ?? null;
 
       const orderCheckoutData: CheckoutData = {
         ...checkoutData,
@@ -94,6 +102,7 @@ export async function processMultiRestaurantCheckout(
           ...checkoutData.deliveryOption,
           type: orderDeliveryType,
         },
+        paymentMethod: orderPaymentMethod,
       };
 
       const validation = await validateOrderItems(order, orderDeliveryType);
@@ -108,7 +117,7 @@ export async function processMultiRestaurantCheckout(
         continue;
       }
 
-      const result = await createRestaurantOrder(order, orderCheckoutData);
+      const result = await createRestaurantOrder(order, orderCheckoutData, orderMercadoPagoLink);
       results.push(result);
     } catch (error) {
       console.error(`Error procesando pedido para ${order.restaurant.name}:`, error);
@@ -130,7 +139,8 @@ export async function processMultiRestaurantCheckout(
  */
 async function createRestaurantOrder(
   order: CartOrder,
-  checkoutData: CheckoutData
+  checkoutData: CheckoutData,
+  mercadoPagoLink: string | null = null
 ): Promise<OrderResult> {
   try {
     // 1. Obtener el profile.id y nombre del usuario
@@ -161,6 +171,9 @@ async function createRestaurantOrder(
         : [],
     }));
 
+    const isMercadoPago = checkoutData.paymentMethod === 'mercado_pago';
+    const initialStatus = isMercadoPago ? 'awaiting_payment' : 'pending';
+
     const { data: rpcData, error: rpcError } = await supabase.rpc(
       'create_order_with_items',
       {
@@ -171,6 +184,7 @@ async function createRestaurantOrder(
         p_delivery_type:  checkoutData.deliveryOption.type,
         p_payment_method: checkoutData.paymentMethod,
         p_items:          orderItems,
+        p_status:         initialStatus,
       }
     );
 
@@ -178,9 +192,7 @@ async function createRestaurantOrder(
 
     const orderId: string = rpcData.order_id;
     const orderCreatedAt: string = rpcData.created_at ?? new Date().toISOString();
-
-    // 3. Aquí iría la integración con MercadoPago
-    // await processPayment(orderId, order.total, checkoutData.paymentMethod);
+    const shortId = orderId.slice(-8).toUpperCase();
 
     // 4. Notificar al restaurante sobre el nuevo pedido vía Broadcast
     await notifyRestaurant(orderId, {
@@ -188,6 +200,7 @@ async function createRestaurantOrder(
       customer_name: customerProfile.full_name || 'Cliente',
       total: order.total,
       delivery_type: checkoutData.deliveryOption.type,
+      status: initialStatus,
       created_at: orderCreatedAt,
       order_items: order.items.map(item => ({
         product_name: item.name,
@@ -231,9 +244,12 @@ async function createRestaurantOrder(
     return {
       success: true,
       orderId: orderId,
+      shortId,
       restaurantName: order.restaurant.name,
       restaurantId: order.restaurant.id,
-      total: order.total
+      total: order.total,
+      paymentMethod: checkoutData.paymentMethod || 'cash',
+      mercadoPagoLink: isMercadoPago ? mercadoPagoLink : null,
     };
 
   } catch (error) {
@@ -276,6 +292,7 @@ export async function notifyRestaurant(orderId: string, orderData?: {
   delivery_type: string;
   order_items: Array<{ product_name: string; quantity: number; price: number; addons?: string }>;
   created_at?: string;
+  status?: string;
 }): Promise<void> {
   if (!orderData) return;
 
@@ -306,7 +323,7 @@ export async function notifyRestaurant(orderId: string, orderData?: {
             customer_name: orderData.customer_name,
             total: orderData.total,
             delivery_type: orderData.delivery_type,
-            status: 'pending',
+            status: orderData.status || 'pending',
             created_at: orderData.created_at || new Date().toISOString(),
             order_items: orderData.order_items,
           },

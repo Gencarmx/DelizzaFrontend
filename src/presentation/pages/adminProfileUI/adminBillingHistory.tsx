@@ -1074,7 +1074,7 @@ export default function AdminBillingHistory() {
                                       <CreditCard className="w-4 h-4" />
                                     </button>
                                   ) : row.statement_status === "paid" ? (
-                                    <BadgeCheck className="w-4 h-4 text-emerald-500" title="Pagado" />
+                                    <span title="Pagado"><BadgeCheck className="w-4 h-4 text-emerald-500" /></span>
                                   ) : (
                                     <span className="text-xs text-gray-400 italic">—</span>
                                   )}

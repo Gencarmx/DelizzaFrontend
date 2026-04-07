@@ -16,7 +16,7 @@ export interface Order {
   customerPhone?: string;
   items: string;
   total: number;
-  status: "pending" | "completed" | "cancelled" | "in_progress" | "ready" | "preparing";
+  status: "pending" | "awaiting_payment" | "completed" | "cancelled" | "in_progress" | "ready" | "preparing";
   date: string;
   paymentMethod: string;
   originalStatus?: string;

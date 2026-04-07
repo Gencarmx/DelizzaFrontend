@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { CheckCircle2, Clock, XCircle, Loader2, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { useLocation } from "react-router";
+import { CheckCircle2, Clock, XCircle, Loader2, ChevronLeft, ChevronRight, ChevronDown, Copy, ExternalLink } from "lucide-react";
 import {
   getOrdersByCustomer,
   type OrderWithItems,
@@ -18,23 +19,38 @@ interface StatusFilterOption {
 }
 
 const STATUS_FILTERS: StatusFilterOption[] = [
-  { value: "completed",  label: "Entregado" },
-  { value: null,         label: "Todos" },
-  { value: "pending",    label: "Pendiente" },
-  { value: "confirmed",  label: "Confirmado" },
-  { value: "preparing",  label: "Preparando" },
-  { value: "ready",      label: "Listo" },
-  { value: "cancelled",  label: "Cancelado" },
+  { value: "completed",        label: "Entregado" },
+  { value: null,               label: "Todos" },
+  { value: "awaiting_payment", label: "Esperando pago" },
+  { value: "pending",          label: "Pendiente" },
+  { value: "confirmed",        label: "Confirmado" },
+  { value: "preparing",        label: "Preparando" },
+  { value: "ready",            label: "Listo" },
+  { value: "cancelled",        label: "Cancelado" },
 ];
 
 export default function Activity() {
   const { profileId, user } = useAuth();
   const { registerOrderUpdateCallback } = useCustomerNotificationsContext();
+  const location = useLocation();
+  const [copiedText, setCopiedText] = useState<string | null>(null);
+
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedText(text);
+      setTimeout(() => setCopiedText(null), 2500);
+    } catch {
+      // fallback silencioso
+    }
+  };
+
+  const initialFilter = (location.state as { defaultFilter?: FilterStatus } | null)?.defaultFilter ?? "completed";
 
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedStatus, setSelectedStatus] = useState<FilterStatus>("completed");
+  const [selectedStatus, setSelectedStatus] = useState<FilterStatus>(initialFilter);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -116,6 +132,8 @@ export default function Activity() {
         return { color: "text-green-500", Icon: CheckCircle2, label: "Entregado" };
       case "cancelled":
         return { color: "text-red-500", Icon: XCircle, label: "Cancelado" };
+      case "awaiting_payment":
+        return { color: "text-indigo-500", Icon: Clock, label: "Pendiente de confirmación de pago" };
       case "pending":
         return { color: "text-amber-500", Icon: Clock, label: "Pendiente" };
       case "confirmed":
@@ -194,13 +212,31 @@ export default function Activity() {
               return (
                 <div
                   key={order.id}
-                  className="bg-white dark:bg-gray-800 rounded-3xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 dark:border-gray-700 flex flex-col gap-4"
+                  className={`rounded-3xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border flex flex-col gap-4 ${
+                    order.status === 'awaiting_payment'
+                      ? 'bg-indigo-50 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-800'
+                      : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700'
+                  }`}
                 >
                   <div className="flex justify-between items-start">
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1 flex-1 min-w-0 mr-3">
                       <h3 className="font-semibold text-gray-900 dark:text-white">
                         {order.business_name || (order as any).businesses?.name || "Restaurante"}
                       </h3>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs font-semibold text-gray-400 dark:text-gray-500 tracking-wider">
+                          #{order.id.slice(-8).toUpperCase()}
+                        </span>
+                        <button
+                          onClick={() => handleCopy(order.id.slice(-8).toUpperCase())}
+                          className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                          title="Copiar ID"
+                        >
+                          {copiedText === order.id.slice(-8).toUpperCase()
+                            ? <CheckCircle2 className="w-3 h-3 text-green-500" />
+                            : <Copy className="w-3 h-3 text-gray-400 dark:text-gray-500" />}
+                        </button>
+                      </div>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         {order.created_at ? formatDate(order.created_at) : "Fecha no disponible"}
                       </span>
@@ -208,19 +244,69 @@ export default function Activity() {
                         {formatItems(order.order_items)}
                       </p>
                     </div>
-                    <Icon className={`w-6 h-6 ${color}`} />
+                    <Icon className={`w-6 h-6 ${color} flex-shrink-0`} />
                   </div>
 
                   <div className="h-px bg-gray-100 dark:bg-gray-700" />
 
                   <div className="flex justify-between items-center">
-                    <span className="font-medium text-gray-700 dark:text-gray-300 text-sm">
+                    <span className={`font-medium text-sm ${color}`}>
                       {label}
                     </span>
-                    <span className="font-bold text-gray-900 dark:text-white text-lg">
-                      ${(order.total || 0).toFixed(2)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-900 dark:text-white text-lg">
+                        ${(order.total || 0).toFixed(2)}
+                      </span>
+                      {order.status === 'awaiting_payment' && (
+                        <button
+                          onClick={() => handleCopy((order.total || 0).toFixed(2))}
+                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                          title="Copiar monto"
+                        >
+                          {copiedText === (order.total || 0).toFixed(2)
+                            ? <CheckCircle2 className="w-4 h-4 text-green-500" />
+                            : <Copy className="w-4 h-4 text-gray-400 dark:text-gray-500" />}
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Awaiting payment: show short ID and pay link */}
+                  {order.status === 'awaiting_payment' && (() => {
+                    const shortId = order.id.slice(-8).toUpperCase();
+                    const mpLink = order.mercado_pago_link || (order as any).businesses?.mercado_pago_link;
+                    return (
+                      <div className="flex flex-col gap-3 pt-1">
+                        <p className="text-xs text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                          Incluye el siguiente ID en el asunto de tu pago para que el restaurante pueda identificarlo:
+                        </p>
+                        <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-indigo-300 dark:border-indigo-700 rounded-xl px-3 py-2">
+                          <span className="font-mono font-bold text-base text-indigo-700 dark:text-indigo-300 flex-1 tracking-wider">
+                            {shortId}
+                          </span>
+                          <button
+                            onClick={() => handleCopy(shortId)}
+                            className="p-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                          >
+                            {copiedText === shortId
+                              ? <CheckCircle2 className="w-4 h-4 text-green-500" />
+                              : <Copy className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />}
+                          </button>
+                        </div>
+                        {mpLink && (
+                          <a
+                            href={mpLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            Ir a pagar
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

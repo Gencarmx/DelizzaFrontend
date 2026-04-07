@@ -13,10 +13,10 @@ const registerSchema = z
       .string()
       .min(1, "El número de teléfono es requerido")
       .regex(
-        /^\+[1-9][\d\s\-]{6,18}$/,
+        /^\+[1-9][\d\s-]{6,18}$/,
         "Incluye el código de país, ej: +52 999 123 4567"
       ),
-    email: z.email("Formato de correo inválido"),
+    email: z.string().email("Formato de correo inválido"),
     password: z
       .string()
       .min(6, "La contraseña debe tener al menos 6 caracteres"),

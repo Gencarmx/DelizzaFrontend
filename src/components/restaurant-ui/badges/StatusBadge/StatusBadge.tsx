@@ -3,6 +3,7 @@ export interface StatusBadgeProps {
     | "active"
     | "inactive"
     | "pending"
+    | "awaiting_payment"
     | "completed"
     | "cancelled"
     | "in_progress"
@@ -52,6 +53,11 @@ export default function StatusBadge({ status, label }: StatusBadgeProps) {
       bg: "bg-blue-100 dark:bg-blue-900/30",
       text: "text-blue-700 dark:text-blue-400",
       label: label || "En preparación",
+    },
+    awaiting_payment: {
+      bg: "bg-indigo-100 dark:bg-indigo-900/30",
+      text: "text-indigo-700 dark:text-indigo-400",
+      label: label || "Esperando pago",
     },
   };
 

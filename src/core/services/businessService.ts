@@ -417,6 +417,61 @@ export async function getBusinessStats(): Promise<{
 }
 
 /**
+ * Información de métodos de pago de un restaurante
+ */
+export interface BusinessPaymentInfo {
+  accepted_payment_methods: string[];
+  mercado_pago_link: string | null;
+}
+
+/**
+ * Obtiene la configuración de métodos de pago de un restaurante
+ */
+export async function getBusinessPaymentInfo(businessId: string): Promise<BusinessPaymentInfo | null> {
+  try {
+    const { data, error } = await supabase
+      .from('businesses')
+      .select('accepted_payment_methods, mercado_pago_link')
+      .eq('id', businessId)
+      .single();
+
+    if (error) throw error;
+    return {
+      accepted_payment_methods: (data?.accepted_payment_methods as string[]) ?? ['cash'],
+      mercado_pago_link: data?.mercado_pago_link ?? null,
+    };
+  } catch (error) {
+    console.error('Error obteniendo métodos de pago:', error);
+    return null;
+  }
+}
+
+/**
+ * Actualiza los métodos de pago aceptados por un restaurante
+ */
+export async function updatePaymentSettings(
+  businessId: string,
+  acceptedMethods: string[],
+  mercadoPagoLink: string | null,
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('businesses')
+      .update({
+        accepted_payment_methods: acceptedMethods,
+        mercado_pago_link: mercadoPagoLink,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', businessId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error actualizando métodos de pago:', error);
+    throw error instanceof Error ? error : new Error('Error desconocido al actualizar métodos de pago');
+  }
+}
+
+/**
  * Verifica si un usuario puede gestionar un restaurante.
  *
  * @param profileId - El profiles.id del usuario (disponible en AuthContext).

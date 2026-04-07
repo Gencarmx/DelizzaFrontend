@@ -315,7 +315,7 @@ BEGIN
   IF p_delivery_type NOT IN ('pickup', 'delivery') THEN
     RAISE EXCEPTION 'delivery_type inválido: %', p_delivery_type;
   END IF;
-  IF p_payment_method NOT IN ('card', 'cash') THEN
+  IF p_payment_method NOT IN ('card', 'cash', 'mercado_pago') THEN
     RAISE EXCEPTION 'payment_method inválido: %', p_payment_method;
   END IF;
 

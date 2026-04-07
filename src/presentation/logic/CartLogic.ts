@@ -9,8 +9,9 @@ import { useCart } from "@core/context/CartContext";
 import type { CartOrder } from "@core/context/CartContext";
 import { useAddress } from "@core/context/AddressContext";
 import { processMultiRestaurantCheckout } from "@core/services/checkoutService";
-import { getDeliverySettings } from "@core/services/businessService";
-import type { DeliverySettings } from "@core/services/businessService";
+import type { OrderResult } from "@core/services/checkoutService";
+import { getDeliverySettings, getBusinessPaymentInfo } from "@core/services/businessService";
+import type { DeliverySettings, BusinessPaymentInfo } from "@core/services/businessService";
 import { supabase } from "@core/supabase/client";
 
 export interface EnrichedOrder extends CartOrder {
@@ -35,8 +36,11 @@ export function useCartLogic() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [restaurantSettings, setRestaurantSettings] = useState<Record<string, DeliverySettings>>({});
   const [deliveryTypeByRestaurant, setDeliveryTypeByRestaurant] = useState<Record<string, "pickup" | "delivery">>({});
+  const [businessPaymentInfo, setBusinessPaymentInfo] = useState<Record<string, BusinessPaymentInfo>>({});
+  const [paymentMethodByRestaurant, setPaymentMethodByRestaurant] = useState<Record<string, string>>({});
   const [showFeeDialog, setShowFeeDialog] = useState(false);
   const [hasPhone, setHasPhone] = useState<boolean | null>(null);
+  const [checkoutResult, setCheckoutResult] = useState<OrderResult[] | null>(null);
 
   // ── Check if user has a phone number registered ───────────────────────────
   useEffect(() => {
@@ -53,24 +57,33 @@ export function useCartLogic() {
     checkPhone();
   }, []);
 
-  // ── Fetch delivery settings for every restaurant in the cart ─────────────
+  // ── Fetch delivery & payment settings for every restaurant in the cart ───
   useEffect(() => {
     const ids = [...new Set(items.map((i) => i.restaurant?.id).filter(Boolean) as string[])];
     if (ids.length === 0) {
       setRestaurantSettings({});
+      setBusinessPaymentInfo({});
       return;
     }
     let cancelled = false;
-    Promise.all(ids.map((id) => getDeliverySettings(id).then((s) => [id, s] as const))).then(
-      (results) => {
-        if (cancelled) return;
-        const map: Record<string, DeliverySettings> = {};
-        for (const [id, settings] of results) {
-          if (settings) map[id] = settings;
-        }
-        setRestaurantSettings(map);
+    Promise.all(
+      ids.map((id) =>
+        Promise.all([
+          getDeliverySettings(id).then((s) => [id, s] as const),
+          getBusinessPaymentInfo(id).then((p) => [id, p] as const),
+        ])
+      )
+    ).then((results) => {
+      if (cancelled) return;
+      const deliveryMap: Record<string, DeliverySettings> = {};
+      const paymentMap: Record<string, BusinessPaymentInfo> = {};
+      for (const [[id, delivery], [, payment]] of results) {
+        if (delivery) deliveryMap[id] = delivery;
+        if (payment) paymentMap[id] = payment;
       }
-    );
+      setRestaurantSettings(deliveryMap);
+      setBusinessPaymentInfo(paymentMap);
+    });
     return () => {
       cancelled = true;
     };
@@ -82,13 +95,27 @@ export function useCartLogic() {
       const updated = { ...prev };
       for (const [id, settings] of Object.entries(restaurantSettings)) {
         if (!(id in updated)) {
-          // Default: pickup if supported, else delivery
           updated[id] = settings.has_pickup ? "pickup" : "delivery";
         }
       }
       return updated;
     });
   }, [restaurantSettings]);
+
+  // ── Auto-initialize per-restaurant payment method when payment info arrives
+  useEffect(() => {
+    setPaymentMethodByRestaurant((prev) => {
+      const updated = { ...prev };
+      for (const [id, info] of Object.entries(businessPaymentInfo)) {
+        if (!(id in updated)) {
+          // Default: cash (always available)
+          updated[id] = info.accepted_payment_methods.includes('cash') ? 'cash'
+            : (info.accepted_payment_methods[0] ?? 'cash');
+        }
+      }
+      return updated;
+    });
+  }, [businessPaymentInfo]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -104,6 +131,17 @@ export function useCartLogic() {
 
   const setRestaurantDeliveryType = (restaurantId: string, type: "pickup" | "delivery") => {
     setDeliveryTypeByRestaurant((prev) => ({ ...prev, [restaurantId]: type }));
+  };
+
+  /** Returns accepted payment methods for a specific restaurant. */
+  const getRestaurantPaymentMethods = (restaurantId: string): string[] => {
+    const info = businessPaymentInfo[restaurantId];
+    if (!info) return ['cash']; // default while loading
+    return info.accepted_payment_methods.length > 0 ? info.accepted_payment_methods : ['cash'];
+  };
+
+  const setRestaurantPaymentMethod = (restaurantId: string, method: string) => {
+    setPaymentMethodByRestaurant((prev) => ({ ...prev, [restaurantId]: method }));
   };
 
   // ── Enriched orders: each order knows its own delivery type and service fee ─
@@ -167,38 +205,45 @@ export function useCartLogic() {
         perRestaurantDeliveryTypes[order.restaurant.id] = order.deliveryType;
       }
 
+      const perRestaurantPaymentInfo: Record<string, { method: string; mercadoPagoLink: string | null }> = {};
+      for (const order of enrichedOrders) {
+        const method = paymentMethodByRestaurant[order.restaurant.id] ?? 'cash';
+        const mpLink = businessPaymentInfo[order.restaurant.id]?.mercado_pago_link ?? null;
+        perRestaurantPaymentInfo[order.restaurant.id] = { method, mercadoPagoLink: mpLink };
+      }
+
       const results = await processMultiRestaurantCheckout(
         ordersForCheckout,
         baseCheckoutData,
-        perRestaurantDeliveryTypes
+        perRestaurantDeliveryTypes,
+        perRestaurantPaymentInfo
       );
 
       const successfulOrders = results.filter((r) => r.success);
       const failedOrders = results.filter((r) => !r.success);
 
-      if (successfulOrders.length > 0 && failedOrders.length === 0) {
-        clearCart();
-        alert(
-          `¡Pedidos procesados exitosamente!\n\n${successfulOrders
-            .map((r) => `${r.restaurantName}: $${r.total.toFixed(2)}`)
-            .join("\n")}\n\nTotal: $${successfulOrders
-            .reduce((sum, r) => sum + r.total, 0)
-            .toFixed(2)}`
-        );
-        navigate("/");
-      } else if (successfulOrders.length > 0 && failedOrders.length > 0) {
-        alert(
-          `⚠️ Algunos pedidos se procesaron con éxito, pero otros fallaron:\n\n` +
-            `✅ Exitosos:\n${successfulOrders.map((r) => `  • ${r.restaurantName}: $${r.total.toFixed(2)}`).join("\n")}\n\n` +
-            `❌ Fallidos:\n${failedOrders.map((r) => `  • ${r.restaurantName}: ${r.error}`).join("\n")}\n\n` +
-            `Los productos de los pedidos fallidos permanecen en tu carrito.`
-        );
-        const successfulRestaurantIds = results
-          .filter((r) => r.success && r.restaurantId)
+      if (successfulOrders.length > 0) {
+        // Clear cart items for successful orders
+        const successfulRestaurantIds = successfulOrders
           .map((r) => r.restaurantId)
           .filter((id): id is string => !!id);
         successfulRestaurantIds.forEach((id) => clearCartByRestaurantId(id));
+
+        if (failedOrders.length === 0) {
+          clearCart();
+        }
+
+        // If any successful order uses Mercado Pago, redirect to activity so
+        // the customer can immediately see and copy the payment reference ID.
+        const hasMercadoPago = successfulOrders.some((r) => r.paymentMethod === 'mercado_pago');
+        if (hasMercadoPago && failedOrders.length === 0) {
+          navigate('/activity', { state: { defaultFilter: 'awaiting_payment' } });
+        } else {
+          // Show result modal (cash only, or mixed with failures)
+          setCheckoutResult(results);
+        }
       } else {
+        // All failed — show error alert (no success modal)
         alert(
           `❌ Todos los pedidos fallaron:\n\n${failedOrders
             .map((r) => `${r.restaurantName}: ${r.error}`)
@@ -249,9 +294,19 @@ export function useCartLogic() {
     setRestaurantDeliveryType,
     restaurantSettings,
 
+    // Per-restaurant payment method config
+    getRestaurantPaymentMethods,
+    setRestaurantPaymentMethod,
+    paymentMethodByRestaurant,
+    businessPaymentInfo,
+
     // Fee dialog
     showFeeDialog,
     setShowFeeDialog,
+
+    // Checkout result (null = not done yet, array = results ready)
+    checkoutResult,
+    clearCheckoutResult: () => setCheckoutResult(null),
 
     // Actions
     updateQuantity,

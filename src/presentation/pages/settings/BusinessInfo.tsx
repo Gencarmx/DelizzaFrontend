@@ -11,6 +11,9 @@ import {
   X,
   Bike,
   DollarSign,
+  CreditCard,
+  Banknote,
+  Link,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
@@ -21,6 +24,7 @@ import {
   deleteBusinessLogo,
   getDeliverySettings,
   updateDeliverySettings,
+  updatePaymentSettings,
 } from "@core/services/businessService";
 import type { DeliverySettings } from "@core/services/businessService";
 import { useForm } from "react-hook-form";
@@ -57,6 +61,14 @@ export default function BusinessInfo() {
   });
   const [savingDelivery, setSavingDelivery] = useState(false);
   const [deliverySaveMessage, setDeliverySaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Payment settings state
+  const [paymentMethods, setPaymentMethods] = useState<string[]>(['cash']);
+  const [mercadoPagoLink, setMercadoPagoLink] = useState('');
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [paymentSaveMessage, setPaymentSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const MP_LINK_REGEX = /^https:\/\/(mpago\.la|link\.mercadopago\.com\.\w{2})\/.+/;
 
   const {
     register,
@@ -99,6 +111,10 @@ export default function BusinessInfo() {
         });
         setOriginalLogoUrl(business.logo_url || "");
         setImagePreview(business.logo_url || "");
+        // Load payment settings from business row
+        const methods = (business.accepted_payment_methods as string[] | null) ?? ['cash'];
+        setPaymentMethods(methods.length > 0 ? methods : ['cash']);
+        setMercadoPagoLink(business.mercado_pago_link ?? '');
       }
 
       if (delivery) {
@@ -128,6 +144,50 @@ export default function BusinessInfo() {
     } finally {
       setSavingDelivery(false);
     }
+  };
+
+  const handleSavePaymentSettings = async () => {
+    if (!businessId) return;
+
+    if (paymentMethods.length === 0) {
+      setPaymentSaveMessage({ type: 'error', text: 'Debes aceptar al menos un método de pago.' });
+      return;
+    }
+
+    if (paymentMethods.includes('mercado_pago')) {
+      if (!mercadoPagoLink.trim()) {
+        setPaymentSaveMessage({ type: 'error', text: 'Debes ingresar el link de cobro de Mercado Pago.' });
+        return;
+      }
+      if (!MP_LINK_REGEX.test(mercadoPagoLink.trim())) {
+        setPaymentSaveMessage({ type: 'error', text: 'El link debe comenzar con https://mpago.la/ o https://link.mercadopago.com.*/' });
+        return;
+      }
+    }
+
+    const linkToSave = paymentMethods.includes('mercado_pago') ? mercadoPagoLink.trim() : null;
+
+    setSavingPayment(true);
+    try {
+      await updatePaymentSettings(businessId, paymentMethods, linkToSave);
+      setPaymentSaveMessage({ type: 'success', text: 'Métodos de pago guardados correctamente.' });
+      setTimeout(() => setPaymentSaveMessage(null), 3000);
+    } catch {
+      setPaymentSaveMessage({ type: 'error', text: 'Error al guardar los métodos de pago.' });
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const togglePaymentMethod = (method: string) => {
+    setPaymentMethods((prev) => {
+      if (prev.includes(method)) {
+        // No permitir desmarcar si es el único seleccionado
+        if (prev.length === 1) return prev;
+        return prev.filter((m) => m !== method);
+      }
+      return [...prev, method];
+    });
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -650,6 +710,119 @@ export default function BusinessInfo() {
                 <>
                   <Save className="w-5 h-5" />
                   <span>Guardar configuración</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Payment Methods Card */}
+        <div className="mt-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="p-6 space-y-5">
+            <div className="flex items-center gap-2 mb-1">
+              <CreditCard className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                Métodos de pago aceptados <span className="text-red-500">*</span>
+              </h2>
+            </div>
+
+            {/* Cash toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Banknote className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <div>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Efectivo</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => togglePaymentMethod('cash')}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  paymentMethods.includes('cash') ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                }`}
+                aria-checked={paymentMethods.includes('cash')}
+                role="switch"
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  paymentMethods.includes('cash') ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
+
+            {/* Mercado Pago toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Link className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <div>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Transferencia / Link de Mercado Pago</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => togglePaymentMethod('mercado_pago')}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  paymentMethods.includes('mercado_pago') ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                }`}
+                aria-checked={paymentMethods.includes('mercado_pago')}
+                role="switch"
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  paymentMethods.includes('mercado_pago') ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
+
+            {/* Mercado Pago link input */}
+            {paymentMethods.includes('mercado_pago') && (
+              <div className="flex items-start gap-3">
+                <Link className="w-5 h-5 text-gray-500 dark:text-gray-400 mt-1 flex-shrink-0" />
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Link de cobro de Mercado Pago <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    Pega aquí el link de cobro que te provee Mercado Pago en tu cuenta.
+                  </p>
+                  <input
+                    type="url"
+                    value={mercadoPagoLink}
+                    onChange={(e) => setMercadoPagoLink(e.target.value)}
+                    placeholder="https://mpago.la/..."
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    Formatos aceptados: https://mpago.la/... o https://link.mercadopago.com.*/...
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Save message */}
+            {paymentSaveMessage && (
+              <div className={`p-3 rounded-lg text-sm font-medium ${
+                paymentSaveMessage.type === 'success'
+                  ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800'
+                  : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800'
+              }`}>
+                {paymentSaveMessage.text}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleSavePaymentSettings}
+              disabled={savingPayment}
+              className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {savingPayment ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Guardando...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-5 h-5" />
+                  <span>Guardar métodos de pago</span>
                 </>
               )}
             </button>

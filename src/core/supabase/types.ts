@@ -137,6 +137,7 @@ export type Database = {
       }
       businesses: {
         Row: {
+          accepted_payment_methods: string[] | null
           active: boolean | null
           address: string | null
           created_at: string | null
@@ -146,6 +147,7 @@ export type Database = {
           id: string
           is_paused: boolean
           logo_url: string | null
+          mercado_pago_link: string | null
           min_order_amount: number
           name: string
           owner_id: string
@@ -154,6 +156,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          accepted_payment_methods?: string[] | null
           active?: boolean | null
           address?: string | null
           created_at?: string | null
@@ -163,6 +166,7 @@ export type Database = {
           id?: string
           is_paused?: boolean
           logo_url?: string | null
+          mercado_pago_link?: string | null
           min_order_amount?: number
           name: string
           owner_id: string
@@ -171,6 +175,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          accepted_payment_methods?: string[] | null
           active?: boolean | null
           address?: string | null
           created_at?: string | null
@@ -180,6 +185,7 @@ export type Database = {
           id?: string
           is_paused?: boolean
           logo_url?: string | null
+          mercado_pago_link?: string | null
           min_order_amount?: number
           name?: string
           owner_id?: string

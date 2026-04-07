@@ -1,0 +1,173 @@
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\coverage\block-navigation.js
+  1:1  warning  Unused eslint-disable directive (no problems were reported)
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\coverage\prettify.js
+  1:1  warning  Unused eslint-disable directive (no problems were reported)
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\coverage\sorter.js
+  1:1  warning  Unused eslint-disable directive (no problems were reported)
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\dev-dist\workbox-5a5d9309.js
+    69:7   error    Definition for rule '@typescript-eslint/ban-types' was not found                @typescript-eslint/ban-types
+   436:5   error    Definition for rule '@typescript-eslint/ban-types' was not found                @typescript-eslint/ban-types
+   452:5   warning  Unused eslint-disable directive (no problems were reported)
+   769:11  error    Definition for rule '@typescript-eslint/no-unsafe-member-access' was not found  @typescript-eslint/no-unsafe-member-access
+   771:13  error    Definition for rule '@typescript-eslint/no-unsafe-assignment' was not found     @typescript-eslint/no-unsafe-assignment
+   965:11  error    Definition for rule '@typescript-eslint/no-unsafe-assignment' was not found     @typescript-eslint/no-unsafe-assignment
+   981:13  error    Definition for rule '@typescript-eslint/no-unsafe-assignment' was not found     @typescript-eslint/no-unsafe-assignment
+   987:13  warning  Unused eslint-disable directive (no problems were reported)
+  1406:11  warning  Unused eslint-disable directive (no problems were reported)
+  1665:5   error    Definition for rule '@typescript-eslint/ban-types' was not found                @typescript-eslint/ban-types
+  2062:35  warning  Unused eslint-disable directive (no problems were reported)
+  2793:9   error    Definition for rule '@typescript-eslint/no-unsafe-return' was not found         @typescript-eslint/no-unsafe-return
+  2840:9   error    Definition for rule '@typescript-eslint/no-unsafe-return' was not found         @typescript-eslint/no-unsafe-return
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\core\context\AddressContext.tsx
+  108:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\core\context\AuthContext.tsx
+  359:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\core\context\CartContext.tsx
+  243:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\core\context\CustomerNotificationsContext.tsx
+  87:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\core\context\RestaurantNotificationsContext.tsx
+  133:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\core\context\ThemeContext.tsx
+  86:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\core\router\loaders\productsLoader.ts
+  33:11  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\core\services\__tests__\businessHoursService.test.ts
+   49:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   55:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   61:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   67:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   73:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   79:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   85:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   96:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  106:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\core\services\__tests__\orderService.test.ts
+   65:71  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   74:89  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   83:85  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   98:48  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  113:80  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  115:72  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  118:66  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  119:70  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  130:10  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  135:82  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  140:80  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  143:72  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  146:66  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  147:70  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  158:67  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\core\services\analyticsService.ts
+  116:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  119:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  251:26  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  254:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\core\services\cartService.ts
+  86:3  error  'channel' is never reassigned. Use 'const' instead  prefer-const
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\core\services\orderService.ts
+  38:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  46:43  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\components\layout\SearchBar.tsx
+  108:58  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\logic\EditProfileLogic.ts
+  21:21  error  Unnecessary escape character: \-  no-useless-escape
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\logic\__tests__\useCustomerNotifications.test.ts
+   34:8   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   59:66  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   60:68  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  110:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  155:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\logic\useCustomerNotifications.ts
+   18:43  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   34:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  122:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\logic\useRealtimeNotifications.ts
+   58:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   76:16  error  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  119:18  error  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  244:43  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  289:45  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  293:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  305:12  error  'error' is defined but never used         @typescript-eslint/no-unused-vars
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\pages\Activity.tsx
+  224:59  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  277:73  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\pages\Home.tsx
+   96:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   97:60  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   99:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  177:43  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  275:69  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\pages\Products.tsx
+  101:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\pages\RestaurantDetail.tsx
+  121:79  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\pages\adminProfileUI\AdminDashboard.tsx
+  137:58  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  146:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  189:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\pages\adminProfileUI\AdminOrdersDashboard.tsx
+  235:74  warning  The ref value 'toastTimerRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'toastTimerRef.current' to a variable inside the effect, and use that variable in the cleanup function  react-hooks/exhaustive-deps
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\pages\auth\PendingApproval.tsx
+  159:6  warning  React Hook useEffect has a missing dependency: 'businessStatus'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\pages\auth\Register.tsx
+  16:23  error  Unnecessary escape character: \-  no-useless-escape
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\pages\restaurantUI\Dashboard.tsx
+  58:42  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  96:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  97:52  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\pages\restaurantUI\Orders.tsx
+  133:52  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  155:7   warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  157:39  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  204:6   warning  React Hook useEffect has a missing dependency: 'formatOrders'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  619:3   warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\pages\restaurantUI\ProductList.tsx
+  118:3  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\pages\settings\BusinessHours.tsx
+  104:6  warning  React Hook useEffect has a missing dependency: 'loadBusinessHours'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\src\presentation\pages\settings\BusinessInfo.tsx
+  92:6  warning  React Hook useEffect has a missing dependency: 'loadBusinessInfo'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\laragon\www\GENCAR\Delizza\DelizzaFrontend\supabase\functions\send-push-notification\index.ts
+   84:56  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  100:70  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 99 problems (84 errors, 15 warnings)
+  0 errors and 10 warnings potentially fixable with the `--fix` option.
+

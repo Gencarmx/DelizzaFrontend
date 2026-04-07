@@ -13,6 +13,7 @@ type OrderItem = Database["public"]["Tables"]["order_items"]["Row"];
 
 export type OrderStatus =
   | "pending"
+  | "awaiting_payment"
   | "confirmed"
   | "preparing"
   | "ready"
@@ -23,6 +24,7 @@ export interface OrderWithItems extends Order {
   order_items: OrderItem[];
   customer_name: string | null;
   business_name?: string;
+  mercado_pago_link?: string | null;
   customer?: {
     full_name: string;
     phone_number: string;
@@ -175,6 +177,7 @@ export async function updateOrderStatus(
   try {
     const validStatuses: OrderStatus[] = [
       "pending",
+      "awaiting_payment",
       "confirmed",
       "preparing",
       "ready",
@@ -274,6 +277,7 @@ export async function updateOrderStatus(
 
         if (profile?.user_id) {
           const statusMessages: Record<string, string> = {
+            awaiting_payment: "Tu pedido está esperando confirmación de pago 💳",
             confirmed: "Tu pedido fue confirmado ✅",
             preparing: "Tu pedido está en preparación 👨‍🍳",
             ready:     "Tu pedido está listo 🎉",
@@ -540,7 +544,8 @@ export async function getOrdersByCustomer(
         *,
         order_items (*),
         businesses:business_id (
-          name
+          name,
+          mercado_pago_link
         )
       `,
         { count: "exact" },
@@ -561,6 +566,8 @@ export async function getOrdersByCustomer(
       orders: (data || []).map((order) => ({
         ...order,
         business_name: order.businesses?.name,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mercado_pago_link: (order.businesses as any)?.mercado_pago_link ?? null,
       })) as OrderWithItems[],
       total: count ?? 0,
     };

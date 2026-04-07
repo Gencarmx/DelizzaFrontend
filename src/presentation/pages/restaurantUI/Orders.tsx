@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, Filter, Eye, Loader2, Wifi, WifiOff, ChefHat, Package, X, CheckCircle, Phone, MapPin, User, ShoppingBag, Copy, MessageCircle } from "lucide-react";
+import { Search, Filter, Eye, Loader2, Wifi, WifiOff, ChefHat, Package, X, CheckCircle, Phone, MapPin, User, ShoppingBag, Copy, MessageCircle, CreditCard, ChevronLeft, ChevronRight } from "lucide-react";
 import DataTable from "@components/restaurant-ui/tables/DataTable";
 import StatusBadge from "@components/restaurant-ui/badges/StatusBadge";
 import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
@@ -21,7 +21,7 @@ interface Order {
   /** Array estructurado de items — usado para renderizar sin depender de split por coma */
   itemsList?: Array<{ quantity: number; productName: string }>;
   total: number;
-  status: "pending" | "completed" | "cancelled" | "in_progress" | "ready" | "preparing";
+  status: "pending" | "awaiting_payment" | "completed" | "cancelled" | "in_progress" | "ready" | "preparing";
   date: string;
   paymentMethod: string;
   originalStatus?: string;
@@ -61,10 +61,14 @@ interface OrderDetailData {
   }[];
 }
 
+const PAGE_SIZE_OPTIONS = [5, 10, 20, 50] as const;
+
 export default function Orders() {
   const { profileId } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("pending");
+  const [statusFilter, setStatusFilter] = useState("pending_and_awaiting");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(5);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingOrders, setUpdatingOrders] = useState<Set<string>>(new Set());
@@ -251,6 +255,8 @@ export default function Orders() {
     switch (status) {
       case 'pending':
         return 'pending';
+      case 'awaiting_payment':
+        return 'awaiting_payment';
       case 'confirmed':
       case 'preparing':
         return 'preparing';
@@ -464,7 +470,9 @@ export default function Orders() {
     );
 
     // ── Flujo secuencial ────────────────────────────────────────────────────
-    // pending   → [Ver] [En preparación] [Cancelar] [Imprimir]
+    // pending (cash)           → [Ver] [En preparación] [Cancelar] [Imprimir]
+    // pending (mercado_pago)   → [Ver] [Esperando pago] [Cancelar] [Imprimir]
+    // awaiting_payment         → [Ver] [Confirmar pago → preparing] [Cancelar] [Imprimir]
     // preparing → [Ver] [Listo para entrega] [Cancelar] [Imprimir]
     // ready     → [Ver] [Entregado] [Cancelar] [Imprimir]
     // completed / cancelled → [Ver] [Imprimir]
@@ -480,6 +488,28 @@ export default function Orders() {
     }
 
     if (status === 'pending') {
+      const isMercadoPago = order.paymentMethod === 'mercado_pago';
+
+      if (isMercadoPago) {
+        // Flujo Mercado Pago: pending → awaiting_payment
+        return (
+          <div className="flex items-center gap-1">
+            {btnView}
+            <button
+              onClick={() => setPendingAction({ order, newStatus: 'awaiting_payment' })}
+              disabled={isUpdating}
+              className="p-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-full text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors disabled:opacity-50"
+              title="Marcar como esperando pago"
+            >
+              <CreditCard className="w-4 h-4" />
+            </button>
+            {btnCancel}
+            {btnPrint}
+          </div>
+        );
+      }
+
+      // Flujo efectivo: pending → preparing
       return (
         <div className="flex items-center gap-1">
           {btnView}
@@ -533,6 +563,24 @@ export default function Orders() {
       );
     }
 
+    if (status === 'awaiting_payment') {
+      return (
+        <div className="flex items-center gap-1">
+          {btnView}
+          <button
+            onClick={() => setPendingAction({ order, newStatus: 'preparing' })}
+            disabled={isUpdating}
+            className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-full text-blue-600 hover:text-blue-700 dark:hover:text-blue-400 transition-colors disabled:opacity-50"
+            title="Confirmar pago recibido"
+          >
+            <CheckCircle className="w-4 h-4" />
+          </button>
+          {btnCancel}
+          {btnPrint}
+        </div>
+      );
+    }
+
     // Fallback (in_progress u otro estado no mapeado)
     return (
       <div className="flex items-center gap-1">
@@ -549,9 +597,27 @@ export default function Orders() {
       order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
-      statusFilter === "all" || order.status === statusFilter;
+      statusFilter === "all"
+        ? true
+        : statusFilter === "pending_and_awaiting"
+          ? order.status === "pending" || order.status === "awaiting_payment"
+          : order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  // Paginación client-side
+  const totalOrders = filteredOrders.length;
+  const totalPages = Math.max(1, Math.ceil(totalOrders / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageOffset = (safeCurrentPage - 1) * pageSize;
+  const rangeStart = totalOrders === 0 ? 0 : pageOffset + 1;
+  const rangeEnd = Math.min(pageOffset + pageSize, totalOrders);
+  const pagedOrders = filteredOrders.slice(pageOffset, pageOffset + pageSize);
+
+  // Reset a página 1 cuando cambian los filtros o la búsqueda
+  // (se usa useEffect para no perder el estado entre renders)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setCurrentPage(1); }, [statusFilter, searchTerm, pageSize]);
 
   const columns: Column<Order>[] = [
     {
@@ -659,49 +725,147 @@ export default function Orders() {
 
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
-          <input
-            type="text"
-            placeholder="Buscar por ID o cliente..."
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="flex flex-col gap-3 bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+            <input
+              type="text"
+              placeholder="Buscar por ID o cliente..."
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Filter className="w-5 h-5 text-gray-400 dark:text-gray-500" />
-          <select
-            className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-sm text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="all">Todos los estados</option>
-            <option value="pending">Pendientes</option>
-            <option value="preparing">En preparación</option>
-            <option value="ready">Listo para entrega</option>
-            <option value="completed">Completados</option>
-            <option value="cancelled">Cancelados</option>
-          </select>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+          {(
+            [
+              { value: "pending_and_awaiting", label: "Pendientes" },
+              { value: "all",                  label: "Todos" },
+              { value: "pending",              label: "Por confirmar" },
+              { value: "awaiting_payment",     label: "Esperando pago" },
+              { value: "preparing",            label: "En preparación" },
+              { value: "ready",                label: "Listo" },
+              { value: "completed",            label: "Completados" },
+              { value: "cancelled",            label: "Cancelados" },
+            ] as const
+          ).map((opt) => {
+            const isActive = statusFilter === opt.value;
+            const colorMap: Record<string, string> = {
+              pending_and_awaiting: isActive
+                ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"
+                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700",
+              all: isActive
+                ? "bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 border-gray-400 dark:border-gray-500"
+                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700",
+              pending: isActive
+                ? "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700"
+                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700",
+              awaiting_payment: isActive
+                ? "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700"
+                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700",
+              preparing: isActive
+                ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700"
+                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700",
+              ready: isActive
+                ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700"
+                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700",
+              completed: isActive
+                ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"
+                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700",
+              cancelled: isActive
+                ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700"
+                : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700",
+            };
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setStatusFilter(opt.value)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors border ${colorMap[opt.value]}`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Orders Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 mb-24 sm:mb-8">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
-            <span className="ml-3 text-gray-600 dark:text-gray-400">Cargando pedidos...</span>
-          </div>
-        ) : (
-          <DataTable
-            columns={columns}
-            data={filteredOrders}
-            keyExtractor={(order) => order.fullId || order.id}
-            emptyMessage="No se encontraron pedidos"
-          />
+      <div className="flex flex-col gap-4 mb-24 sm:mb-8">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
+              <span className="ml-3 text-gray-600 dark:text-gray-400">Cargando pedidos...</span>
+            </div>
+          ) : (
+            <DataTable
+              columns={columns}
+              data={pagedOrders}
+              keyExtractor={(order) => order.fullId || order.id}
+              emptyMessage="No se encontraron pedidos"
+            />
+          )}
+        </div>
 
+        {/* Paginador — solo si hay datos */}
+        {!loading && totalOrders > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+            {/* Info + selector de tamaño */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Mostrando{" "}
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {rangeStart}–{rangeEnd}
+                </span>{" "}
+                de{" "}
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {totalOrders}
+                </span>{" "}
+                {totalOrders === 1 ? "pedido" : "pedidos"}
+              </p>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm text-gray-500 dark:text-gray-400">Por página:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  {PAGE_SIZE_OPTIONS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Controles de navegación */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safeCurrentPage === 1}
+                aria-label="Página anterior"
+                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[90px] text-center select-none">
+                Página {safeCurrentPage} de {totalPages}
+              </span>
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safeCurrentPage >= totalPages}
+                aria-label="Página siguiente"
+                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
@@ -912,6 +1076,18 @@ export default function Orders() {
       {pendingAction && (() => {
         const { order, newStatus } = pendingAction;
         const cfg: Record<string, { label: string; accent: string; btnClass: string; iconEl: React.ReactNode }> = {
+          awaiting_payment: {
+            label: '¿Marcar como esperando pago?',
+            accent: 'bg-indigo-100 dark:bg-indigo-900/30',
+            btnClass: 'bg-indigo-600 hover:bg-indigo-700',
+            iconEl: <CreditCard className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />,
+          },
+          confirmed: {
+            label: '¿Confirmar pago recibido?',
+            accent: 'bg-blue-100 dark:bg-blue-900/30',
+            btnClass: 'bg-blue-600 hover:bg-blue-700',
+            iconEl: <CheckCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />,
+          },
           preparing: {
             label: '¿Iniciar preparación?',
             accent: 'bg-orange-100 dark:bg-orange-900/30',

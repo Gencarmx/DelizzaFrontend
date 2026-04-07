@@ -7,7 +7,6 @@
 
 import { supabase } from "@core/supabase/client";
 import type { CartItem } from "@core/context/CartContext";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 
 // ─── CRUD ────────────────────────────────────────────────────────────────────
 
@@ -81,9 +80,7 @@ export function subscribeToCartChanges(
   onChange: () => void,
   getClientToken?: () => string | undefined,
 ): () => void {
-  let channel: RealtimeChannel;
-
-  channel = supabase
+  const channel = supabase
     .channel(`cart-${authUserId}`)
     .on(
       "postgres_changes",
