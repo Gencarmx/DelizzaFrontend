@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@core/supabase/client";
@@ -17,6 +17,7 @@ export default function ResetPassword() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
 
   // Supabase con detectSessionInUrl:true procesa automáticamente el fragment
   // de la URL (#access_token=...&type=recovery) y establece la sesión.
@@ -36,6 +37,8 @@ export default function ResetPassword() {
         setPageState("invalid");
       }
     });
+
+    subscriptionRef.current = subscription;
 
     // Timeout de seguridad: si en 5 segundos no hay sesión, el enlace es inválido
     const timeout = setTimeout(() => {
@@ -79,7 +82,9 @@ export default function ResetPassword() {
       return;
     }
 
-    // Cerrar la sesión temporal de recuperación antes de redirigir
+    // Desuscribirse antes de cerrar sesión para evitar que el evento
+    // SIGNED_OUT sobreescriba el estado "success"
+    subscriptionRef.current?.unsubscribe();
     await signOut();
     setPageState("success");
   };
