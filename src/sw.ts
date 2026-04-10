@@ -32,15 +32,24 @@ self.addEventListener("activate", () => self.clients.claim());
 
 // ── Push: recibir y mostrar la notificación ───────────────────────────────────
 self.addEventListener("push", (event: PushEvent) => {
+  console.log("[SW] push event recibido, tiene data:", !!event.data);
   if (!event.data) return;
 
-  const data = event.data.json() as {
+  let data: {
     title: string;
     body: string;
     url?: string;
     type?: "order_update" | "new_order";
     icon?: string;
   };
+
+  try {
+    data = event.data.json();
+    console.log("[SW] push payload parseado:", JSON.stringify(data));
+  } catch (e) {
+    console.error("[SW] Error al parsear push payload:", e, "| raw:", event.data.text());
+    return;
+  }
 
   const options: NotificationOptions = {
     body: data.body,
@@ -50,7 +59,13 @@ self.addEventListener("push", (event: PushEvent) => {
     data: { url: data.url ?? "/" },
   };
 
-  event.waitUntil(self.registration.showNotification(data.title, options));
+  event.waitUntil(
+    self.registration.showNotification(data.title, options).then(() => {
+      console.log("[SW] showNotification exitoso:", data.title);
+    }).catch((e) => {
+      console.error("[SW] showNotification falló:", e);
+    })
+  );
 });
 
 // ── Notification Click: abrir o enfocar la ventana ───────────────────────────

@@ -11,7 +11,7 @@ import { useCustomerNotificationsContext } from "@core/context/CustomerNotificat
 
 const PAGE_SIZE = 5;
 
-type FilterStatus = OrderStatus | null;
+type FilterStatus = OrderStatus | string | null;
 
 interface StatusFilterOption {
   value: FilterStatus;
@@ -19,6 +19,7 @@ interface StatusFilterOption {
 }
 
 const STATUS_FILTERS: StatusFilterOption[] = [
+  { value: "pending,awaiting_payment", label: "Pendientes y Esperando pago" },
   { value: "completed",        label: "Entregado" },
   { value: null,               label: "Todos" },
   { value: "awaiting_payment", label: "Esperando pago" },
@@ -45,7 +46,7 @@ export default function Activity() {
     }
   };
 
-  const initialFilter = (location.state as { defaultFilter?: FilterStatus } | null)?.defaultFilter ?? "completed";
+  const initialFilter = (location.state as { defaultFilter?: FilterStatus } | null)?.defaultFilter ?? "pending,awaiting_payment";
 
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [total, setTotal] = useState(0);
@@ -128,6 +129,8 @@ export default function Activity() {
 
   const getStatusConfig = (status: string | null) => {
     switch (status) {
+      case "pending,awaiting_payment":
+        return { color: "text-amber-500", Icon: Clock, label: "Pendientes y Esperando pago" };
       case "completed":
         return { color: "text-green-500", Icon: CheckCircle2, label: "Entregado" };
       case "cancelled":

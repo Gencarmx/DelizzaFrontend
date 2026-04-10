@@ -534,7 +534,7 @@ export async function getOrdersByCustomer(
   customerId: string,
   limit: number = 5,
   offset: number = 0,
-  status?: OrderStatus | null,
+  status?: OrderStatus | OrderStatus[] | string | null,
 ): Promise<{ orders: OrderWithItems[]; total: number }> {
   try {
     let query = supabase
@@ -555,7 +555,13 @@ export async function getOrdersByCustomer(
       .range(offset, offset + limit - 1);
 
     if (status) {
-      query = query.eq("status", status);
+      if (Array.isArray(status)) {
+        query = query.in("status", status);
+      } else if (typeof status === "string" && status.includes(",")) {
+        query = query.in("status", status.split(","));
+      } else {
+        query = query.eq("status", status);
+      }
     }
 
     const { data, error, count } = await query;
