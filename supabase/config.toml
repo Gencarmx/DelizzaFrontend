@@ -352,6 +352,9 @@ authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration
 allow_dynamic_registration = false
 
+[functions.onesignal-notify]
+verify_jwt = false
+
 [functions.generate-billing-statement]
 verify_jwt = false
 

@@ -120,7 +120,9 @@ let lastLinkedUserId: string | null = null;
 export async function setOneSignalUser(userId: string): Promise<void> {
   if (!(await whenReady())) return;
   if (userId === lastLinkedUserId) return;
+  console.info("[OneSignal] login →", userId);
   await OneSignal.login(userId);
+  console.info("[OneSignal] login OK | optedIn:", OneSignal.User.PushSubscription.optedIn, "| token:", OneSignal.User.PushSubscription.token?.slice(0, 40));
   lastLinkedUserId = userId;
 
   // Solo en desarrollo: guarda el appId activo en profiles.onesignal_app_id
