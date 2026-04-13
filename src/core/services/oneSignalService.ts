@@ -86,7 +86,7 @@ async function whenReady(): Promise<boolean> {
 export const waitForOneSignal = whenReady;
 
 type SubscriptionChangeHandler = (event: {
-  current: { optedIn: boolean; token: string | null };
+  current: { optedIn: boolean; token: string | null | undefined };
 }) => void;
 
 /** Registra un listener para cambios en la suscripción push (optIn/optOut). */

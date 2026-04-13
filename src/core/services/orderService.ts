@@ -241,7 +241,7 @@ export async function updateOrderStatus(
         channel.subscribe(async (status) => {
           if (status === 'SUBSCRIBED') {
             clearTimeout(safetyTimer);
-            const resp = await channel.send({
+            await channel.send({
               type: "broadcast",
               event: "order_status_update",
               payload: {
@@ -286,7 +286,7 @@ export async function updateOrderStatus(
 
           const body = statusMessages[status] ?? `Estado actualizado: ${status}`;
 
-          const { data: notifyData, error: notifyError } = await supabase.functions.invoke("onesignal-notify", {
+          const { error: notifyError } = await supabase.functions.invoke("onesignal-notify", {
             body: {
               targetUserId: profile.user_id,
               title: "📦 Actualización de tu pedido",

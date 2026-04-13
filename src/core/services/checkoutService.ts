@@ -231,7 +231,7 @@ async function createRestaurantOrder(
           .maybeSingle();
 
         if (profile?.user_id) {
-          const { data: notifyData, error: notifyError } = await supabase.functions.invoke('onesignal-notify', {
+          const { error: notifyError } = await supabase.functions.invoke('onesignal-notify', {
             body: {
               targetUserId: profile.user_id,
               title: '🛵 ¡Nuevo pedido!',
@@ -323,7 +323,7 @@ export async function notifyRestaurant(orderId: string, orderData?: {
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         clearTimeout(safetyTimer);
-        const resp = await channel.send({
+        await channel.send({
           type: 'broadcast',
           event: 'new_order',
           payload: {
