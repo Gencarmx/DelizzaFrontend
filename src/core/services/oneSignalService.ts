@@ -16,17 +16,14 @@ const APP_ID: string = (() => {
   return import.meta.env.VITE_ONESIGNAL_APP_ID as string;
 })();
 
-/**
- * App ID activo de OneSignal en este contexto (puerto/entorno).
- * Se guarda en profiles.onesignal_app_id al hacer login para que el servidor
- * sepa a qué app enviarle notificaciones al usuario.
- */
-// En dev (localhost o túnel) se guarda el appId activo para que el servidor
-// sepa a qué app enviar la notificación a este usuario.
+// En dev (localhost o túnel) se guarda el appId activo en profiles.onesignal_app_id
+// para que el servidor sepa a qué app enviar la notificación durante pruebas locales.
+// En producción no se usa: solo existe una app y el servidor ya conoce su ID.
 const activeOneSignalAppId: string | undefined =
   import.meta.env.DEV ? APP_ID : undefined;
 // En desarrollo, OneSignal solo se inicializa si VITE_ONESIGNAL_ENABLED=true.
 // Esto evita errores de dominio al correr en localhost con puerto variable.
+// En producción siempre está habilitado (import.meta.env.DEV === false).
 const ENABLED =
   !import.meta.env.DEV || import.meta.env.VITE_ONESIGNAL_ENABLED === "true";
 
@@ -117,23 +114,25 @@ export function offPermissionChange(handler: (granted: boolean) => void): void {
  * enviarle notificaciones.
  * @param userId - auth.users.id de Supabase
  */
-// Evita actualizar la DB en cada TOKEN_REFRESH cuando no cambió nada
+// Evita loguear en OneSignal en cada TOKEN_REFRESH cuando no cambió nada
 let lastLinkedUserId: string | null = null;
 
 export async function setOneSignalUser(userId: string): Promise<void> {
   if (!(await whenReady())) return;
+  if (userId === lastLinkedUserId) return;
   await OneSignal.login(userId);
+  lastLinkedUserId = userId;
 
-  // Solo actualiza el profile si el usuario cambió o todavía no se guardó en esta sesión
-  if (activeOneSignalAppId && userId !== lastLinkedUserId) {
+  // Solo en desarrollo: guarda el appId activo en profiles.onesignal_app_id
+  // para que el servidor sepa a qué app de prueba enviarle notificaciones.
+  // En producción este campo no se usa (el servidor conoce el appId de producción).
+  if (import.meta.env.DEV && activeOneSignalAppId) {
     const { error } = await supabase
       .from("profiles")
       .update({ onesignal_app_id: activeOneSignalAppId })
       .eq("user_id", userId);
     if (error) {
       console.error("[OneSignal] Error guardando onesignal_app_id:", error.message);
-    } else {
-      lastLinkedUserId = userId;
     }
   }
 }
