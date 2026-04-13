@@ -128,6 +128,14 @@ serve(async (req) => {
       );
     }
 
+    console.info("[onesignal-notify] Notificación enviada:", JSON.stringify({
+      targetUserId,
+      appId: resolvedAppId,
+      title,
+      notificationId: result.id,
+      recipients: result.recipients ?? 0,
+    }));
+
     return new Response(
       JSON.stringify({ ok: true, notificationId: result.id, recipients: result.recipients }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -7,3 +7,4 @@ export {
   useRestaurantNotifications,
 } from "./RestaurantNotificationsContext";
 export { AddressProvider, useAddress } from "./AddressContext";
+export { OneSignalProvider } from "./OneSignalContext";
