@@ -118,7 +118,7 @@ describe("updateOrderStatus", () => {
     vi.mocked(supabase.channel).mockReturnValue(silentChannel as any);
     vi.mocked(supabase.removeChannel).mockResolvedValue(undefined as any);
 
-    await updateOrderStatus("order-1", "confirmed", undefined, "profile-123");
+    await updateOrderStatus("order-1", "confirmed", "profile-123");
 
     expect(supabase.auth.getUser).not.toHaveBeenCalled();
   });
@@ -159,7 +159,7 @@ describe("updateOrderStatus", () => {
     );
 
     await expect(
-      updateOrderStatus("order-1", "confirmed", undefined, "profile-no-access")
+      updateOrderStatus("order-1", "confirmed", "profile-no-access")
     ).rejects.toThrow("No autorizado");
   });
 });

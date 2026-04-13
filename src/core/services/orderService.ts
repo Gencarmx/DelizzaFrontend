@@ -171,7 +171,6 @@ async function resolveProfileId(profileId?: string): Promise<string> {
 export async function updateOrderStatus(
   orderId: string,
   status: OrderStatus,
-  notes?: string,
   profileId?: string,
 ): Promise<Order> {
   try {
@@ -202,9 +201,6 @@ export async function updateOrderStatus(
       updated_at: new Date().toISOString(),
     };
 
-    if (status === "cancelled" && notes) {
-      console.log(`Pedido ${orderId} cancelado. Notas: ${notes}`);
-    }
 
     const { data, error } = await supabase
       .from("orders")

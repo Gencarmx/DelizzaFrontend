@@ -30,9 +30,6 @@ export default function PendingApproval() {
       if (!user?.id) return;
 
       attempts++;
-      console.log(
-        `Attempt ${attempts}/${MAX_RETRIES} to fetch business status`,
-      );
 
       try {
         // First get the profile id
@@ -71,14 +68,11 @@ export default function PendingApproval() {
         }
 
         // Get business info using profile.id
-        console.log("🔍 Searching business with owner_id:", profile.id);
         const { data: business, error: businessError } = await supabase
           .from("businesses")
           .select("name, active")
           .eq("owner_id", profile.id)
           .maybeSingle();
-
-        console.log("🏢 Business query result:", { business, businessError });
 
         // Handle business not found (still being created)
         if (businessError && businessError.code !== "PGRST116") {
@@ -107,7 +101,6 @@ export default function PendingApproval() {
         }
 
         // Business found! Set status and stop polling
-        console.log("Business found:", business.name);
         setBusinessStatus({
           name: business.name,
           active: business.active,

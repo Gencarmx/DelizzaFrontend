@@ -126,7 +126,7 @@ async function handleRequest(req: Request) {
     const chunkSize = 5;
     for (let i = 0; i < businessIds.length; i += chunkSize) {
       const chunk = businessIds.slice(i, i + chunkSize);
-      console.log(`Procesando chunk ${Math.floor(i/chunkSize) + 1}:`, chunk);
+      console.log(`Procesando chunk ${Math.floor(i/chunkSize) + 1} de ${Math.ceil(businessIds.length/chunkSize)}`);
       const chunkResults = await Promise.all(
         chunk.map(async (businessId) => {
           try {

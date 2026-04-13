@@ -318,7 +318,7 @@ async function handleRequest(req: Request) {
       statementId = inserted.id;
     }
 
-    console.log("Statement guardado exitosamente:", statementId);
+    console.log("Statement guardado exitosamente");
 
     return Response.json({
       success: true,

@@ -130,7 +130,7 @@ export default function Orders() {
 
     try {
       setUpdatingOrders(prev => new Set(prev).add(fullId));
-      await updateOrderStatus(fullId, newStatus as any, undefined, profileId ?? undefined);
+      await updateOrderStatus(fullId, newStatus as any, profileId ?? undefined);
 
       setOrders(prev => prev.map(order =>
         order.fullId === fullId

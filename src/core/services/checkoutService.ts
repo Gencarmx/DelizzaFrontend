@@ -271,12 +271,11 @@ async function createRestaurantOrder(
  * Simula el procesamiento de pago (reemplazar con integración real)
  */
 export async function processPayment(
-  orderId: string,
-  amount: number,
-  paymentMethod: string
+  _orderId: string,
+  _amount: number,
+  _paymentMethod: string
 ): Promise<boolean> {
   // TODO: Integrar con MercadoPago/Stripe
-  console.log(`Procesando pago de $${amount} para orden ${orderId} con ${paymentMethod}`);
 
   // Simulación de procesamiento
   return new Promise((resolve) => {

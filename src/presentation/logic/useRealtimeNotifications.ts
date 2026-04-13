@@ -124,7 +124,6 @@ export function useRealtimeNotifications(businessId?: string) {
 
       // Helper compartido para procesar un nuevo pedido (viene de broadcast o de postgres_changes)
       const handleNewOrder = (orderPayload: OrderNotification) => {
-        console.log('[Realtime] ✅ Nuevo pedido recibido:', orderPayload.id);
         setNotificationState(prev => ({
           ...prev,
           hasNewOrder: true,

@@ -193,7 +193,6 @@ export function useCustomerNotifications(
         "broadcast",
         { event: "order_status_update" },
         ({ payload }) => {
-          console.log("[Customer] ✅ Actualización de pedido recibida (Broadcast):", payload);
           handleOrderUpdate(payload as { id: string; status: string });
         },
       )
