@@ -215,30 +215,39 @@ async function createRestaurantOrder(
       })),
     });
 
-    // 5. Push notification al owner — funciona aunque el browser esté cerrado
+    // 5. Push notification al owner vía OneSignal — funciona aunque el browser esté cerrado
     try {
       const { data: business } = await supabase
         .from('businesses')
-        .select('profiles!inner(user_id)')
+        .select('owner_id')
         .eq('id', order.restaurant.id)
         .maybeSingle();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ownerUserId = (business as any)?.profiles?.user_id as string | undefined;
+      if (business?.owner_id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .eq('id', business.owner_id)
+          .maybeSingle();
 
-      if (ownerUserId) {
-        await supabase.functions.invoke('send-push-notification', {
-          body: {
-            targetUserId: ownerUserId,
-            title: '🛵 ¡Nuevo pedido!',
-            body: `${customerProfile.full_name || 'Cliente'} — $${order.total.toFixed(2)}`,
-            url: '/restaurant/orders',
-            type: 'new_order',
-          },
-        });
+        if (profile?.user_id) {
+          const { data: notifyData, error: notifyError } = await supabase.functions.invoke('onesignal-notify', {
+            body: {
+              targetUserId: profile.user_id,
+              title: '🛵 ¡Nuevo pedido!',
+              body: `${customerProfile.full_name || 'Cliente'} — $${order.total.toFixed(2)}`,
+              url: '/restaurant/orders',
+              data: { type: 'new_order', orderId },
+            },
+          });
+          if (notifyError) {
+            console.error('[checkout:push-restaurante] Error:', notifyError);
+          }
+        }
       }
-    } catch {
-      // No interrumpir el flujo del pedido si falla la push
+    } catch (e) {
+      // No interrumpir el flujo del pedido, pero sí logear
+      console.error('[checkout:push-restaurante] Falló:', e);
     }
 
     return {
@@ -328,8 +337,6 @@ export async function notifyRestaurant(orderId: string, orderData?: {
             order_items: orderData.order_items,
           },
         });
-        console.log("[notifyRestaurant] Broadcast sent response:", resp);
-
         // Limpiar el canal temporal (el del restaurante tiene su propio canal persistente)
         try { await supabase.removeChannel(channel); } catch { /* ignorar */ }
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {

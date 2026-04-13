@@ -3,7 +3,11 @@ import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { routes } from "@core/router/routes";
 import { AuthProvider, CartProvider, ThemeProvider, AddressProvider } from "@core/context";
+import { initOneSignal } from "@core/services/oneSignalService";
 import "@presentation/styles/global.css";
+
+// Inicializar OneSignal al arrancar (no bloquea el render)
+initOneSignal().catch(console.error);
 
 // Capturar el evento antes de que React monte para no perderlo
 window.__pwaInstallPrompt = null;

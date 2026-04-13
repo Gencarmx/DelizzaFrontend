@@ -1,30 +1,28 @@
 import { BellOff, BellRing } from "lucide-react";
-import { usePushNotifications } from "@core/hooks/usePushNotifications";
+import { useOneSignal } from "@core/hooks/useOneSignal";
 
 export function NotificationPermissionBanner() {
-  const { isSupported, permissionState, isSubscribed, isLoading, subscribe } =
-    usePushNotifications();
+  const { status, isSubscribed, isLoading, requestPermission } = useOneSignal();
 
-  // Navegador sin soporte para Web Push
-  if (!isSupported) return null;
+  // No soportado
+  if (status === "unsupported") return null;
 
-  // Ya tiene permiso y está suscrito — no molestar
-  if (permissionState === "granted" && isSubscribed) return null;
+  // Ya está suscrito y con permisos
+  if (status === "granted" && isSubscribed) return null;
 
-  // El usuario bloqueó los permisos — mostrar instrucción informativa
-  if (permissionState === "denied") {
+  // Permisos bloqueados por el usuario
+  if (status === "denied") {
     return (
       <div className="mx-4 mt-3 mb-1 bg-gray-100 dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 flex items-center gap-3">
         <BellOff className="w-5 h-5 text-gray-500 flex-shrink-0" />
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Notificaciones bloqueadas. Actívalas en la configuración del
-          navegador.
+          Notificaciones bloqueadas. Actívalas en la configuración del navegador.
         </p>
       </div>
     );
   }
 
-  // Estado "default" (no ha decidido) o tiene permiso pero sin suscripción push
+  // Estado default — mostrar banner de activación
   return (
     <div className="mx-4 mt-3 mb-1 bg-amber-50 dark:bg-amber-900/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-800 flex items-center justify-between shadow-sm">
       <div className="flex items-center gap-3">
@@ -36,13 +34,13 @@ export function NotificationPermissionBanner() {
             Activar notificaciones
           </span>
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            Recibe actualizaciones de tus pedidos
+            Recibe actualizaciones de tus pedidos en tiempo real
           </span>
         </div>
       </div>
       <button
-        id="btn-enable-push-notifications"
-        onClick={subscribe}
+        id="btn-enable-onesignal-notifications"
+        onClick={requestPermission}
         disabled={isLoading}
         className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors"
       >

@@ -253,7 +253,6 @@ export async function updateOrderStatus(
                 total: updatedOrder.total,
               },
             });
-            console.log("[updateOrderStatus] Broadcast sent response:", resp);
             try { await supabase.removeChannel(channel); } catch { /* ignorar */ }
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             clearTimeout(safetyTimer);
@@ -266,7 +265,7 @@ export async function updateOrderStatus(
       }
     }
 
-    // Push notification al cliente — funciona aunque el browser esté cerrado
+    // Push notification al cliente vía OneSignal — funciona aunque el browser esté cerrado
     if (updatedOrder.customer_id) {
       try {
         const { data: profile } = await supabase
@@ -287,18 +286,22 @@ export async function updateOrderStatus(
 
           const body = statusMessages[status] ?? `Estado actualizado: ${status}`;
 
-          await supabase.functions.invoke("send-push-notification", {
+          const { data: notifyData, error: notifyError } = await supabase.functions.invoke("onesignal-notify", {
             body: {
               targetUserId: profile.user_id,
               title: "📦 Actualización de tu pedido",
               body,
               url: "/activity",
-              type: "order_update",
+              data: { type: "order_update", orderId: updatedOrder.id },
             },
           });
+          if (notifyError) {
+            console.error("[updateOrderStatus] Error invocando onesignal-notify:", notifyError);
+          }
         }
-      } catch {
-        // No interrumpir si falla la push
+      } catch (pushErr) {
+        // No interrumpir si falla la push, pero sí loguear para diagnóstico
+        console.error("[updateOrderStatus] Error enviando push notification:", pushErr);
       }
     }
 

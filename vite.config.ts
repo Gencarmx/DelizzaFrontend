@@ -14,7 +14,7 @@ export default defineConfig({
       // Estrategia personalizada: permite manejar el evento `push` en sw.ts
       strategies: "injectManifest",
       srcDir: "src",
-      filename: "sw.ts",
+      filename: "OneSignalSDKWorker.ts",
       injectRegister: "auto",
       includeAssets: ["favicon.ico", "apple-touch-icon.png"],
 
@@ -59,17 +59,26 @@ export default defineConfig({
       // Solo se especifica qué archivos deben precachearse.
       injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
+        // OneSignalSDKWorker.js en public/ es el fallback de dev.
+        // En production, vite-plugin-pwa genera su propio OneSignalSDKWorker.js
+        // (con Workbox + OneSignal) que sobreescribe la copia del public/.
+        globIgnores: ["**/OneSignalSDKWorker.js"],
       },
 
       devOptions: {
-        enabled: true,
-        navigateFallback: "index.html",
-        suppressWarnings: true,
-        type: "module",
+        // Desactivado en dev para evitar conflicto de scope con el SW de OneSignal
+        // (public/OneSignalSDKWorker.js). En producción vite-plugin-pwa genera el
+        // SW combinado que reemplaza al del public/.
+        enabled: false,
       },
 
     }),
   ],
+  server: {
+    // Permite acceso desde túneles (ngrok, cloudflare) y dispositivos en red local.
+    // En producción esto no aplica — solo afecta al servidor de desarrollo.
+    allowedHosts: true,
+  },
   resolve: {
     alias: {
       "@core": path.resolve(__dirname, "./src/core"),

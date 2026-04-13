@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@core/supabase/client";
 import { type User, type Session, type AuthError } from "@supabase/supabase-js";
-import { removePushSubscription } from "@core/services/pushNotificationService";
+import { setOneSignalUser, clearOneSignalUser } from "@core/services/oneSignalService";
 
 interface AuthContextType {
   user: User | null;
@@ -166,6 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         setRole(userRole);
         setProfileId(fetchedProfileId);
+        setOneSignalUser(currentSession.user.id).catch(console.error);
 
         if (userRole === "owner") {
           const active = fetchedProfileId
@@ -180,6 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRole(null);
         setProfileId(null);
         setBusinessActive(null);
+        clearOneSignalUser().catch(console.error);
       }
 
       setLoading(false);
@@ -321,11 +323,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    // Cancelar la suscripción push ANTES de cerrar sesión para poder
-    // eliminar el registro en Supabase (requiere sesión activa por RLS).
-    // Si falla, se continúa con el cierre de sesión igualmente.
     try {
-      await removePushSubscription();
+      await clearOneSignalUser();
     } catch {
       // ignorar error — el cierre de sesión no debe bloquearse
     }
