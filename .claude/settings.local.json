@@ -21,7 +21,8 @@
       "Bash(bun add:*)",
       "Bash(xargs grep:*)",
       "Bash(xargs wc:*)",
-      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")"
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(bun run:*)"
     ]
   }
 }

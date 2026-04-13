@@ -60,7 +60,7 @@ export function useOneSignal(): UseOneSignalReturn {
 
     // Escucha cambios de suscripción (optIn / optOut desde otra pestaña o dispositivo)
     const handleSubscription = (event: {
-      current: { optedIn: boolean; token: string | null };
+      current: { optedIn: boolean; token: string | null | undefined };
     }) => {
       if (cancelled) return;
       setIsSubscribed(event.current?.optedIn ?? false);
