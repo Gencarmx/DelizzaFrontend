@@ -145,6 +145,8 @@ export async function setOneSignalUser(userId: string): Promise<void> {
  */
 export async function clearOneSignalUser(): Promise<void> {
   if (!(await whenReady())) return;
+  console.info("[OneSignal] logout");
+  lastLinkedUserId = null;
   await OneSignal.logout();
 }
 

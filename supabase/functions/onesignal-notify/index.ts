@@ -96,10 +96,7 @@ serve(async (req) => {
         app_id: resolvedAppId,
 
         // Segmentar por external_user_id (= auth.users.id de Supabase)
-        include_aliases: {
-          external_id: [targetUserId],
-        },
-        target_channel: "push",
+        include_external_user_ids: [targetUserId],
 
         // Contenido de la notificación
         headings: { en: title, es: title },
@@ -134,6 +131,7 @@ serve(async (req) => {
       title,
       notificationId: result.id,
       recipients: result.recipients ?? 0,
+      errors: result.errors ?? null,
     }));
 
     return new Response(
