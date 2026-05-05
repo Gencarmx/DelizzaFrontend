@@ -422,6 +422,7 @@ export async function getBusinessStats(): Promise<{
 export interface BusinessPaymentInfo {
   accepted_payment_methods: string[];
   mercado_pago_link: string | null;
+  clabe_interbancaria: string | null;
 }
 
 /**
@@ -431,7 +432,7 @@ export async function getBusinessPaymentInfo(businessId: string): Promise<Busine
   try {
     const { data, error } = await supabase
       .from('businesses')
-      .select('accepted_payment_methods, mercado_pago_link')
+      .select('accepted_payment_methods, mercado_pago_link, clabe_interbancaria')
       .eq('id', businessId)
       .single();
 
@@ -439,6 +440,7 @@ export async function getBusinessPaymentInfo(businessId: string): Promise<Busine
     return {
       accepted_payment_methods: (data?.accepted_payment_methods as string[]) ?? ['cash'],
       mercado_pago_link: data?.mercado_pago_link ?? null,
+      clabe_interbancaria: (data as Record<string, unknown>)?.clabe_interbancaria as string | null ?? null,
     };
   } catch (error) {
     console.error('Error obteniendo métodos de pago:', error);
@@ -453,6 +455,7 @@ export async function updatePaymentSettings(
   businessId: string,
   acceptedMethods: string[],
   mercadoPagoLink: string | null,
+  clabeInterbancaria: string | null,
 ): Promise<void> {
   try {
     const { error } = await supabase
@@ -460,6 +463,7 @@ export async function updatePaymentSettings(
       .update({
         accepted_payment_methods: acceptedMethods,
         mercado_pago_link: mercadoPagoLink,
+        clabe_interbancaria: clabeInterbancaria,
         updated_at: new Date().toISOString(),
       })
       .eq('id', businessId);

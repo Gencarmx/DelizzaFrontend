@@ -41,6 +41,8 @@ export interface OrderResult {
   total: number;
   paymentMethod?: string;
   mercadoPagoLink?: string | null;
+  /** CLABE interbancaria del restaurante para pago por transferencia SPEI */
+  clabeInterbancaria?: string | null;
   error?: string;
 }
 
@@ -60,7 +62,7 @@ export async function processMultiRestaurantCheckout(
   orders: CartOrder[],
   checkoutData: CheckoutData,
   deliveryTypeByRestaurant?: Record<string, 'pickup' | 'delivery'>,
-  paymentInfoByRestaurant?: Record<string, { method: string; mercadoPagoLink: string | null }>
+  paymentInfoByRestaurant?: Record<string, { method: string; mercadoPagoLink: string | null; clabeInterbancaria?: string | null }>
 ): Promise<OrderResult[]> {
   const results: OrderResult[] = [];
 
@@ -95,6 +97,7 @@ export async function processMultiRestaurantCheckout(
       const paymentInfo = paymentInfoByRestaurant?.[order.restaurant.id];
       const orderPaymentMethod = paymentInfo?.method ?? checkoutData.paymentMethod ?? 'cash';
       const orderMercadoPagoLink = paymentInfo?.mercadoPagoLink ?? null;
+      const orderClabeInterbancaria = paymentInfo?.clabeInterbancaria ?? null;
 
       const orderCheckoutData: CheckoutData = {
         ...checkoutData,
@@ -117,7 +120,7 @@ export async function processMultiRestaurantCheckout(
         continue;
       }
 
-      const result = await createRestaurantOrder(order, orderCheckoutData, orderMercadoPagoLink);
+      const result = await createRestaurantOrder(order, orderCheckoutData, orderMercadoPagoLink, orderClabeInterbancaria);
       results.push(result);
     } catch (error) {
       console.error(`Error procesando pedido para ${order.restaurant.name}:`, error);
@@ -140,7 +143,8 @@ export async function processMultiRestaurantCheckout(
 async function createRestaurantOrder(
   order: CartOrder,
   checkoutData: CheckoutData,
-  mercadoPagoLink: string | null = null
+  mercadoPagoLink: string | null = null,
+  clabeInterbancaria: string | null = null
 ): Promise<OrderResult> {
   try {
     // 1. Obtener el profile.id y nombre del usuario
@@ -172,7 +176,8 @@ async function createRestaurantOrder(
     }));
 
     const isMercadoPago = checkoutData.paymentMethod === 'mercado_pago';
-    const initialStatus = isMercadoPago ? 'awaiting_payment' : 'pending';
+    const isTransfer = checkoutData.paymentMethod === 'transfer';
+    const initialStatus = (isMercadoPago || isTransfer) ? 'awaiting_payment' : 'pending';
 
     const { data: rpcData, error: rpcError } = await supabase.rpc(
       'create_order_with_items',
@@ -259,6 +264,7 @@ async function createRestaurantOrder(
       total: order.total,
       paymentMethod: checkoutData.paymentMethod || 'cash',
       mercadoPagoLink: isMercadoPago ? mercadoPagoLink : null,
+      clabeInterbancaria: isTransfer ? clabeInterbancaria : null,
     };
 
   } catch (error) {

@@ -14,6 +14,7 @@ import {
   CreditCard,
   Banknote,
   Link,
+  Building2,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useRestaurantNotifications } from "@core/context/RestaurantNotificationsContext";
@@ -65,9 +66,11 @@ export default function BusinessInfo() {
   // Payment settings state
   const [paymentMethods, setPaymentMethods] = useState<string[]>(['cash']);
   const [mercadoPagoLink, setMercadoPagoLink] = useState('');
+  const [clabeInterbancaria, setClabeInterbancaria] = useState('');
   const [savingPayment, setSavingPayment] = useState(false);
   const [paymentSaveMessage, setPaymentSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const CLABE_REGEX = /^\d{18}$/;
   const MP_LINK_REGEX = /^https:\/\/(mpago\.la|link\.mercadopago\.com\.\w{2})\/.+/;
 
   const {
@@ -115,6 +118,7 @@ export default function BusinessInfo() {
         const methods = (business.accepted_payment_methods as string[] | null) ?? ['cash'];
         setPaymentMethods(methods.length > 0 ? methods : ['cash']);
         setMercadoPagoLink(business.mercado_pago_link ?? '');
+        setClabeInterbancaria((business as unknown as Record<string, unknown>).clabe_interbancaria as string ?? '');
       }
 
       if (delivery) {
@@ -154,6 +158,18 @@ export default function BusinessInfo() {
       return;
     }
 
+    // Validate CLABE if provided
+    const clabeToSave = clabeInterbancaria.trim();
+    if (clabeToSave && !CLABE_REGEX.test(clabeToSave)) {
+      setPaymentSaveMessage({ type: 'error', text: 'La CLABE interbancaria debe tener exactamente 18 dígitos numéricos.' });
+      return;
+    }
+
+    if (paymentMethods.includes('transfer') && !clabeToSave) {
+      setPaymentSaveMessage({ type: 'error', text: 'Debes ingresar la CLABE interbancaria para recibir transferencias.' });
+      return;
+    }
+
     if (paymentMethods.includes('mercado_pago')) {
       if (!mercadoPagoLink.trim()) {
         setPaymentSaveMessage({ type: 'error', text: 'Debes ingresar el link de cobro de Mercado Pago.' });
@@ -166,10 +182,11 @@ export default function BusinessInfo() {
     }
 
     const linkToSave = paymentMethods.includes('mercado_pago') ? mercadoPagoLink.trim() : null;
+    const clabeToSaveFinal = clabeToSave || null;
 
     setSavingPayment(true);
     try {
-      await updatePaymentSettings(businessId, paymentMethods, linkToSave);
+      await updatePaymentSettings(businessId, paymentMethods, linkToSave, clabeToSaveFinal);
       setPaymentSaveMessage({ type: 'success', text: 'Métodos de pago guardados correctamente.' });
       setTimeout(() => setPaymentSaveMessage(null), 3000);
     } catch {
@@ -726,6 +743,46 @@ export default function BusinessInfo() {
               </h2>
             </div>
 
+            {/* CLABE Interbancaria */}
+            <div className="flex items-start gap-3">
+              <Building2 className="w-5 h-5 text-gray-500 dark:text-gray-400 mt-1 flex-shrink-0" />
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  CLABE interbancaria
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Número de 18 dígitos para recibir transferencias bancarias (SPEI). Se mostrará al cliente al momento del pago.
+                </p>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={18}
+                  value={clabeInterbancaria}
+                  onChange={(e) => setClabeInterbancaria(e.target.value.replace(/\D/g, '').slice(0, 18))}
+                  placeholder="000000000000000000"
+                  className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-mono tracking-widest focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                    clabeInterbancaria && clabeInterbancaria.length !== 18
+                      ? 'border-red-400 dark:border-red-500'
+                      : 'border-gray-300 dark:border-gray-600'
+                  }`}
+                />
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    {clabeInterbancaria.length === 18
+                      ? <span className="text-green-600 dark:text-green-400 font-medium">✓ CLABE válida</span>
+                      : clabeInterbancaria.length > 0
+                        ? <span className="text-red-500">{18 - clabeInterbancaria.length} dígitos restantes</span>
+                        : 'Opcional — déjalo vacío si no aceptas transferencias'}
+                  </p>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{clabeInterbancaria.length}/18</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Métodos habilitados</p>
+            </div>
+
             {/* Cash toggle */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -749,12 +806,44 @@ export default function BusinessInfo() {
               </button>
             </div>
 
+            {/* Transfer / SPEI toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Building2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <div>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Transferencia bancaria (SPEI)</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">El cliente paga vía SPEI a la CLABE configurada arriba</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => togglePaymentMethod('transfer')}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  paymentMethods.includes('transfer') ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                }`}
+                aria-checked={paymentMethods.includes('transfer')}
+                role="switch"
+                disabled={!clabeInterbancaria || clabeInterbancaria.length !== 18}
+                title={!clabeInterbancaria || clabeInterbancaria.length !== 18 ? 'Ingresa una CLABE válida de 18 dígitos para habilitar este método' : undefined}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  paymentMethods.includes('transfer') ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
+            {paymentMethods.includes('transfer') && (!clabeInterbancaria || clabeInterbancaria.length !== 18) && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 -mt-2 pl-7">
+                ⚠ Ingresa una CLABE de 18 dígitos para habilitar las transferencias SPEI.
+              </p>
+            )}
+
             {/* Mercado Pago toggle */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Link className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                 <div>
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Transferencia / Link de Mercado Pago</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Mercado Pago</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">El cliente paga mediante el link de cobro de Mercado Pago</p>
                 </div>
               </div>
               <button

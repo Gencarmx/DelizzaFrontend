@@ -205,11 +205,12 @@ export function useCartLogic() {
         perRestaurantDeliveryTypes[order.restaurant.id] = order.deliveryType;
       }
 
-      const perRestaurantPaymentInfo: Record<string, { method: string; mercadoPagoLink: string | null }> = {};
+      const perRestaurantPaymentInfo: Record<string, { method: string; mercadoPagoLink: string | null; clabeInterbancaria: string | null }> = {};
       for (const order of enrichedOrders) {
         const method = paymentMethodByRestaurant[order.restaurant.id] ?? 'cash';
         const mpLink = businessPaymentInfo[order.restaurant.id]?.mercado_pago_link ?? null;
-        perRestaurantPaymentInfo[order.restaurant.id] = { method, mercadoPagoLink: mpLink };
+        const clabe = businessPaymentInfo[order.restaurant.id]?.clabe_interbancaria ?? null;
+        perRestaurantPaymentInfo[order.restaurant.id] = { method, mercadoPagoLink: mpLink, clabeInterbancaria: clabe };
       }
 
       const results = await processMultiRestaurantCheckout(
@@ -233,10 +234,12 @@ export function useCartLogic() {
           clearCart();
         }
 
-        // If any successful order uses Mercado Pago, redirect to activity so
+        // If any successful order uses Mercado Pago or transfer, redirect to activity so
         // the customer can immediately see and copy the payment reference ID.
-        const hasMercadoPago = successfulOrders.some((r) => r.paymentMethod === 'mercado_pago');
-        if (hasMercadoPago && failedOrders.length === 0) {
+        const hasPendingPayment = successfulOrders.some(
+          (r) => r.paymentMethod === 'mercado_pago' || r.paymentMethod === 'transfer'
+        );
+        if (hasPendingPayment && failedOrders.length === 0) {
           navigate('/activity', { state: { defaultFilter: 'awaiting_payment' } });
         } else {
           // Show result modal (cash only, or mixed with failures)

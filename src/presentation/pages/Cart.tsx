@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   ExternalLink,
   AlertCircle,
+  Building2,
 } from "lucide-react";
 import { useState } from "react";
 import { useCartLogic } from "@presentation/logic/CartLogic";
@@ -26,9 +27,16 @@ interface MpLinkModal {
   total: number;
 }
 
+interface TransferModal {
+  clabe: string;
+  restaurantName: string;
+  total: number;
+}
+
 export default function Cart() {
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [mpLinkModal, setMpLinkModal] = useState<MpLinkModal | null>(null);
+  const [transferModal, setTransferModal] = useState<TransferModal | null>(null);
 
   const {
     items,
@@ -222,13 +230,30 @@ export default function Cart() {
               {(() => {
                 const methods = getRestaurantPaymentMethods(order.restaurant.id);
                 const selectedMethod = paymentMethodByRestaurant[order.restaurant.id] ?? 'cash';
-                if (methods.length <= 1) return null; // solo un método, no mostrar selector
+                const clabe = businessPaymentInfo[order.restaurant.id]?.clabe_interbancaria ?? null;
+                const mpLink = businessPaymentInfo[order.restaurant.id]?.mercado_pago_link ?? null;
+
+                // Show SPEI option whenever CLABE exists (regardless of whether 'transfer'
+                // is in accepted_payment_methods — backward compat for existing restaurants)
+                const showSpei = !!clabe;
+
+                // Count real visible options
+                const visibleOptions = [
+                  methods.includes('cash'),
+                  methods.includes('mercado_pago'),
+                  showSpei,
+                ].filter(Boolean).length;
+
+                if (visibleOptions <= 1) return null;
+
                 return (
                   <div className="px-4 pb-4 pt-2 border-t border-gray-100 dark:border-gray-700">
                     <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
                       Método de pago
                     </p>
                     <div className="flex flex-col gap-2">
+
+                      {/* ── Efectivo ────────────────────────────────────── */}
                       {methods.includes('cash') && (
                         <label className={`flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-all ${
                           selectedMethod === 'cash'
@@ -243,71 +268,147 @@ export default function Cart() {
                             className="w-4 h-4 text-amber-400 focus:ring-amber-400"
                           />
                           <Banknote className="w-4 h-4 text-gray-600 dark:text-gray-300 flex-shrink-0" />
-                          <span className="font-semibold text-gray-900 dark:text-white text-sm">Efectivo</span>
+                          <div className="flex-1">
+                            <span className="font-semibold text-gray-900 dark:text-white text-sm">Efectivo</span>
+                            {selectedMethod === 'cash' && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                Paga al repartidor o en caja al recoger tu pedido.
+                              </p>
+                            )}
+                          </div>
                         </label>
                       )}
-                      {methods.includes('mercado_pago') && (() => {
-                        const mpLink = businessPaymentInfo[order.restaurant.id]?.mercado_pago_link ?? null;
-                        return (
-                          <>
-                            <label className={`flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-all ${
-                              selectedMethod === 'mercado_pago'
-                                ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20'
-                                : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
-                            }`}>
-                              <input
-                                type="radio"
-                                name={`paymentMethod-${order.restaurant.id}`}
-                                checked={selectedMethod === 'mercado_pago'}
-                                onChange={() => setRestaurantPaymentMethod(order.restaurant.id, 'mercado_pago')}
-                                className="w-4 h-4 text-amber-400 focus:ring-amber-400"
-                              />
-                              <CreditCard className="w-4 h-4 text-gray-600 dark:text-gray-300 flex-shrink-0" />
-                              <div className="flex-1">
-                                <span className="font-semibold text-gray-900 dark:text-white text-sm">Transferencia / Mercado Pago</span>
-                                {selectedMethod === 'mercado_pago' && (
-                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                    Recibirás el ID de tu pedido para incluirlo en el asunto del pago.
-                                  </p>
-                                )}
-                              </div>
-                            </label>
 
-                            {selectedMethod === 'mercado_pago' && (
-                              <div className="flex flex-col gap-2 mt-1">
-                                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3">
-                                  <div className="flex items-start gap-2.5">
-                                    <CreditCard className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                                    <div>
-                                      <h4 className="font-semibold text-red-900 dark:text-red-100 text-sm mb-1">
-                                        Pago por Mercado Pago
-                                      </h4>
-                                      <p className="text-red-700 dark:text-red-300 text-xs leading-relaxed">
-                                        Al confirmar, tu pedido quedará en espera de confirmación de pago. Recibirás un ID que debes incluir en el asunto de tu transferencia para que el restaurante pueda identificarla.
-                                      </p>
-                                    </div>
+                      {/* ── Transferencia bancaria SPEI ──────────────── */}
+                      {showSpei && (
+                        <>
+                          <label className={`flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-all ${
+                            selectedMethod === 'transfer'
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                              : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                          }`}>
+                            <input
+                              type="radio"
+                              name={`paymentMethod-${order.restaurant.id}`}
+                              checked={selectedMethod === 'transfer'}
+                              onChange={() => setRestaurantPaymentMethod(order.restaurant.id, 'transfer')}
+                              className="w-4 h-4 text-blue-500 focus:ring-blue-500"
+                            />
+                            <Building2 className={`w-4 h-4 flex-shrink-0 ${
+                              selectedMethod === 'transfer'
+                                ? 'text-blue-600 dark:text-blue-400'
+                                : 'text-gray-600 dark:text-gray-300'
+                            }`} />
+                            <div className="flex-1">
+                              <span className="font-semibold text-gray-900 dark:text-white text-sm">
+                                Transferencia bancaria (SPEI)
+                              </span>
+                              {selectedMethod === 'transfer' && (
+                                <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                                  Transfiere a la CLABE del restaurante e incluye el ID de tu pedido como asunto.
+                                </p>
+                              )}
+                            </div>
+                          </label>
+
+                          {selectedMethod === 'transfer' && (
+                            <div className="flex flex-col gap-2 mt-1 ml-1">
+                              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3">
+                                <div className="flex items-start gap-2.5">
+                                  <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                                  <div>
+                                    <h4 className="font-semibold text-blue-900 dark:text-blue-100 text-sm mb-0.5">
+                                      Pago por transferencia SPEI
+                                    </h4>
+                                    <p className="text-blue-700 dark:text-blue-300 text-xs leading-relaxed">
+                                      Tu pedido quedará pendiente de confirmación. Deberás incluir el <strong>ID de pedido como asunto</strong> de la transferencia para que el restaurante pueda identificarla.
+                                    </p>
                                   </div>
                                 </div>
-
-                                {mpLink && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setMpLinkModal({
-                                      link: mpLink,
-                                      restaurantName: order.restaurant.name,
-                                      total: order.total,
-                                    })}
-                                    className="flex items-center justify-center gap-2 w-full border-2 border-red-400 dark:border-red-500 text-red-700 dark:text-red-300 font-semibold py-2.5 rounded-xl text-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                                  >
-                                    <ExternalLink className="w-4 h-4" />
-                                    Ver enlace de pago del restaurante
-                                  </button>
-                                )}
                               </div>
-                            )}
-                          </>
-                        );
-                      })()}
+                              <button
+                                type="button"
+                                onClick={() => setTransferModal({
+                                  clabe,
+                                  restaurantName: order.restaurant.name,
+                                  total: order.total,
+                                })}
+                                className="flex items-center justify-center gap-2 w-full border-2 border-blue-400 dark:border-blue-500 text-blue-700 dark:text-blue-300 font-semibold py-2.5 rounded-xl text-sm hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                              >
+                                <Building2 className="w-4 h-4" />
+                                Ver CLABE del restaurante
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* ── Mercado Pago ─────────────────────────────── */}
+                      {methods.includes('mercado_pago') && (
+                        <>
+                          <label className={`flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-all ${
+                            selectedMethod === 'mercado_pago'
+                              ? 'border-red-400 bg-red-50 dark:bg-red-900/20'
+                              : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                          }`}>
+                            <input
+                              type="radio"
+                              name={`paymentMethod-${order.restaurant.id}`}
+                              checked={selectedMethod === 'mercado_pago'}
+                              onChange={() => setRestaurantPaymentMethod(order.restaurant.id, 'mercado_pago')}
+                              className="w-4 h-4 text-red-500 focus:ring-red-400"
+                            />
+                            <CreditCard className={`w-4 h-4 flex-shrink-0 ${
+                              selectedMethod === 'mercado_pago'
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-gray-600 dark:text-gray-300'
+                            }`} />
+                            <div className="flex-1">
+                              <span className="font-semibold text-gray-900 dark:text-white text-sm">
+                                Mercado Pago
+                              </span>
+                              {selectedMethod === 'mercado_pago' && (
+                                <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
+                                  Paga con el enlace de cobro del restaurante en Mercado Pago.
+                                </p>
+                              )}
+                            </div>
+                          </label>
+
+                          {selectedMethod === 'mercado_pago' && (
+                            <div className="flex flex-col gap-2 mt-1 ml-1">
+                              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3">
+                                <div className="flex items-start gap-2.5">
+                                  <CreditCard className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                                  <div>
+                                    <h4 className="font-semibold text-red-900 dark:text-red-100 text-sm mb-0.5">
+                                      Pago por Mercado Pago
+                                    </h4>
+                                    <p className="text-red-700 dark:text-red-300 text-xs leading-relaxed">
+                                      Tu pedido quedará pendiente de confirmación. Recibirás un <strong>ID de referencia</strong> que debes incluir en el asunto de la transferencia para que el restaurante la identifique.
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                              {mpLink && (
+                                <button
+                                  type="button"
+                                  onClick={() => setMpLinkModal({
+                                    link: mpLink,
+                                    restaurantName: order.restaurant.name,
+                                    total: order.total,
+                                  })}
+                                  className="flex items-center justify-center gap-2 w-full border-2 border-red-400 dark:border-red-500 text-red-700 dark:text-red-300 font-semibold py-2.5 rounded-xl text-sm hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                  Ver enlace de Mercado Pago
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+
                     </div>
                   </div>
                 );
@@ -539,11 +640,14 @@ export default function Cart() {
 
             {checkoutResult.filter((r) => r.success).map((result) => {
               const isMp = result.paymentMethod === 'mercado_pago';
+              const isTransfer = result.paymentMethod === 'transfer';
               return (
                 <div key={result.restaurantId} className={`rounded-2xl p-4 ${
                   isMp
                     ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-                    : 'bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700'
+                    : isTransfer
+                      ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+                      : 'bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700'
                 }`}>
                   <p className="font-semibold text-gray-900 dark:text-white text-sm mb-2">
                     {result.restaurantName}
@@ -600,7 +704,67 @@ export default function Cart() {
                     </>
                   )}
 
-                  {!isMp && (
+                  {isTransfer && result.shortId && (
+                    <>
+                      <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-800 rounded-xl px-3 py-2 mb-2">
+                        <div className="flex-1">
+                          <p className="text-[10px] uppercase font-bold text-blue-500 tracking-wider">Monto a transferir</p>
+                          <p className="font-bold text-lg text-blue-700 dark:text-blue-300">
+                            ${result.total.toFixed(2)}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleCopy(result.total.toFixed(2))}
+                          className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                          title="Copiar monto"
+                        >
+                          {copiedText === result.total.toFixed(2)
+                            ? <CheckCircle2 className="w-4 h-4 text-green-500" />
+                            : <Copy className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
+                        </button>
+                      </div>
+
+                      {result.clabeInterbancaria && (
+                        <>
+                          <p className="text-xs text-blue-700 dark:text-blue-300 mb-1.5 font-medium">CLABE del restaurante:</p>
+                          <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-700 rounded-xl px-3 py-2 mb-2">
+                            <span className="font-mono font-bold text-base text-blue-700 dark:text-blue-300 flex-1 tracking-widest">
+                              {result.clabeInterbancaria}
+                            </span>
+                            <button
+                              onClick={() => handleCopy(result.clabeInterbancaria!)}
+                              className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                              title="Copiar CLABE"
+                            >
+                              {copiedText === result.clabeInterbancaria
+                                ? <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                : <Copy className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
+                            </button>
+                          </div>
+                        </>
+                      )}
+
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mb-1.5 leading-relaxed">
+                        Incluye el siguiente <strong>ID como asunto</strong> de tu transferencia SPEI para que el restaurante identifique tu pago:
+                      </p>
+                      <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-700 rounded-xl px-3 py-2">
+                        <span className="font-mono font-bold text-lg text-blue-700 dark:text-blue-300 flex-1 tracking-wider">
+                          {result.shortId}
+                        </span>
+                        <button
+                          onClick={() => handleCopy(result.shortId!)}
+                          className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                          title="Copiar ID de pedido"
+                        >
+                          {copiedText === result.shortId
+                            ? <CheckCircle2 className="w-4 h-4 text-green-500" />
+                            : <Copy className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  {!isMp && !isTransfer && (
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       Pago en efectivo · Total: <strong className="text-gray-800 dark:text-gray-200">${result.total.toFixed(2)}</strong>
                     </p>
@@ -812,6 +976,110 @@ export default function Cart() {
                 className="w-full py-2.5 text-gray-500 dark:text-gray-400 font-medium text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded-2xl transition-colors"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Transfer / SPEI instructions modal ────────────────────────────── */}
+      {transferModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          onClick={() => setTransferModal(null)}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h3 className="font-bold text-gray-900 dark:text-white text-base leading-tight">
+                  ¿Cómo realizar tu transferencia?
+                </h3>
+              </div>
+              <button
+                onClick={() => setTransferModal(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 -mt-1 -mr-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Steps */}
+            <ol className="flex flex-col gap-3">
+              <li className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                  Confirma tu pedido en la aplicación. Recibirás un <strong>ID de referencia</strong> que debes usar como asunto de la transferencia.
+                </p>
+              </li>
+
+              <li className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                  Realiza una transferencia SPEI a la siguiente CLABE por el monto exacto de tu pedido:
+                </p>
+              </li>
+
+              {/* CLABE + monto display */}
+              <li className="mx-9 flex flex-col gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl px-4 py-3">
+                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">{transferModal.restaurantName}</p>
+                {/* CLABE row */}
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-blue-500 tracking-wider mb-0.5">CLABE</p>
+                    <p className="font-mono font-bold text-blue-700 dark:text-blue-300 tracking-widest text-sm">
+                      {transferModal.clabe}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleCopy(transferModal.clabe)}
+                    className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-800/30 rounded-lg transition-colors flex-shrink-0"
+                    title="Copiar CLABE"
+                  >
+                    {copiedText === transferModal.clabe
+                      ? <CheckCircle2 className="w-4 h-4 text-green-600" />
+                      : <Copy className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
+                  </button>
+                </div>
+                {/* Monto row */}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-blue-200 dark:border-blue-700">
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-blue-500 tracking-wider mb-0.5">Monto exacto</p>
+                    <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">${transferModal.total.toFixed(2)}</p>
+                  </div>
+                  <button
+                    onClick={() => handleCopy(transferModal.total.toFixed(2))}
+                    className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-800/30 rounded-lg transition-colors flex-shrink-0"
+                    title="Copiar monto"
+                  >
+                    {copiedText === transferModal.total.toFixed(2)
+                      ? <CheckCircle2 className="w-4 h-4 text-green-600" />
+                      : <Copy className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
+                  </button>
+                </div>
+              </li>
+
+              <li className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                  En el <strong>asunto o referencia</strong> de la transferencia, escribe el <strong>ID de tu pedido</strong> (lo recibirás al confirmar) para que el restaurante pueda identificar tu pago.
+                </p>
+              </li>
+            </ol>
+
+            {/* Action */}
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                onClick={() => setTransferModal(null)}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-sm transition-colors"
+              >
+                Entendido
               </button>
             </div>
           </div>
