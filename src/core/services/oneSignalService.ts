@@ -139,6 +139,53 @@ export async function setOneSignalUser(userId: string): Promise<void> {
 }
 
 /**
+ * Fuerza una re-vinculación del userId con OneSignal, omitiendo la guardia
+ * de deduplicación de setOneSignalUser(). Usar únicamente desde acciones
+ * explícitas del usuario (botón "Activar notificaciones").
+ *
+ * Retorna true si tras el login el usuario quedó suscrito (optedIn === true).
+ */
+export async function forceRelinkOneSignalUser(userId: string): Promise<boolean> {
+  if (!(await whenReady())) return false;
+
+  // Resetear la guardia para que login() se ejecute aunque el userId no cambiara
+  lastLinkedUserId = null;
+
+  try {
+    await OneSignal.login(userId);
+    console.info(
+      "[OneSignal] forceRelink completado | optedIn:",
+      OneSignal.User.PushSubscription.optedIn
+    );
+    lastLinkedUserId = userId;
+  } catch (error) {
+    console.error("[OneSignal] forceRelink login error:", error);
+    return false;
+  }
+
+  // Si el permiso está concedido pero el usuario no está opted-in,
+  // intentar optIn explícito (Caso B: subscription huérfana)
+  if (
+    Notification.permission === "granted" &&
+    !OneSignal.User.PushSubscription.optedIn
+  ) {
+    try {
+      await OneSignal.User.PushSubscription.optIn();
+      console.info("[OneSignal] optIn forzado tras relink");
+    } catch (error) {
+      console.error("[OneSignal] optIn error:", error);
+    }
+  }
+
+  // Esperar a que el SDK registre el estado internamente antes de leer
+  await new Promise((r) => setTimeout(r, 500));
+
+  const subscribed = OneSignal.User?.PushSubscription?.optedIn ?? false;
+  console.info("[OneSignal] estado final tras forceRelink | optedIn:", subscribed);
+  return subscribed;
+}
+
+/**
  * Desvincula al usuario al hacer logout.
  * Llamar dentro de applySession cuando la sesión se limpia.
  */
@@ -188,4 +235,47 @@ export function isOneSignalSubscribed(): boolean {
  */
 export function getNotificationPermission(): NotificationPermission {
   return Notification.permission;
+}
+
+/**
+ * Envía una notificación push de confirmación al propio usuario tras activar
+ * correctamente las notificaciones.
+ *
+ * Reintenta con backoff exponencial (2s, 4s, 8s… hasta 30s de techo) hasta
+ * MAX_RETRIES veces. Retorna true si el envío terminó OK, false si se agotaron
+ * todos los intentos. No lanza excepciones.
+ */
+export async function sendActivationConfirmPush(userId: string): Promise<boolean> {
+  const MAX_RETRIES = 10;
+  const BASE_DELAY_MS = 2000;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const { error } = await supabase.functions.invoke("onesignal-notify", {
+        body: {
+          targetUserId: userId,
+          title: "🔔 ¡Notificaciones activadas!",
+          body: "A partir de ahora recibirás alertas de nuevos pedidos en tiempo real a través de este dispositivo.",
+          url: "/restaurant/dashboard",
+          data: { type: "activation_confirm" },
+        },
+      });
+
+      if (!error) {
+        console.info("[OneSignal] Push de confirmación enviado en intento", attempt + 1);
+        return true;
+      }
+
+      console.warn(`[OneSignal] sendActivationConfirmPush intento ${attempt + 1}/${MAX_RETRIES + 1}:`, error);
+    } catch (err) {
+      console.warn(`[OneSignal] sendActivationConfirmPush error intento ${attempt + 1}:`, err);
+    }
+
+    if (attempt < MAX_RETRIES) {
+      const delay = Math.min(BASE_DELAY_MS * Math.pow(2, attempt), 30_000);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+
+  return false;
 }

@@ -18,7 +18,7 @@ export const editProfileSchema = z.object({
     .string()
     .min(1, "El teléfono es obligatorio")
     .regex(
-      /^\+[1-9][\d\s\-]{6,18}$/,
+      /^\+[1-9][\d\s-]{6,18}$/,
       "Incluye el código de país, ej: +52 999 123 4567"
     ),
   birthdate: z.string().optional(),

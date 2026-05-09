@@ -10,7 +10,11 @@ import {
   offPushSubscriptionChange,
   onPermissionChange,
   offPermissionChange,
+  forceRelinkOneSignalUser,
 } from "@core/services/oneSignalService";
+import { checkPushSubscriptionHealth } from "@core/services/push/push-health.service";
+import { attemptAutoRecovery } from "@core/services/push/push-recovery.service";
+import { supabase } from "@core/supabase/client";
 
 export type NotificationStatus = "default" | "granted" | "denied" | "unsupported";
 
@@ -55,13 +59,40 @@ export function OneSignalProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isSupported) return;
 
-    // Sincroniza el estado real una vez que el SDK esté listo
+    // Sincroniza el estado real una vez que el SDK esté listo y verifica la salud
+    // del push usando pushManager como fuente de verdad (no solo el estado de OneSignal).
     waitForOneSignal().then((ready) => {
       if (!mounted.current) return;
-      if (ready) {
-        setStatus(getNotificationPermission() as NotificationStatus);
-        setIsSubscribed(isOneSignalSubscribed());
-      }
+      if (!ready) return;
+
+      setStatus(getNotificationPermission() as NotificationStatus);
+      setIsSubscribed(isOneSignalSubscribed());
+
+      // Solo ejecutar el health check si el permiso ya fue concedido.
+      // Corre en segundo plano — no bloquea la inicialización de la UI.
+      if (Notification.permission !== "granted") return;
+
+      (async () => {
+        try {
+          const health = await checkPushSubscriptionHealth();
+          if (!mounted.current) return;
+
+          if (health.status === "missing_subscription" || health.status === "onesignal_desynced") {
+            // Intentar recuperación silenciosa (Case A: optIn perdido)
+            const recovered = await attemptAutoRecovery();
+            if (!mounted.current) return;
+
+            if (recovered) {
+              setIsSubscribed(isOneSignalSubscribed());
+            } else {
+              // Recuperación falló → forzar estado a false para mostrar el banner
+              setIsSubscribed(false);
+            }
+          }
+        } catch {
+          // El health check nunca debe romper la app
+        }
+      })();
     });
 
     const handlePermission = (granted: boolean) => {
@@ -91,14 +122,24 @@ export function OneSignalProvider({ children }: { children: React.ReactNode }) {
     if (!isSupported) return false;
     setIsLoading(true);
     try {
-      const granted = await requestOneSignalPermission();
-      // Actualiza el permiso del navegador
-      setStatus(granted ? "granted" : "denied");
-      // La suscripción real (optedIn) la actualiza el evento onPushSubscriptionChange.
-      // Si el permiso fue concedido, leemos el estado real de OneSignal inmediatamente.
-      if (granted) {
-        setIsSubscribed(isOneSignalSubscribed());
+      if (Notification.permission === "denied") {
+        return false;
       }
+
+      const granted = await requestOneSignalPermission();
+      setStatus(granted ? "granted" : "denied");
+
+      if (granted) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          const subscribed = await forceRelinkOneSignalUser(session.user.id);
+          setIsSubscribed(subscribed);
+        } else {
+          await new Promise((r) => setTimeout(r, 500));
+          setIsSubscribed(isOneSignalSubscribed());
+        }
+      }
+
       return granted;
     } finally {
       setIsLoading(false);
@@ -121,7 +162,13 @@ export function OneSignalProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       await optInOneSignal();
-      setIsSubscribed(isOneSignalSubscribed());
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        const subscribed = await forceRelinkOneSignalUser(session.user.id);
+        setIsSubscribed(subscribed);
+      } else {
+        setIsSubscribed(isOneSignalSubscribed());
+      }
     } finally {
       setIsLoading(false);
     }
